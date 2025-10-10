@@ -1,0 +1,61 @@
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { useProfile, useUpdateProfile } from "@/hooks/use-supabase";
+import { useEffect, useState } from "react";
+
+export default function SettingsPage() {
+  const { data: profile, isLoading, isError } = useProfile();
+  const [fullName, setFullName] = useState('');
+
+  const updateProfileMutation = useUpdateProfile();
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+    }
+  }, [profile]);
+
+  const handleUpdate = () => {
+    if (profile) {
+      updateProfileMutation.mutate({ ...profile, full_name: fullName });
+    }
+  };
+
+  if (isLoading) {
+    return <div>Cargando perfil...</div>;
+  }
+  
+  if (isError || !profile) {
+     return <div>No se encontró un perfil vinculado a esta cuenta.</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Configuración</h1>
+        <Card>
+            <CardHeader>
+                <CardTitle>Perfil</CardTitle>
+                <CardDescription>Actualiza la información de tu perfil.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-2">
+                    <Label htmlFor="fullName">Nombre Completo</Label>
+                    <Input 
+                        id="fullName" 
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                    />
+                </div>
+            </CardContent>
+            <CardFooter className="border-t px-6 py-4">
+                <Button onClick={handleUpdate} disabled={updateProfileMutation.isPending}>
+                  {updateProfileMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
+                </Button>
+            </CardFooter>
+        </Card>
+    </div>
+  );
+};

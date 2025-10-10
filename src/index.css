@@ -1,0 +1,236 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Fondo de la aplicación: gris muy claro */
+    --background: 220 14% 96%;
+    --foreground: 224 71.4% 4.1%;
+
+    /* Fondo de las tarjetas: blanco puro */
+    --card: 0 0% 100%;
+    --card-foreground: 224 71.4% 4.1%;
+
+    /* Popovers y dropdowns */
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71.4% 4.1%;
+
+    /* Color primario: naranja (#FF7043 - similar a la referencia) */
+    --primary: 14 100% 63%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Color secundario */
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    /* Muted (para texto y fondos deshabilitados) */
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+
+    /* Accent */
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    /* Destructive (errores) */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Bordes e inputs */
+    --border: 220 13% 91%;
+    --ring: 14 100% 63%;
+
+    /* Radio de bordes más redondeado */
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 14 100% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 14 100% 63%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Aumentar espaciado general para un diseño más limpio y aireado */
+  .card-spacing {
+    @apply p-6;
+  }
+
+  .section-spacing {
+    @apply space-y-6;
+  }
+
+  /* Mejorar sombras de tarjetas para más profundidad */
+  .card-shadow {
+    @apply shadow-md hover:shadow-lg transition-shadow duration-200;
+  }
+
+  /* Estilos para tablas con mejor espaciado */
+  .table-spacing td,
+  .table-spacing th {
+    @apply px-4 py-3;
+  }
+
+  .rdp-day_hasTasks {
+    position: relative;
+  }
+
+  .rdp-day_hasTasks::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 6px;
+    height: 6px;
+    background-color: hsl(var(--primary));
+    border-radius: 50%;
+  }
+
+  .rdp-day_today {
+    background: hsl(14 100% 63%);
+    color: white;
+    font-weight: bold;
+    border-radius: 0.375rem;
+    box-shadow: 0 0 0 2px hsl(14 100% 80%);
+  }
+
+  .rdp-day_pastWithPending {
+    background-color: hsl(14 100% 96%);
+    border: 2px solid hsl(14 100% 63%);
+    color: hsl(14 100% 30%);
+  }
+
+  .rdp-day_pastWithPending:hover {
+    background-color: hsl(14 100% 92%);
+  }
+
+  /* Enhanced calendar styling */
+  .rdp {
+    --rdp-cell-size: 40px;
+    --rdp-accent-color: hsl(var(--primary));
+    --rdp-background-color: hsl(var(--accent) / 0.1);
+    --rdp-outline: 2px solid var(--rdp-accent-color);
+    --rdp-outline-selected: 2px solid hsl(var(--primary));
+  }
+
+  .rdp-months {
+    gap: 1rem;
+  }
+
+  .rdp-month {
+    background-color: hsl(var(--card));
+    border-radius: var(--radius);
+    padding: 1rem;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  .rdp-caption {
+    margin-bottom: 1rem;
+  }
+
+  .rdp-caption_label {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+  }
+
+  .rdp-nav_button {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s;
+  }
+
+  .rdp-nav_button:hover {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
+  .rdp-head_cell {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    padding: 0.5rem 0;
+  }
+
+  .rdp-day {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.375rem;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .rdp-day:hover {
+    background-color: hsl(var(--accent));
+  }
+
+  .rdp-day_selected {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-weight: 600;
+  }
+
+  .rdp-day_selected:hover {
+    background-color: hsl(var(--primary));
+  }
+
+  .rdp-day_today {
+    background-color: hsl(14 100% 63%);
+    color: white;
+    font-weight: bold;
+  }
+
+  .rdp-day_today:hover {
+    background-color: hsl(14 100% 58%);
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 640px) {
+    .rdp-months {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .rdp-month {
+      padding: 0.75rem;
+    }
+
+    .rdp-day {
+      width: 2rem;
+      height: 2rem;
+      font-size: 0.875rem;
+    }
+
+    .rdp-head_cell {
+      font-size: 0.75rem;
+      padding: 0.25rem 0;
+    }
+  }
+}
