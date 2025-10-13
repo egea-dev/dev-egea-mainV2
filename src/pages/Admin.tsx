@@ -23,12 +23,12 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CalendarCheck, Users, Car, ClipboardList, MoreHorizontal, Archive, Eye, Pencil, Filter, Clock, Settings, LogOut, User } from "lucide-react";
+import { CalendarCheck, Users, Car, ClipboardList, MoreHorizontal, Archive, Eye, Pencil, Filter, Clock, Settings, LogOut, User, AlertTriangle, CheckCircle, RotateCcw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState } from "react";
-import { subDays, format, parseISO, isSameDay } from "date-fns";
+import { useEffect, useState, useCallback } from "react";
+import { subDays, format, parseISO, isSameDay, isBefore } from "date-fns";
 import { es } from 'date-fns/locale';
 import { toast } from "sonner";
 import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
@@ -39,6 +39,62 @@ import { useUsers, useVehicles } from "@/hooks/use-supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { DetailedTask } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+
+const SCREEN_FIELD_MAP: Record<string, { site: string[]; description: string[] }> = {
+  Instalaciones: {
+    site: ['site', 'client', 'address', 'location'],
+    description: ['description', 'notes', 'notas', 'detalle', 'observaciones']
+  },
+  'Tapicería': {
+    site: ['obra_', 'n_orden', 'gestor', 'hoja'],
+    description: ['trabajo', 'descripcion', 'descripción', 'prioridad', 'cantidad']
+  },
+  'Confección': {
+    site: ['cliente', 'linea', 'línea', 'zona', 'obra'],
+    description: ['trabajo', 'descripcion', 'descripción', 'detalle', 'observaciones']
+  },
+  'Carpintería': {
+    site: ['obra', 'ubicacion', 'ubicación', 'cliente'],
+    description: ['trabajo', 'descripcion', 'descripción', 'detalle']
+  }
+};
+
+const DEFAULT_SITE_FIELDS = ['site', 'client', 'address', 'location', 'obra', 'obra_', 'ubicacion', 'ubicación'];
+const DEFAULT_DESCRIPTION_FIELDS = ['description', 'descripcion', 'descripción', 'notes', 'notas', 'detalle', 'trabajo'];
+
+const getCandidateFields = (group: string | null | undefined, type: 'site' | 'description') => {
+  const mapping = SCREEN_FIELD_MAP[group ?? ''];
+  const defaults = type === 'site' ? DEFAULT_SITE_FIELDS : DEFAULT_DESCRIPTION_FIELDS;
+  const groupFields = mapping ? mapping[type] : [];
+  return Array.from(new Set([...groupFields, ...defaults]));
+};
+
+const extractFieldValue = (task: DetailedTask, candidates: string[]) => {
+  const data = (task.data ?? {}) as Record<string, any>;
+  for (const candidate of candidates) {
+    const normalized = candidate.trim();
+    const variants = Array.from(new Set([
+      normalized,
+      normalized.toLowerCase(),
+      normalized.toUpperCase(),
+      normalized.replace(/\s+/g, '_'),
+      normalized.replace(/\s+/g, '').toLowerCase()
+    ]));
+
+    for (const key of variants) {
+      const valueFromTask = (task as unknown as Record<string, any>)[key];
+      if (valueFromTask !== undefined && valueFromTask !== null && String(valueFromTask).trim() !== '') {
+        return String(valueFromTask).trim();
+      }
+
+      const valueFromData = data?.[key];
+      if (valueFromData !== undefined && valueFromData !== null && String(valueFromData).trim() !== '') {
+        return String(valueFromData).trim();
+      }
+    }
+  }
+  return undefined;
+};
 
 // Tipos para compatibilidad
 interface SimpleProfile {
@@ -59,20 +115,59 @@ interface SimpleVehicle {
 export default function AdminPage() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const [activeDays, setActiveDays] = useState<Date[]>([]);
+  const [calendarTaskDays, setCalendarTaskDays] = useState<Date[]>([]);
+  const [calendarPendingDays, setCalendarPendingDays] = useState<Date[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTask, setSelectedTask] = useState<DetailedTask | null>(null);
 
   // Usar hooks personalizados para datos del dashboard
-  const { confeccionTasks, tapiceriaTasks, pendingTasks, loading: tasksLoading } = useDashboardTasks();
+  const { confeccionTasks, tapiceriaTasks, pendingTasks, loading: tasksLoading, refresh: refreshDashboardTasks } = useDashboardTasks();
   const { stats, loading: statsLoading } = useDashboardStats();
   const { data: users = [] } = useUsers();
   const { data: vehicles = [] } = useVehicles();
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [taskFilter, setTaskFilter] = useState<'all' | 'instalaciones' | 'confeccion' | 'tapiceria'>('all');
+  const [taskFilter, setTaskFilter] = useState<'all' | 'instalaciones' | 'confeccion' | 'tapiceria'>('instalaciones');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<SimpleProfile | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const refreshCalendarData = useCallback(async () => {
+    try {
+      const sixtyDaysAgo = subDays(new Date(), 60);
+      const startDateFilter = format(sixtyDaysAgo, "yyyy-MM-dd");
+
+      const { data, error } = await supabase
+        .from("detailed_tasks")
+        .select("start_date, state")
+        .gte("start_date", startDateFilter);
+
+      if (error) {
+        console.error("Error fetching calendar data:", error);
+        return;
+      }
+
+      const taskDays = new Set<string>();
+      const pendingDays = new Set<string>();
+
+      (data ?? []).forEach((task) => {
+        if (!task?.start_date) return;
+        const taskDate = parseISO(task.start_date);
+        if (Number.isNaN(taskDate.getTime())) return;
+
+        const dateKey = format(taskDate, "yyyy-MM-dd");
+        taskDays.add(dateKey);
+
+        if (task.state !== "terminado") {
+          pendingDays.add(dateKey);
+        }
+      });
+
+      setCalendarTaskDays(Array.from(taskDays).map((dateStr) => parseISO(dateStr)));
+      setCalendarPendingDays(Array.from(pendingDays).map((dateStr) => parseISO(dateStr)));
+    } catch (error) {
+      console.error("Error fetching calendar data:", error);
+    }
+  }, []);
 
   // Actualizar el reloj cada segundo
   useEffect(() => {
@@ -108,83 +203,115 @@ export default function AdminPage() {
     navigate('/auth');
   };
 
-  useEffect(() => {
-    const fetchCalendarData = async () => {
-      try {
-        // Obtener días con tareas para el calendario usando la vista detailed_tasks
-        const sixtyDaysAgo = subDays(new Date(), 60);
-        const { data: recentTasks, error: calendarError } = await supabase
-          .from("detailed_tasks")
-          .select("start_date, state, screen_group")
-          .gte("start_date", sixtyDaysAgo.toISOString());
+  const refreshAllData = useCallback(() => {
+    refreshDashboardTasks();
+    refreshCalendarData();
+  }, [refreshDashboardTasks, refreshCalendarData]);
 
-        if (calendarError) {
-          console.error("Error fetching calendar data:", calendarError);
-          return;
-        }
-
-        if (recentTasks) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          const daysWithTasks = new Map<string, { hasPending: boolean; isToday: boolean }>();
-          
-          recentTasks.forEach((task) => {
-            const taskDate = new Date(task.start_date);
-            taskDate.setHours(0, 0, 0, 0);
-            const dateKey = format(taskDate, "yyyy-MM-dd");
-            
-            const isToday = taskDate.getTime() === today.getTime();
-            const isPast = taskDate < today;
-            const isPending = task.state !== 'terminado' && task.screen_group === 'Instalaciones';
-            
-            // Días pasados con tareas pendientes de Instalaciones
-            if (isPast && isPending) {
-              daysWithTasks.set(dateKey, { hasPending: true, isToday: false });
-            }
-            // Hoy
-            else if (isToday) {
-              daysWithTasks.set(dateKey, { hasPending: false, isToday: true });
-            }
-          });
-          
-          const activeDays = Array.from(daysWithTasks.entries()).map(([dateStr, info]) => {
-            const date = new Date(dateStr + "T00:00:00");
-            return date;
-          });
-          
-          setActiveDays(activeDays);
-        }
-      } catch (error) {
-        console.error("Error fetching calendar data:", error);
-      }
-    };
-
-    fetchCalendarData();
+  const getTaskDateLabel = useCallback((task: DetailedTask) => {
+    if (!task.start_date) {
+      return 'Sin fecha';
+    }
+    const parsed = parseISO(task.start_date);
+    if (Number.isNaN(parsed.getTime())) {
+      return 'Sin fecha';
+    }
+    return format(parsed, 'dd/MM/yyyy', { locale: es });
   }, []);
 
-  const handleArchiveTask = async (taskId: string) => {
+  const getTaskSiteLabel = useCallback((task: DetailedTask) => {
+    const candidates = getCandidateFields(task.screen_group, 'site');
+    const value = extractFieldValue(task, candidates);
+    return value || 'Sin sitio definido';
+  }, []);
+
+  const getTaskDescriptionLabel = useCallback((task: DetailedTask) => {
+    const candidates = getCandidateFields(task.screen_group, 'description');
+    const value = extractFieldValue(task, candidates);
+    return value || 'Sin descripción';
+  }, []);
+
+  const archiveTask = useCallback(async (taskId: string, options?: { skipRefresh?: boolean }) => {
     try {
-      const { data, error } = await supabase.rpc('archive_completed_tasks', {
-        p_days_old: 0 // Forzar archivado inmediato
+      const { data, error } = await supabase.rpc('archive_task_by_id', {
+        p_task_id: taskId
       });
 
       if (error) {
-        console.error('Error al archivar tarea:', error);
-        toast.error('Error al archivar la tarea');
-        return;
+        throw error;
       }
 
-      if (data && data.length > 0) {
-        const { archived_count, message } = data[0];
-        toast.success(`Tarea archivada: ${message}`);
+      const result = Array.isArray(data) ? data[0] : data;
+      if (!result?.archived) {
+        toast.error(result?.message || 'No se pudo archivar la tarea');
       } else {
-        toast.success('Tarea archivada correctamente');
+        toast.success(result?.message || 'Tarea archivada correctamente');
       }
-    } catch (error) {
-      console.error('Error archiving task:', error);
+
+      if (!options?.skipRefresh) {
+        refreshAllData();
+      }
+    } catch (err) {
+      console.error('Error archiving task:', err);
       toast.error('Error al archivar la tarea');
     }
+  }, [refreshAllData]);
+
+  const updateTaskState = useCallback(async (taskId: string, newState: 'pendiente' | 'urgente' | 'terminado') => {
+    try {
+      const updates: Record<string, any> = { state: newState };
+      if (newState === 'terminado') {
+        updates.status = 'acabado';
+      }
+
+      const { error } = await supabase
+        .from('screen_data')
+        .update(updates)
+        .eq('id', taskId);
+
+      if (error) {
+        throw error;
+      }
+
+      if (newState === 'terminado') {
+        await archiveTask(taskId, { skipRefresh: true });
+        toast.success('Tarea marcada como terminada y archivada');
+      } else if (newState === 'urgente') {
+        toast.success('Tarea marcada como urgente');
+      } else {
+        toast.success('Tarea marcada como pendiente');
+      }
+
+      refreshAllData();
+    } catch (err) {
+      console.error('Error updating task state:', err);
+      toast.error('No se pudo actualizar el estado de la tarea');
+    }
+  }, [archiveTask, refreshAllData]);
+
+  useEffect(() => {
+    refreshCalendarData();
+  }, [refreshCalendarData]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("dashboard-calendar")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "screen_data" },
+        () => {
+          refreshCalendarData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refreshCalendarData]);
+
+  const handleArchiveTask = async (taskId: string) => {
+    await archiveTask(taskId);
   };
 
   const handleViewDetails = (task: DetailedTask) => {
@@ -208,8 +335,12 @@ export default function AdminPage() {
     // Filtro por fecha si hay una fecha seleccionada
     let dateMatch = true;
     if (selectedDate) {
-      const taskDate = new Date(task.start_date + 'T00:00:00');
-      dateMatch = isSameDay(taskDate, selectedDate);
+      if (!task.start_date) {
+        dateMatch = true;
+      } else {
+        const taskDate = parseISO(task.start_date);
+        dateMatch = isSameDay(taskDate, selectedDate) || isBefore(taskDate, selectedDate);
+      }
     }
 
     return categoryMatch && dateMatch;
@@ -356,10 +487,12 @@ export default function AdminPage() {
                 className="rounded-lg"
                 modifiers={{
                   today: new Date(),
-                  hasTasks: activeDays
+                  pending: calendarPendingDays,
+                  hasTasks: calendarTaskDays
                 }}
                 modifiersClassNames={{
                   today: "bg-orange-500 text-white hover:bg-orange-600 rounded-md font-medium ring-2 ring-orange-300",
+                  pending: "rdp-day_pending",
                   hasTasks: "hasTasks"
                 }}
               />
@@ -653,7 +786,7 @@ export default function AdminPage() {
                         />
                       </TableCell>
                       <TableCell className="text-sm">
-                        {task.start_date ? format(new Date(task.start_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: es }) : 'N/A'}
+                        {getTaskDateLabel(task)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
@@ -663,17 +796,14 @@ export default function AdminPage() {
                                 t => t.assigned_profiles?.some((p: any) => p.id === profile.id)
                               ).length;
 
-                              const bgColor =
-                                profile.status === 'activo' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' :
-                                profile.status === 'vacaciones' ? 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300' :
-                                'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300';
+                              const bgColor = 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200';
 
                               return (
                                 <div key={profile.id} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${bgColor}`}>
                                   <User className="h-3 w-3 flex-shrink-0" />
                                   <span className="truncate max-w-[80px]">{profile.full_name}</span>
                                   {taskCount > 1 && (
-                                    <Badge variant="destructive" className="h-4 w-4 p-0 flex items-center justify-center text-xs">
+                                    <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-xs text-blue-800 dark:text-blue-200">
                                       {taskCount}
                                     </Badge>
                                   )}
@@ -685,15 +815,24 @@ export default function AdminPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm font-medium">{task.site || 'N/A'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={task.description || 'N/A'}>
-                        {task.description || 'N/A'}
+                      <TableCell className="text-sm font-medium">{getTaskSiteLabel(task)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[220px] truncate" title={getTaskDescriptionLabel(task)}>
+                        {getTaskDescriptionLabel(task)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {task.vehicle_type ? (
+                          {task.assigned_vehicles && task.assigned_vehicles.length > 0 ? (
+                            task.assigned_vehicles.map((vehicle: any) => (
+                              <VehicleBadge
+                                key={`${task.id}-${vehicle.id}`}
+                                name={vehicle.name}
+                                type={vehicle.type}
+                                size="sm"
+                              />
+                            ))
+                          ) : task.vehicle_type ? (
                             <VehicleBadge
-                              key={task.id}
+                              key={`${task.id}-vehicle-type`}
                               name={task.vehicle_type}
                               type={task.vehicle_type}
                               size="sm"
@@ -722,6 +861,20 @@ export default function AdminPage() {
                               <Pencil className="mr-2 h-4 w-4" />
                               Editar
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => updateTaskState(task.id, 'pendiente')}>
+                              <RotateCcw className="mr-2 h-4 w-4" />
+                              Marcar como pendiente
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateTaskState(task.id, 'urgente')}>
+                              <AlertTriangle className="mr-2 h-4 w-4 text-amber-500" />
+                              Marcar como urgente
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateTaskState(task.id, 'terminado')}>
+                              <CheckCircle className="mr-2 h-4 w-4 text-emerald-500" />
+                              Marcar como terminado
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleArchiveTask(task.id)}>
                               <Archive className="mr-2 h-4 w-4" />
                               Archivar

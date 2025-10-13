@@ -71,18 +71,14 @@ export function TaskDetailsDialog({ task, open, onOpenChange }: TaskDetailsDialo
             <p className="text-sm font-medium text-muted-foreground mb-2">Operarios asignados</p>
             <div className="flex flex-wrap gap-2">
               {task.assigned_users && task.assigned_users.length > 0 ? (
-                task.assigned_users.map((user) => {
-                  const statusBgColor =
-                    user.status === 'activo' ? 'bg-green-50/50 dark:bg-green-950/10 text-green-600 dark:text-green-400 ring-1 ring-green-500/20' :
-                    user.status === 'vacaciones' ? 'bg-orange-50/50 dark:bg-orange-950/10 text-orange-600 dark:text-orange-400 ring-1 ring-orange-500/20' :
-                    user.status === 'baja' ? 'bg-red-50/50 dark:bg-red-950/10 text-red-600 dark:text-red-400 ring-1 ring-red-500/20' : 'bg-gray-50/50 dark:bg-gray-950/10 text-gray-600 dark:text-gray-400 ring-1 ring-gray-500/20';
-
-                  return (
-                    <div key={user.id} className={`px-3 py-1.5 rounded-md text-sm ${statusBgColor}`}>
-                      {user.full_name}
-                    </div>
-                  );
-                })
+                task.assigned_users.map((user) => (
+                  <div
+                    key={user.id}
+                    className="px-3 py-1.5 rounded-md text-sm bg-blue-50/70 dark:bg-blue-950/20 text-blue-700 dark:text-blue-200 ring-1 ring-blue-500/30"
+                  >
+                    {user.full_name}
+                  </div>
+                ))
               ) : (
                 <p className="text-sm text-muted-foreground">Sin operarios asignados</p>
               )}

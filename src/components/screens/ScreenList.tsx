@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ExternalLink, Edit, Trash2, Plus, Eye, Search } from "lucide-react";
+import { Edit, Trash2, Plus, Eye, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -25,9 +25,10 @@ type Screen = {
   is_active: boolean;
   refresh_interval_sec: number;
   template_id: string | null;
-  screen_type: 'pendiente' | 'acabado';
+  screen_type: 'data' | 'display';
   next_screen_id?: string | null;
-  screen_group?: string;
+  screen_group?: string | null;
+  color?: string | null;
 };
 
 export const ScreenList = () => {
@@ -180,7 +181,7 @@ export const ScreenList = () => {
 
       {Object.entries(groupedScreens).map(([groupName, screenList]) => (
         <Card key={groupName}>
-          <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>{groupName}</CardTitle>
             {groupName !== 'General' && (
               <Button size="sm" variant="outline" onClick={() => window.open(`/group/${groupName}`, "_blank")}>
@@ -204,8 +205,16 @@ export const ScreenList = () => {
                     <p>Tipo: {screen.screen_type}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => window.open(`/display/${screen.id}`, "_blank")} className="flex-1 sm:flex-none">
-                      <ExternalLink className="h-4 w-4 sm:mr-2" />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const targetUrl = screen.screen_type === "data" ? `/screen/${screen.id}` : `/display/${screen.id}`;
+                        window.open(targetUrl, "_blank");
+                      }}
+                      className="flex-1 sm:flex-none"
+                    >
+                      <Eye className="h-4 w-4 sm:mr-2" />
                       <span className="hidden sm:inline">Ver</span>
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => handleEdit(screen)} className="flex-1 sm:flex-none">

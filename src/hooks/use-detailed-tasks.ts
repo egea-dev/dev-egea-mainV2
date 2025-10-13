@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type {
   DetailedTask,
@@ -176,49 +176,67 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
 
   const completeTask = async (taskId: string, nextScreenId?: string) => {
     try {
-      // Primero archivar la tarea
+      // Intentar obtener la tarea desde el estado local (vista detailed_tasks)
+      let task = tasks.find(t => t.id === taskId) as any | undefined;
+
+      // Si no está en memoria, obtenerla desde la vista
+      if (!task) {
+        const { data, error } = await supabase
+          .from('detailed_tasks')
+          .select('*')
+          .eq('id', taskId)
+          .single();
+        if (error) throw error;
+        task = data as any;
+      }
+
+      // Preparar asignaciones para el archivado
+      const assignedUsers = Array.isArray(task?.assigned_profiles)
+        ? task.assigned_profiles.map((p: any) => ({ id: p.id, full_name: p.full_name, email: p.email }))
+        : [];
+      const assignedVehicles = Array.isArray(task?.assigned_vehicles)
+        ? task.assigned_vehicles.map((v: any) => ({ id: v.id, name: v.name, type: v.type }))
+        : [];
+
+      // Archivar la tarea con datos reales
       const { error: archiveError } = await supabase
         .from('archived_tasks')
         .insert({
-          id: taskId,
           archived_at: new Date().toISOString(),
-          data: {},
+          data: task?.data || {},
           status: 'acabado',
           state: 'terminado',
-          start_date: new Date().toISOString().split('T')[0],
-          end_date: new Date().toISOString().split('T')[0],
-          location: '',
-          responsible_profile_id: null,
-          responsible_name: '',
-          assigned_users: [],
-          assigned_vehicles: []
+          start_date: task?.start_date || null,
+          end_date: task?.end_date || null,
+          location: task?.location || null,
+          responsible_profile_id: task?.responsible_profile_id || null,
+          responsible_name: task?.responsible_name || null,
+          assigned_users: assignedUsers,
+          assigned_vehicles: assignedVehicles,
         });
 
       if (archiveError) {
         throw archiveError;
       }
 
-      // Si hay next_screen_id, copiar a nueva pantalla
-      if (nextScreenId) {
-        const task = tasks.find(t => t.id === taskId);
-        if (task) {
-          await createTask({
-            screen_id: nextScreenId,
-            data: task.data,
-            state: 'pendiente',
-            status: 'pendiente',
-            start_date: task.start_date,
-            end_date: task.end_date,
-            location: task.location,
-            responsible_profile_id: task.responsible_profile_id,
-            assigned_to: task.assigned_to,
-            assigned_profiles: task.assigned_profiles?.map((p: { id: string }) => p.id) || [],
-            assigned_vehicles: task.assigned_vehicles?.map((v: { id: string }) => v.id) || []
-          });
-        }
+      // Si hay next_screen_id, copiar a nueva pantalla con estado reiniciado
+      if (nextScreenId && task) {
+        await createTask({
+          screen_id: nextScreenId,
+          data: task.data || {},
+          state: 'pendiente',
+          status: 'pendiente',
+          start_date: task.start_date || null,
+          end_date: task.end_date || null,
+          location: task.location || null,
+          responsible_profile_id: task.responsible_profile_id || null,
+          assigned_to: task.assigned_to || null,
+          assigned_profiles: Array.isArray(task.assigned_profiles) ? task.assigned_profiles.map((p: any) => p.id) : [],
+          assigned_vehicles: Array.isArray(task.assigned_vehicles) ? task.assigned_vehicles.map((v: any) => v.id) : [],
+        });
       }
 
-      // Eliminar tarea original
+      // Eliminar tarea original de la tabla principal
       await deleteTask(taskId);
     } catch (err) {
       console.error('Error completing task:', err);
@@ -281,62 +299,57 @@ export function useDashboardTasks() {
   const [pendingTasks, setPendingTasks] = useState<DetailedTask[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchDashboardTasks = async () => {
-      try {
-        setLoading(true);
+  const fetchDashboardTasks = useCallback(async () => {
+    try {
+      setLoading(true);
 
-        // Tareas de Confección (4 más próximas)
-        const { data: confeccionData } = await supabase
+      const [{ data: confeccionData }, { data: tapiceriaData }, { data: pendingData }] = await Promise.all([
+        supabase
           .from('detailed_tasks')
           .select('*')
           .eq('screen_group', 'Confección')
           .neq('state', 'terminado')
           .order('is_urgent', { ascending: false })
           .order('start_date', { ascending: true })
-          .limit(4);
-
-        // Tareas de Tapicería (4 más próximas)
-        const { data: tapiceriaData } = await supabase
+          .limit(4),
+        supabase
           .from('detailed_tasks')
           .select('*')
           .eq('screen_group', 'Tapicería')
           .neq('state', 'terminado')
           .order('is_urgent', { ascending: false })
           .order('start_date', { ascending: true })
-          .limit(4);
-
-        // Tareas pendientes de todos los grupos (semáforos)
-        const { data: pendingData } = await supabase
+          .limit(4),
+        supabase
           .from('detailed_tasks')
           .select('*')
           .neq('state', 'terminado')
           .order('is_urgent', { ascending: false })
-          .order('start_date', { ascending: true })
-          .limit(20);
+          .order('start_date', { ascending: true, nullsFirst: true })
+      ]);
 
-        setConfeccionTasks(confeccionData || []);
-        setTapiceriaTasks(tapiceriaData || []);
-        setPendingTasks(pendingData || []);
-      } catch (err) {
-        console.error('Error fetching dashboard tasks:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setConfeccionTasks(confeccionData || []);
+      setTapiceriaTasks(tapiceriaData || []);
+      setPendingTasks(pendingData || []);
+    } catch (err) {
+      console.error('Error fetching dashboard tasks:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchDashboardTasks();
-
-    // Refrescar cada minuto
     const interval = setInterval(fetchDashboardTasks, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchDashboardTasks]);
 
   return {
     confeccionTasks,
     tapiceriaTasks,
     pendingTasks,
-    loading
+    loading,
+    refresh: fetchDashboardTasks
   };
 }
 
@@ -358,7 +371,10 @@ export function useDashboardStats(dateFrom?: string, dateTo?: string) {
           throw error;
         }
 
-        setStats(data);
+        const normalized: Database['public']['Functions']['get_dashboard_stats']['Returns'] | null = Array.isArray(data)
+          ? (data[0] ?? null)
+          : (data as Database['public']['Functions']['get_dashboard_stats']['Returns'] | null);
+        setStats(normalized);
       } catch (err) {
         console.error('Error fetching dashboard stats:', err);
       } finally {

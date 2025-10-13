@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2, Plus, UploadCloud } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TemplateDialog } from "./TemplateDialog";
+import { TemplateImportDialog } from "./TemplateImportDialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Accordion,
@@ -31,6 +32,7 @@ export const TemplateList = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const loadTemplates = async () => {
     try {
@@ -85,6 +87,15 @@ export const TemplateList = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h2 className="text-xl sm:text-2xl font-semibold">Plantillas</h2>
         <div className="flex gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            className="sm:size-default flex-1 sm:flex-none"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <UploadCloud className="mr-2 h-4 w-4" />
+            Importar planilla
+          </Button>
           <Button variant="outline" onClick={() => setDialogOpen(true)} size="sm" className="sm:size-default flex-1 sm:flex-none">
             <Plus className="mr-2 h-4 w-4" />
             Nueva Plantilla
@@ -155,6 +166,15 @@ export const TemplateList = () => {
         onClose={handleCloseDialog}
         template={editingTemplate}
         fromTaskData={null}
+      />
+
+      <TemplateImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={() => {
+          setImportDialogOpen(false);
+          loadTemplates();
+        }}
       />
     </div>
   );

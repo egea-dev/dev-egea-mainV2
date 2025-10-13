@@ -37,24 +37,20 @@ export const AllTasksTable = ({ tasks, onEditTask }: AllTasksTableProps) => {
             <TableBody>
               {tasks.map((task) => (
                 <TableRow key={task.id}>
-                  <TableCell>{new Date(task.due_date + 'T00:00:00').toLocaleDateString()}</TableCell>
-                  <TableCell className="font-medium">{task.site}</TableCell>
-                  <TableCell className="text-muted-foreground">{task.description}</TableCell>
+                  <TableCell>{task.start_date ? new Date(task.start_date + 'T00:00:00').toLocaleDateString() : 'Sin fecha'}</TableCell>
+                  <TableCell className="font-medium">{task.site || (task.data?.site as string | undefined) || 'Sin sitio'}</TableCell>
+                  <TableCell className="text-muted-foreground">{task.description || (task.data?.description as string | undefined) || 'Sin descripción'}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {task.assigned_users.map(user => {
-                        const statusBgColor =
-                          user.status === 'activo' ? 'bg-green-50/50 dark:bg-green-950/10 text-green-600 dark:text-green-400 ring-1 ring-green-500/20' :
-                          user.status === 'vacaciones' ? 'bg-orange-50/50 dark:bg-orange-950/10 text-orange-600 dark:text-orange-400 ring-1 ring-orange-500/20' :
-                          user.status === 'baja' ? 'bg-red-50/50 dark:bg-red-950/10 text-red-600 dark:text-red-400 ring-1 ring-red-500/20' : 'bg-gray-50/50 dark:bg-gray-950/10 text-gray-600 dark:text-gray-400 ring-1 ring-gray-500/20';
-
-                        return (
-                          <div key={user.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${statusBgColor}`}>
-                            <User className="h-4 w-4" />
-                            {user.full_name}
-                          </div>
-                        );
-                      })}
+                      {task.assigned_users.map(user => (
+                        <div
+                          key={user.id}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm bg-blue-50/70 dark:bg-blue-950/20 text-blue-700 dark:text-blue-200 ring-1 ring-blue-500/30"
+                        >
+                          <User className="h-4 w-4" />
+                          {user.full_name}
+                        </div>
+                      ))}
                       {task.assigned_vehicles.map(vehicle => {
                         const vehicleBgColor =
                           vehicle.type?.toLowerCase().includes('jumper') ? 'bg-blue-50/50 dark:bg-blue-950/10 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20' :

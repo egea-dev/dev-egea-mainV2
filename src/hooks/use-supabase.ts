@@ -275,15 +275,38 @@ export const useScreenData = (screenId: string | null) => {
   return useQuery({
     queryKey: ['screen_data', screenId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("screen_data").select("*, screens!inner(id, name, template_id, next_screen_id, templates(name, fields))").eq('screen_id', screenId!).order("created_at", { ascending: false });
-      if (error) throw error;
-      
-      const screen = data[0]?.screens || null;
-      let templateFields = [];
-      if (screen?.templates?.fields) {
-        templateFields = Array.isArray(screen.templates.fields) ? screen.templates.fields : [];
+      if (!screenId) {
+        return { dataList: [], templateFields: [], screen: null };
       }
-      return { dataList: data || [], templateFields };
+
+      const [
+        { data: screen, error: screenError },
+        { data: dataRows, error: dataError },
+      ] = await Promise.all([
+        supabase
+          .from("screens")
+          .select("id, name, header_color, screen_group, screen_type, template_id, next_screen_id, templates(name, fields)")
+          .eq("id", screenId)
+          .maybeSingle(),
+        supabase
+          .from("screen_data")
+          .select("*")
+          .eq("screen_id", screenId)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (screenError) throw screenError;
+      if (dataError) throw dataError;
+
+      const templateFields = Array.isArray(screen?.templates?.fields)
+        ? screen.templates.fields
+        : [];
+
+      return {
+        dataList: dataRows || [],
+        templateFields,
+        screen,
+      };
     },
     enabled: !!screenId,
   });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -6,7 +6,7 @@ import { Task, Profile, Vehicle } from '@/types';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import { es } from 'date-fns/locale';
-import { format, subDays } from 'date-fns';
+import { format, subDays, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 dayjs.locale('es');
 
@@ -56,64 +56,65 @@ export default function InstallationsPage() {
 
   const sensors = useSensors(useSensor(PointerSensor));
 
-  // Cargar días con tareas para el calendario
-  useEffect(() => {
-    const fetchCalendarData = async () => {
-      try {
-        const sixtyDaysAgo = subDays(new Date(), 60);
-        const { data: recentTasks, error } = await supabase
-          .from("detailed_tasks")
-          .select("start_date, state, screen_group")
-          .gte("start_date", sixtyDaysAgo.toISOString());
+  const refreshCalendarData = useCallback(async () => {
+    try {
+      const sixtyDaysAgo = subDays(new Date(), 60);
+      const startDateFilter = format(sixtyDaysAgo, "yyyy-MM-dd");
 
-        if (error) {
-          console.error("Error fetching calendar data:", error);
-          return;
-        }
+      const { data, error } = await supabase
+        .from("detailed_tasks")
+        .select("start_date, state")
+        .eq("screen_group", "Instalaciones")
+        .gte("start_date", startDateFilter);
 
-        if (recentTasks) {
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-
-          const daysWithDataMap = new Map<string, { hasPending: boolean; hasTasks: boolean }>();
-
-          recentTasks.forEach((task) => {
-            const taskDate = new Date(task.start_date);
-            taskDate.setHours(0, 0, 0, 0);
-            const dateKey = format(taskDate, "yyyy-MM-dd");
-
-            const isPast = taskDate < today;
-            const isPending = task.state !== 'terminado' && task.screen_group === 'Instalaciones';
-
-            if (!daysWithDataMap.has(dateKey)) {
-              daysWithDataMap.set(dateKey, { hasPending: false, hasTasks: false });
-            }
-
-            daysWithDataMap.get(dateKey)!.hasTasks = true;
-
-            if (isPast && isPending) {
-              daysWithDataMap.get(dateKey)!.hasPending = true;
-            }
-          });
-
-          const pendingDays = Array.from(daysWithDataMap.entries())
-            .filter(([, { hasPending }]) => hasPending)
-            .map(([dateStr]) => new Date(dateStr + "T00:00:00"));
-
-          const taskDays = Array.from(daysWithDataMap.entries())
-            .filter(([, { hasTasks }]) => hasTasks)
-            .map(([dateStr]) => new Date(dateStr + "T00:00:00"));
-
-          setDaysWithPendingTasks(pendingDays);
-          setDaysWithTasks(taskDays);
-        }
-      } catch (error) {
+      if (error) {
         console.error("Error fetching calendar data:", error);
+        return;
       }
-    };
 
-    fetchCalendarData();
+      const pendingDays = new Set<string>();
+      const taskDays = new Set<string>();
+
+      (data ?? []).forEach((task) => {
+        if (!task?.start_date) return;
+        const taskDate = parseISO(task.start_date);
+        if (Number.isNaN(taskDate.getTime())) return;
+
+        const dateKey = format(taskDate, "yyyy-MM-dd");
+        taskDays.add(dateKey);
+
+        if (task.state !== "terminado") {
+          pendingDays.add(dateKey);
+        }
+      });
+
+      setDaysWithPendingTasks(Array.from(pendingDays).map((dateStr) => parseISO(dateStr)));
+      setDaysWithTasks(Array.from(taskDays).map((dateStr) => parseISO(dateStr)));
+    } catch (error) {
+      console.error("Error fetching calendar data:", error);
+    }
   }, []);
+
+  useEffect(() => {
+    refreshCalendarData();
+  }, [refreshCalendarData]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("installations-calendar")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "screen_data" },
+        () => {
+          refreshCalendarData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refreshCalendarData]);
 
   const handleEditTask = (task: Task) => {
     setSelectedTask(task);
@@ -341,17 +342,12 @@ export default function InstallationsPage() {
                    locale={es}
                    modifiers={{
                      today: new Date(),
-                     pastWithPending: (date) => {
-                       const today = new Date();
-                       today.setHours(0, 0, 0, 0);
-                       const dateKey = format(date, "yyyy-MM-dd");
-                       return date < today && daysWithPendingTasks.some(d => format(d, "yyyy-MM-dd") === dateKey);
-                     },
+                     pending: daysWithPendingTasks,
                      hasTasks: daysWithTasks,
                    }}
                    modifiersClassNames={{
                      today: "bg-orange-500 text-white hover:bg-orange-600 rounded-md font-medium ring-2 ring-orange-300",
-                     pastWithPending: "bg-orange-100 border-2 border-orange-400 text-orange-700 hover:bg-orange-200 rounded-md font-medium",
+                     pending: "rdp-day_pending",
                      hasTasks: "hasTasks",
                    }}
                  />

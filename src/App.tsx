@@ -28,6 +28,7 @@ import MyTasksPage from "./pages/MyTasksPage";
 import AdminLayout from "./pages/AdminLayout"; // CORRECCIÓN DEFINITIVA: Importación nombrada
 import { DataManagement } from "./components/data/DataManagement";
 import { ScreenList } from "./components/screens/ScreenList";
+import ScreenDisplay from "./pages/ScreenDisplay";
 import { TemplateList } from "./components/templates/TemplateList";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
           <Route path="/share/plan/:token" element={<SharedPlanPage />} />
           <Route path="/display/:id" element={<DisplayPage />} />
           <Route path="/group/:groupName" element={<GroupDisplayPage />} />
+          <Route path="/screen/:screenId" element={<ScreenDisplay />} />
           <Route path="/checkin/:token" element={<CheckinPage />} />
           <Route path="/mis-tareas/:token" element={<MyTasksPage />} />
 

@@ -8,18 +8,15 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  LogOut,
-  Settings,
-  Heart,
-} from "lucide-react";
+import { useEffect } from "react";
+import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/use-supabase";
-import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import { navItems } from "@/config/nav-items";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const SidebarContentComponent = () => {
   const location = useLocation();
@@ -98,18 +95,9 @@ export const SidebarContentComponent = () => {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-        {!isCollapsed && (
-            <Accordion type="single" collapsible className="w-full px-2">
-                <AccordionItem value="item-1" className="border-b-0">
-                    <AccordionContent className="pb-2 text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Versión {appVersion}</p>
-                        <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
-                            Hecho con <Heart className="h-3 w-3 text-red-500 fill-red-500" /> por Hacchi
-                        </p>
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
-        )}
+        <div className="w-full px-3 py-2 text-center">
+          <p className="text-xs text-muted-foreground">Versión {appVersion}</p>
+        </div>
           <SidebarMenu>
               <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Configuración">

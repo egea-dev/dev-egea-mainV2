@@ -20,7 +20,7 @@ export const FullCalendarView = ({ tasks, onDateClick, onEventClick, onDropOnDat
   const events = tasks.map(task => ({
     id: task.id,
     title: task.site,
-    start: task.due_date,
+    start: task.start_date,
     extendedProps: task,
   }));
   

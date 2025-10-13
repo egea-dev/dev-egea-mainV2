@@ -144,9 +144,14 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
     return 'hover:bg-muted/30';
   };
 
+  const headerStyle = screen.header_color ? { backgroundColor: screen.header_color, color: '#fff' } : undefined;
+  const headerClassName = screen.header_color
+    ? 'sticky top-0 z-10 shadow-lg'
+    : 'bg-primary text-primary-foreground sticky top-0 z-10 shadow-lg';
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-primary text-primary-foreground sticky top-0 z-10 shadow-lg">
+      <header className={headerClassName} style={headerStyle}>
         <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -267,3 +272,4 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
     </div>
   );
 }
+

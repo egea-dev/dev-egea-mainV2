@@ -20,7 +20,6 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
     full_name: '',
     email: '',
     phone: '',
-    whatsapp: '',
     status: 'activo',
     role: 'operario'
   });
@@ -34,7 +33,6 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
         full_name: '',
         email: '',
         phone: '',
-        whatsapp: '',
         status: 'activo',
         role: 'operario'
       });
@@ -57,39 +55,25 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
     }
     setLoading(true);
 
-    let error;
-    if (profile.id) {
-      ({ error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: profile.full_name,
-          email: profile.email || null,
-          phone: profile.phone || null,
-          whatsapp: profile.whatsapp || null,
-          status: profile.status,
-          role: profile.role || 'operario'
-        })
-        .eq('id', profile.id));
-    } else {
-      ({ error } = await supabase
-        .from('profiles')
-        .insert({
-          full_name: profile.full_name,
-          email: profile.email || null,
-          phone: profile.phone || null,
-          whatsapp: profile.whatsapp || null,
-          status: profile.status,
-          role: profile.role || 'operario'
-        }));
-    }
+    const { error } = await supabase.rpc('admin_upsert_profile', {
+      p_profile_id: profile.id ?? null,
+      p_full_name: profile.full_name,
+      p_email: profile.email || null,
+      p_phone: profile.phone || null,
+      p_status: profile.status || 'activo',
+      p_role: profile.role || 'operario'
+    });
 
     if (error) {
-      toast.error("Error al guardar el perfil.");
-    } else {
-      toast.success(`Perfil ${profile.id ? 'actualizado' : 'creado'} correctamente.`);
-      onSuccess();
-      onOpenChange(false);
+      console.error('Supabase profiles error:', error);
+      toast.error(error.message || "Error al guardar el perfil.");
+      setLoading(false);
+      return;
     }
+
+    toast.success(`Perfil ${profile.id ? 'actualizado' : 'creado'} correctamente.`);
+    onSuccess();
+    onOpenChange(false);
     setLoading(false);
   };
 
@@ -111,15 +95,9 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
             <Label htmlFor="email">Email (Opcional)</Label>
             <Input id="email" name="email" type="email" value={profile.email || ''} onChange={handleChange} placeholder="Email para futura invitación" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono</Label>
-              <Input id="phone" name="phone" value={profile.phone || ''} onChange={handleChange} placeholder="+34 600 000 000" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input id="whatsapp" name="whatsapp" value={profile.whatsapp || ''} onChange={handleChange} placeholder="+34 600 000 000" />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Teléfono</Label>
+            <Input id="phone" name="phone" value={profile.phone || ''} onChange={handleChange} placeholder="+34 600 000 000" />
           </div>
           {profile.public_url && (
             <div className="space-y-2">

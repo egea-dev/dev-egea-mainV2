@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, FileDown, ArrowLeft, Database, PlusCircle, MoreHorizontal } from "lucide-react";
+import { Trash2, Plus, FileDown, ArrowLeft, Database, PlusCircle, MoreHorizontal, UploadCloud, Eye } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +16,7 @@ import { Task } from "@/types"; // Tarea 4.2
 import { DoubleConfirmDialog } from "@/components/ui/double-confirm-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { TaskStateBadge, StatusBadge } from "@/components/badges";
+import { DataImportDialog } from "@/components/data/DataImportDialog";
 
 type TemplateField = {
   name: string;
@@ -23,6 +25,7 @@ type TemplateField = {
 };
 
 export const DataManagement = () => {
+  const queryClient = useQueryClient();
   const [selectedScreenId, setSelectedScreenId] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string | number>("");
@@ -42,6 +45,7 @@ export const DataManagement = () => {
   const [newGroupName, setNewGroupName] = useState("");
   const [deleteScreenDialogOpen, setDeleteScreenDialogOpen] = useState(false);
   const [screenToDelete, setScreenToDelete] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   
   const { data: screens = [], isLoading: screensLoading, refetch: refetchScreens } = useScreens();
   const { data: screenInfo, isLoading: dataLoading } = useScreenData(selectedScreenId);
@@ -147,6 +151,20 @@ export const DataManagement = () => {
 
   const { dataList = [], templateFields = [] } = screenInfo || {};
 
+  const openImportDialog = () => {
+    if (!selectedScreenId) {
+      toast.error("Selecciona primero una pantalla")
+      return
+    }
+
+    if (!templateFields.length) {
+      toast.error("La pantalla seleccionada no tiene una plantilla asociada")
+      return
+    }
+
+    setImportDialogOpen(true)
+  }
+
   const handleCellEdit = (itemId: string, field: string) => {
     setEditingCell(`${itemId}-${field}`);
     const item = dataList.find(d => d.id === itemId);
@@ -154,12 +172,12 @@ export const DataManagement = () => {
     setEditValue(value || "");
   };
 
-  const handleCellSave = async (itemId: string, field: string) => {
+  const handleCellSave = async (itemId: string, field: string, newValueOverride?: string | number) => {
     const item = dataList.find(d => d.id === itemId);
     if (!item) return;
 
     const selectedScreen = screens.find(s => s.id === selectedScreenId);
-    const newValue = editValue;
+    const newValue = newValueOverride ?? editValue;
     
     // Lógica especial para cuando se marca como "terminado"
     if (field === 'state' && newValue === 'terminado') {
@@ -405,23 +423,36 @@ export const DataManagement = () => {
                     <p>Grupo: {screen.screen_group || 'N/A'}</p>
                     <p>Tipo: {screen.screen_type}</p>
                 </div>
-                <Button className="w-full" onClick={() => setSelectedScreenId(screen.id)}>
-                  <Database className="mr-2 h-4 w-4" />
-                  Gestionar Datos
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Button className="w-full" onClick={() => setSelectedScreenId(screen.id)}>
+                      <Database className="mr-2 h-4 w-4" />
+                      Gestionar Datos
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => window.open(`/screen/${screen.id}`, "_blank")}
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Ver Pantalla
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
-        <DoubleConfirmDialog
-            open={deleteScreenDialogOpen}
-            onOpenChange={setDeleteScreenDialogOpen}
-            onConfirm={confirmDeleteScreen}
-            title="Eliminar Tabla de Datos"
-            description="Esta acción eliminará permanentemente la tabla de datos y todo su contenido. Esta acción no se puede deshacer."
-            confirmText="ELIMINAR"
-            requiredWord="ELIMINAR"
-        />
+      <DoubleConfirmDialog
+          open={deleteScreenDialogOpen}
+          onOpenChange={setDeleteScreenDialogOpen}
+          onConfirm={confirmDeleteScreen}
+          title="Eliminar Tabla de Datos"
+          description="Esta acción eliminará permanentemente la tabla de datos y todo su contenido. Esta acción no se puede deshacer."
+          confirmText="ELIMINAR"
+          requiredWord="ELIMINAR"
+      />
+
       </div>
     );
   }
@@ -429,7 +460,8 @@ export const DataManagement = () => {
   const selectedScreen = screens.find(s => s.id === selectedScreenId);
 
   return (
-    <Card>
+    <div className="p-4 sm:p-8 space-y-6">
+    <Card className="shadow-sm">
       <CardHeader>
         <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
@@ -442,8 +474,17 @@ export const DataManagement = () => {
                 </div>
             </div>
             <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => selectedScreen?.id && window.open(`/screen/${selectedScreen.id}`, "_blank")}
+                  disabled={!selectedScreen?.id}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  Ver Pantalla
+                </Button>
+                <Button variant="outline" onClick={openImportDialog}><UploadCloud className="mr-2 h-4 w-4" />Importar</Button>
                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="outline"><FileDown className="mr-2 h-4 w-4" />Exportar</Button></DropdownMenuTrigger>
+                  <DropdownMenuTrigger asChild><Button variant="outline"><FileDown className="mr-2 h-4 w-4" />Exportar</Button></DropdownMenuTrigger>
                     <DropdownMenuContent>
                     <DropdownMenuItem>Excel (.xlsx)</DropdownMenuItem>
                     <DropdownMenuItem>CSV (.csv)</DropdownMenuItem>
@@ -477,9 +518,10 @@ export const DataManagement = () => {
                   ))}
                   <TableCell onClick={() => handleCellEdit(item.id, 'state')} className="cursor-pointer">
                     {editingCell === `${item.id}-state` ? (
-                       <Select value={editValue as string} onValueChange={(v) => { setEditValue(v); handleCellSave(item.id, 'state'); }}>
+                       <Select value={String(editValue)} onValueChange={(v) => { setEditValue(v); handleCellSave(item.id, 'state', v); }}>
                          <SelectTrigger><SelectValue/></SelectTrigger>
                          <SelectContent>
+                           <SelectItem value="pendiente">Pendiente</SelectItem>
                            <SelectItem value="normal">Normal</SelectItem>
                            <SelectItem value="incidente">Incidente</SelectItem>
                            <SelectItem value="arreglo">Arreglo</SelectItem>
@@ -491,9 +533,9 @@ export const DataManagement = () => {
                        </Select>
                     ) : <TaskStateBadge state={item.state} size="sm" />}
                   </TableCell>
-                  <TableCell onClick={() => handleCellEdit(item.id, 'status')} className="cursor-pointer">
+                 <TableCell onClick={() => handleCellEdit(item.id, 'status')} className="cursor-pointer">
                      {editingCell === `${item.id}-status` ? (
-                       <Select value={editValue as string} onValueChange={(v) => { setEditValue(v); handleCellSave(item.id, 'status'); }}>
+                       <Select value={String(editValue)} onValueChange={(v) => { setEditValue(v); handleCellSave(item.id, 'status', v); }}>
                          <SelectTrigger><SelectValue/></SelectTrigger>
                          <SelectContent>
                            <SelectItem value="pendiente">Pendiente</SelectItem>
@@ -545,5 +587,19 @@ export const DataManagement = () => {
         requiredWord="ELIMINAR"
       />
     </Card>
+
+    <DataImportDialog
+      open={importDialogOpen}
+      onOpenChange={setImportDialogOpen}
+      screenId={selectedScreenId}
+      templateFields={templateFields}
+      onImported={() => {
+        setImportDialogOpen(false)
+        if (selectedScreenId) {
+          queryClient.invalidateQueries({ queryKey: ['screen_data', selectedScreenId] })
+        }
+      }}
+    />
+    </div>
   );
 };

@@ -16,10 +16,10 @@ type Screen = {
   is_active: boolean;
   refresh_interval_sec: number;
   template_id: string | null;
-  screen_type: 'pendiente' | 'acabado';
+  screen_type: 'data' | 'display';
   next_screen_id?: string | null;
-  screen_group?: string;
-  color?: string | null;
+  screen_group?: string | null;
+  header_color?: string | null;
 };
 
 type ScreenDialogProps = {
@@ -36,11 +36,11 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
     name: '',
     is_active: true,
     refresh_interval_sec: 30,
-    screen_type: 'pendiente',
+    screen_type: 'data',
     template_id: null,
     next_screen_id: null,
     screen_group: '',
-    color: '#ffffff',
+    header_color: '#000000',
   });
   const [loading, setLoading] = useState(false);
 
@@ -52,11 +52,11 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
         name: screen?.name || '',
         is_active: screen?.is_active ?? true,
         refresh_interval_sec: screen?.refresh_interval_sec || 30,
-        screen_type: screen?.screen_type || 'pendiente',
+        screen_type: (screen?.screen_type as 'data' | 'display') || 'data',
         template_id: screen?.template_id || null,
         next_screen_id: screen?.next_screen_id || null,
         screen_group: screen?.screen_group || '',
-        color: screen?.color || '#ffffff',
+        header_color: screen?.header_color || '#000000',
       });
     }
   }, [open, screen]);
@@ -87,13 +87,13 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
     try {
       const screenData = {
         name: formData.name,
-        template_id: formData.template_id,
+        template_id: formData.template_id || null,
         refresh_interval_sec: Number(formData.refresh_interval_sec),
         is_active: formData.is_active,
         screen_type: formData.screen_type,
-        next_screen_id: formData.next_screen_id,
-        screen_group: formData.screen_group,
-        color: formData.color,
+        next_screen_id: formData.next_screen_id || null,
+        screen_group: formData.screen_group ? formData.screen_group : null,
+        header_color: formData.header_color || '#000000',
       };
 
       if (screen?.id) {
@@ -107,6 +107,7 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
       }
       onClose();
     } catch (error) {
+      console.error("Error saving screen:", error);
       toast.error("Error al guardar la pantalla.");
     } finally {
       setLoading(false);
@@ -129,8 +130,8 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
               <Input id="name" name="name" value={formData.name || ''} onChange={handleChange} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="color">Color</Label>
-              <Input id="color" name="color" type="color" value={formData.color || '#ffffff'} onChange={handleChange} />
+              <Label htmlFor="header_color">Color de cabecera</Label>
+              <Input id="header_color" name="header_color" type="color" value={formData.header_color || '#000000'} onChange={handleChange} />
             </div>
           </div>
           
@@ -162,11 +163,11 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
           
           <div className="space-y-2">
             <Label htmlFor="screen_type">Tipo de Pantalla</Label>
-            <Select value={formData.screen_type || 'pendiente'} onValueChange={(val: string) => handleSelectChange('screen_type', val)}>
+            <Select value={formData.screen_type || 'data'} onValueChange={(val: string) => handleSelectChange('screen_type', val)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="acabado">Acabado</SelectItem>
+                <SelectItem value="data">Datos</SelectItem>
+                <SelectItem value="display">Visualización</SelectItem>
               </SelectContent>
             </Select>
           </div>

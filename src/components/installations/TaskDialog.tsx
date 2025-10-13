@@ -62,16 +62,44 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
     const loadInstallationsScreen = async () => {
       const { data, error } = await supabase
         .from('screens')
-        .select('id')
-        .eq('screen_group', 'Instalaciones')
-        .eq('screen_type', 'data')
-        .single();
+        .select('id, name, screen_group, screen_type, is_active')
+        .eq('is_active', true);
 
-      if (!error && data) {
-        setInstallationsScreenId(data.id);
-      } else {
+      if (error) {
         console.error('Error loading Instalaciones screen:', error);
+        toast.error('No se pudo cargar la pantalla de Instalaciones.');
+        return;
       }
+
+      const allScreens = Array.isArray(data) ? data : data ? [data] : [];
+      if (allScreens.length === 0) {
+        toast.error('No hay pantallas configuradas.');
+        console.warn('No screens returned from Supabase.');
+        return;
+      }
+
+      const normalized = allScreens.map((screen) => ({
+        id: (screen as { id: string }).id,
+        name: ((screen as { name?: string }).name || '').trim().toLowerCase(),
+        group: ((screen as { screen_group?: string }).screen_group || '').trim().toLowerCase(),
+        type: ((screen as { screen_type?: string }).screen_type || '').trim().toLowerCase(),
+        isActive: (screen as { is_active?: boolean }).is_active ?? true,
+      }));
+
+      const matchExact = normalized.find((screen) => screen.group === 'instalaciones' && screen.isActive);
+      const matchByName = normalized.find((screen) => screen.name.includes('instal') && screen.isActive);
+      const matchByType = normalized.find((screen) => screen.type === 'data' && screen.isActive);
+      const fallback = normalized[0];
+
+      const selected = matchExact || matchByName || matchByType || fallback;
+
+      if (!selected) {
+        toast.error('No existe una pantalla de Instalaciones activa.');
+        console.warn('No suitable screen found among results.', normalized);
+        return;
+      }
+
+      setInstallationsScreenId(selected.id);
     };
     loadInstallationsScreen();
   }, []);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/integrations/supabase/client'
+import { startOfMonth, endOfMonth, format } from 'date-fns'
 
 interface Operator {
   id: string
@@ -53,8 +54,10 @@ export function useInstallations() {
       setOperators(operatorsData || [])
 
       // Obtener instalaciones del mes actual
-      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+      const currentMonthStart = startOfMonth(new Date())
+      const currentMonthEnd = endOfMonth(new Date())
+      const startDate = format(currentMonthStart, 'yyyy-MM-dd')
+      const endDate = format(currentMonthEnd, 'yyyy-MM-dd')
 
       const { data: installationsData } = await supabase
         .from('detailed_tasks')
@@ -71,8 +74,8 @@ export function useInstallations() {
           )
         `)
         .eq('screen_group', 'Instalaciones')
-        .gte('start_date', startOfMonth.toISOString())
-        .lte('start_date', endOfMonth.toISOString())
+        .gte('start_date', startDate)
+        .lte('start_date', endDate)
         .neq('state', 'terminado')
         .order('start_date', { ascending: true })
 
@@ -125,18 +128,20 @@ export function useInstallations() {
 
   // Suscripción Realtime para cambios externos
   useEffect(() => {
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+    const currentMonthStart = startOfMonth(new Date())
+    const currentMonthEnd = endOfMonth(new Date())
+    const startDate = format(currentMonthStart, 'yyyy-MM-dd')
+    const endDate = format(currentMonthEnd, 'yyyy-MM-dd')
 
     const ch = supabase
       .channel('public:screen_data')
       .on(
         'postgres_changes',
-        { 
-          event: '*', 
-          schema: 'public', 
+        {
+          event: '*',
+          schema: 'public',
           table: 'screen_data',
-          filter: `start_date=gte.${startOfMonth.toISOString()}&start_date=lte.${endOfMonth.toISOString()}` 
+          filter: `start_date=gte.${startDate}&start_date=lte.${endDate}`
         },
         (payload) => {
           console.log('Realtime change:', payload)
