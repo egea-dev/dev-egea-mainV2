@@ -25,7 +25,7 @@ type Screen = {
   id: string;
   name: string;
   refresh_interval_sec: number;
-  screen_type: 'pendiente' | 'acabado';
+  screen_type: 'pendiente' | 'acabado' | 'data';
   templates: {
     fields: Field[];
     name: string;
@@ -69,22 +69,44 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
         setFields(screenDetails.templates.fields as Field[]);
       }
 
+      const isDataScreen = screenDetails.screen_type === 'data';
       const stateFilter = screenDetails.screen_type === 'pendiente' ? 'pendiente' : 'acabado';
 
       // Obtener conteo total para paginación
-      const { count: total } = await supabase
+      let countQuery = supabase
         .from("screen_data")
         .select("*", { count: "exact", head: true })
-        .eq("screen_id", id)
-        .eq("state", stateFilter);
+        .eq("screen_id", id);
 
-      const { data: dataEntries, error: dataError } = await supabase
+      if (!isDataScreen) {
+        countQuery = countQuery.eq("state", stateFilter);
+      }
+
+      const { count: total, error: countError } = await countQuery;
+
+      if (countError) throw countError;
+
+      let dataQuery = supabase
         .from("screen_data")
         .select("*")
-        .eq("screen_id", id)
-        .eq("state", stateFilter)
-        .order("created_at", { ascending: false })
-        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1);
+        .eq("screen_id", id);
+
+      if (!isDataScreen) {
+        dataQuery = dataQuery.eq("state", stateFilter);
+      }
+
+      if (isDataScreen) {
+        dataQuery = dataQuery
+          .order("order", { ascending: true, nullsLast: true })
+          .order("created_at", { ascending: false });
+      } else {
+        dataQuery = dataQuery.order("created_at", { ascending: false });
+      }
+
+      const { data: dataEntries, error: dataError } = await dataQuery.range(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage - 1
+      );
 
       if (dataError) throw dataError;
 

@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type DragEvent } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit, Trash2, Plus, Eye, Search } from "lucide-react";
+import { Edit, Trash2, Plus, Eye, Search, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -18,6 +18,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 
 type Screen = {
   id: string;
@@ -41,10 +42,13 @@ export const ScreenList = () => {
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(15);
+  const [draggingScreen, setDraggingScreen] = useState<string | null>(null);
+  const [activeDropGroup, setActiveDropGroup] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const loadScreens = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from("screens")
         .select("*")
@@ -116,18 +120,96 @@ export const ScreenList = () => {
     setDialogOpen(true);
   };
 
+  const handleDragStart = (event: DragEvent<HTMLDivElement>, screenId: string) => {
+    event.dataTransfer.setData("text/plain", screenId);
+    event.dataTransfer.effectAllowed = "move";
+    setDraggingScreen(screenId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingScreen(null);
+    setActiveDropGroup(null);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragEnter = (groupName: string) => {
+    setActiveDropGroup(groupName);
+  };
+
+  const handleDragLeave = (groupName: string) => {
+    if (activeDropGroup === groupName) {
+      setActiveDropGroup(null);
+    }
+  };
+
+  const handleDropOnGroup = async (
+    event: DragEvent<HTMLDivElement>,
+    targetGroup: string
+  ) => {
+    event.preventDefault();
+    const screenId = event.dataTransfer.getData("text/plain");
+    if (!screenId) return;
+
+    setActiveDropGroup(null);
+    setDraggingScreen(null);
+
+    const normalizedTarget = targetGroup === "General" ? null : targetGroup;
+    const currentScreen = screens.find((screen) => screen.id === screenId);
+    const currentGroupLabel = currentScreen?.screen_group || "General";
+
+    if (!currentScreen || currentGroupLabel === targetGroup) {
+      return;
+    }
+
+    setScreens((prev) =>
+      prev.map((screen) =>
+        screen.id === screenId ? { ...screen, screen_group: normalizedTarget } : screen
+      )
+    );
+
+    try {
+      const { error } = await supabase
+        .from("screens")
+        .update({ screen_group: normalizedTarget })
+        .eq("id", screenId);
+
+      if (error) throw error;
+
+      toast.success(
+        normalizedTarget
+          ? `Pantalla movida al grupo "${targetGroup}".`
+          : "Pantalla movida al grupo General."
+      );
+      loadScreens();
+    } catch (error) {
+      console.error("Error moving screen:", error);
+      toast.error("No se pudo mover la pantalla. Inténtalo de nuevo.");
+      loadScreens();
+    }
+  };
+
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingScreen(null);
     loadScreens();
   };
 
-  const groupedScreens = currentScreens.reduce((acc, screen) => {
-    const group = screen.screen_group || 'General';
+  const groupNames = new Set<string>(["General"]);
+  filteredScreens.forEach((screen) => {
+    groupNames.add(screen.screen_group || "General");
+  });
+
+  const groupedScreens = Array.from(groupNames).reduce((acc, group) => {
+    acc[group] = currentScreens.filter(
+      (screen) => (screen.screen_group || "General") === group
+    );
     if (!acc[group]) {
       acc[group] = [];
     }
-    acc[group].push(screen);
     return acc;
   }, {} as Record<string, Screen[]>);
 
@@ -180,56 +262,112 @@ export const ScreenList = () => {
       </div>
 
       {Object.entries(groupedScreens).map(([groupName, screenList]) => (
-        <Card key={groupName}>
-            <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{groupName}</CardTitle>
-            {groupName !== 'General' && (
-              <Button size="sm" variant="outline" onClick={() => window.open(`/group/${groupName}`, "_blank")}>
-                <Eye className="mr-2 h-4 w-4" /> Ver Grupo
-              </Button>
+        <div
+          key={groupName}
+          onDragOver={handleDragOver}
+          onDragEnter={() => handleDragEnter(groupName)}
+          onDragLeave={() => handleDragLeave(groupName)}
+          onDrop={(event) => handleDropOnGroup(event, groupName)}
+          className="rounded-lg"
+        >
+          <Card
+            className={cn(
+              "transition-colors",
+              activeDropGroup === groupName ? "border-primary/60 ring-2 ring-primary/40" : ""
             )}
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {screenList.map((screen) => (
-              <Card key={screen.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{screen.name}</CardTitle>
-                    <Badge variant={screen.is_active ? "default" : "secondary"}>
-                      {screen.is_active ? "Activa" : "Inactiva"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                   <div className="text-xs text-muted-foreground">
-                    <p>Tipo: {screen.screen_type}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const targetUrl = screen.screen_type === "data" ? `/screen/${screen.id}` : `/display/${screen.id}`;
-                        window.open(targetUrl, "_blank");
-                      }}
-                      className="flex-1 sm:flex-none"
-                    >
-                      <Eye className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Ver</span>
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleEdit(screen)} className="flex-1 sm:flex-none">
-                      <Edit className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Editar</span>
-                    </Button>
-                     <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive/70 hover:text-destructive" onClick={() => handleDelete(screen.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </CardContent>
-        </Card>
+          >
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{groupName}</CardTitle>
+              {groupName !== "General" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(`/group/${groupName}`, "_blank")}
+                >
+                  <Eye className="mr-2 h-4 w-4" /> Ver Grupo
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="grid min-h-[120px] grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {screenList.length === 0 && (
+                <div className="col-span-full flex items-center justify-center rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 py-6 text-sm text-muted-foreground">
+                  No hay pantallas en esta página para este grupo. Arrastra aquí para mover.
+                </div>
+              )}
+              {screenList.map((screen) => (
+                <Card
+                  key={screen.id}
+                  className={cn(
+                    "relative transition-colors",
+                    draggingScreen === screen.id ? "border-primary/40" : ""
+                  )}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-lg">{screen.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={screen.is_active ? "default" : "secondary"}>
+                          {screen.is_active ? "Activa" : "Inactiva"}
+                        </Badge>
+                        <div
+                          className={cn(
+                            "cursor-grab text-muted-foreground hover:text-foreground",
+                            draggingScreen === screen.id ? "cursor-grabbing opacity-70" : ""
+                          )}
+                          draggable
+                          onDragStart={(event) => handleDragStart(event, screen.id)}
+                          onDragEnd={handleDragEnd}
+                          title="Arrastra para mover esta pantalla a otro grupo"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="text-xs text-muted-foreground">
+                      <p>Tipo: {screen.screen_type}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const targetUrl =
+                            screen.screen_type === "data"
+                              ? `/screen/${screen.id}`
+                              : `/display/${screen.id}`;
+                          window.open(targetUrl, "_blank");
+                        }}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <Eye className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Ver</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEdit(screen)}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <Edit className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Editar</span>
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive/70 hover:text-destructive"
+                        onClick={() => handleDelete(screen.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       ))}
 
       {/* Paginación */}
