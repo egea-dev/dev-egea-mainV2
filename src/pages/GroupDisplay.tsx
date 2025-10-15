@@ -16,13 +16,22 @@ export default function GroupDisplayPage() {
   const [screens, setScreens] = useState<Screen[]>([]);
   const [loading, setLoading] = useState(true);
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
+  const [advanceSignals, setAdvanceSignals] = useState<Record<string, number>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shownScreensRef = useRef<Record<string, boolean>>({});
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+  }, []);
+
+  const triggerAdvance = useCallback((screenId: string) => {
+    setAdvanceSignals((prev) => ({
+      ...prev,
+      [screenId]: (prev[screenId] ?? 0) + 1,
+    }));
   }, []);
 
   const scheduleNextSlide = useCallback(
@@ -33,7 +42,16 @@ export default function GroupDisplayPage() {
       }
 
       const selectedIndex = api.selectedScrollSnap();
-      const rawDelay = currentScreens[selectedIndex]?.refresh_interval_sec ?? 30;
+      const currentScreen = currentScreens[selectedIndex];
+      if (currentScreen) {
+        if (shownScreensRef.current[currentScreen.id]) {
+          triggerAdvance(currentScreen.id);
+        } else {
+          shownScreensRef.current[currentScreen.id] = true;
+        }
+      }
+
+      const rawDelay = currentScreen?.refresh_interval_sec ?? 30;
       const delayMs = Math.max(rawDelay || 30, 5) * 1000;
 
       clearTimer();
@@ -41,7 +59,7 @@ export default function GroupDisplayPage() {
         api.scrollNext();
       }, delayMs);
     },
-    [clearTimer],
+    [clearTimer, triggerAdvance],
   );
 
   useEffect(() => {
@@ -62,6 +80,8 @@ export default function GroupDisplayPage() {
         setScreens([]);
       } else {
         setScreens(data || []);
+        shownScreensRef.current = {};
+        setAdvanceSignals({});
       }
       setLoading(false);
     };
@@ -91,7 +111,7 @@ export default function GroupDisplayPage() {
   }, [clearTimer]);
 
   if (!groupName) {
-    return <div className="flex h-screen items-center justify-center">No se especificó un grupo.</div>;
+    return <div className="flex h-screen items-center justify-center">No se especifico un grupo.</div>;
   }
 
   if (loading) {
@@ -108,15 +128,22 @@ export default function GroupDisplayPage() {
       setApi={setCarouselApi}
     >
       <CarouselContent>
-        {screens.map(screen => (
+        {screens.map((screen) => (
           <CarouselItem key={screen.id} className="h-screen w-screen">
-             <div style={{ transform: 'scale(0.9)', transformOrigin: 'top left', height: '111%', width: '111%' }}>
-               <DisplayPage key={screen.id} screenId={screen.id} />
-             </div>
+            <div className="flex h-full w-full items-center justify-center bg-background">
+              <div className="h-full w-full">
+                <DisplayPage
+                  screenId={screen.id}
+                  fullWidth
+                  advanceSignal={advanceSignals[screen.id]}
+                />
+              </div>
+            </div>
           </CarouselItem>
         ))}
       </CarouselContent>
     </Carousel>
   );
 }
+
 

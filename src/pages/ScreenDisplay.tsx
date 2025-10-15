@@ -42,7 +42,7 @@ const ScreenDisplay = () => {
 
   const resolvedDataList = useMemo(
     () => (Array.isArray(dataList) ? dataList : []),
-    [dataList]
+    [dataList],
   );
 
   const dataColumns = useMemo<PreparedColumn[]>(() => {
@@ -71,7 +71,7 @@ const ScreenDisplay = () => {
 
   const rowLevelColumns = useMemo<PreparedColumn[]>(() => {
     const candidates: Array<{ key: string; label: string }> = [
-      { key: "location", label: "Ubicación" },
+      { key: "location", label: "Ubicacion" },
       { key: "start_date", label: "Inicio" },
       { key: "end_date", label: "Fin" },
       { key: "order", label: "Orden" },
@@ -83,7 +83,7 @@ const ScreenDisplay = () => {
         resolvedDataList.some((item) => {
           const value = (item as Record<string, unknown>)?.[key];
           return value !== null && value !== undefined && value !== "";
-        })
+        }),
       )
       .filter(({ key }) => !dataColumns.some((column) => column.key === key))
       .map(({ key, label }) => ({
@@ -113,7 +113,7 @@ const ScreenDisplay = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="text-muted-foreground">Cargando pantalla…</p>
+        <p className="text-muted-foreground">Cargando pantalla...</p>
       </div>
     );
   }
@@ -121,7 +121,7 @@ const ScreenDisplay = () => {
   if (isError || !screenId || !screen) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3">
-        <p className="text-lg font-semibold">No se encontró la pantalla solicitada.</p>
+        <p className="text-lg font-semibold">No se encontro la pantalla solicitada.</p>
         <Button variant="outline" onClick={() => navigate("/admin/screens")}>
           Volver al listado
         </Button>
@@ -136,6 +136,62 @@ const ScreenDisplay = () => {
 
   const totalRecords = resolvedDataList.length;
 
+  const getRowToneClass = (state: string | null | undefined) => {
+    const normalized = (state || "").toLowerCase().trim();
+
+    const tones: Record<string, string> = {
+      pendiente: "bg-white hover:bg-muted/20 border-l-4 border-l-gray-300 animate-pulse text-black",
+      incidente:
+        "bg-destructive/20 hover:bg-destructive/30 border-l-4 border-l-destructive/70 animate-pulse text-black",
+      arreglo:
+        "bg-sky-200 hover:bg-sky-300 border-l-4 border-l-sky-500/70 animate-pulse text-black",
+      reposicion:
+        "bg-amber-200 hover:bg-amber-300 border-l-4 border-l-amber-500/70 animate-pulse text-black",
+      urgente:
+        "bg-red-500/70 hover:bg-red-500 border-l-4 border-l-red-700 animate-pulse text-black",
+    };
+
+    return tones[normalized] ?? null;
+  };
+
+  const resolveCellDisplay = (raw: unknown) => {
+    if (raw === null || raw === undefined || raw === "") {
+      return { content: "-", className: "text-muted-foreground" };
+    }
+
+    if (typeof raw === "number") {
+      return { content: raw, className: "" };
+    }
+
+    if (raw instanceof Date) {
+      return { content: raw.toLocaleString("es-ES"), className: "" };
+    }
+
+    if (typeof raw === "object") {
+      return { content: JSON.stringify(raw), className: "font-mono text-xs" };
+    }
+
+    let text = String(raw).trim();
+    const classes: string[] = [];
+
+    const applyMarker = (start: string, end: string, className: string) => {
+      if (
+        text.startsWith(start) &&
+        text.endsWith(end) &&
+        text.length > start.length + end.length
+      ) {
+        classes.push(className);
+        text = text.slice(start.length, -end.length).trim();
+      }
+    };
+
+    applyMarker("**", "**", "font-semibold text-foreground");
+    applyMarker("##", "##", "text-xl");
+    applyMarker("!!", "!!", "uppercase tracking-wide");
+
+    return { content: text, className: classes.join(" ") };
+  };
+
   return (
     <div className="min-h-screen bg-muted/20">
       <header className="border-b shadow-sm" style={headerStyle}>
@@ -147,7 +203,7 @@ const ScreenDisplay = () => {
             <span
               className={cn(
                 "flex items-center gap-2 text-sm font-medium",
-                headerTextClass || "text-muted-foreground"
+                headerTextClass || "text-muted-foreground",
               )}
             >
               {isOnline ? (
@@ -158,7 +214,7 @@ const ScreenDisplay = () => {
               ) : (
                 <>
                   <WifiOff className={cn("h-4 w-4", headerTextClass && "text-white")} />
-                  <span>Sin conexión</span>
+                  <span>Sin conexion</span>
                 </>
               )}
             </span>
@@ -178,7 +234,7 @@ const ScreenDisplay = () => {
       <main className="mx-auto w-[98%] py-8">
         {resolvedDataList.length === 0 ? (
           <div className="flex min-h-[60vh] items-center justify-center rounded-lg border bg-card text-muted-foreground">
-            No hay datos para mostrar todavía.
+            No hay datos para mostrar todavia.
           </div>
         ) : (
           <div className="rounded-lg border bg-card">
@@ -202,63 +258,65 @@ const ScreenDisplay = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {resolvedDataList.map((item, index) => (
-                    <TableRow
-                      key={item.id}
-                      className={cn(index % 2 === 0 ? "bg-muted/30" : "")}
-                    >
-                      {displayColumns.map((column) => {
-                        if (column.key === "__raw__") {
+                  {resolvedDataList.map((item, index) => {
+                    const rowTone = getRowToneClass(
+                      (item as { state?: string | null | undefined }).state,
+                    );
+
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className={cn(
+                          rowTone ?? "hover:bg-muted/30",
+                          !rowTone && index % 2 === 0 ? "bg-muted/25" : "",
+                          "transition-colors",
+                        )}
+                      >
+                        {displayColumns.map((column) => {
+                          if (column.key === "__raw__") {
+                            return (
+                              <TableCell key="__raw__" className="align-top">
+                                {item.data && Object.keys(item.data).length > 0 ? (
+                                  <pre className="max-h-48 w-full overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-3 text-xs font-mono">
+                                    {JSON.stringify(item.data, null, 2)}
+                                  </pre>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                            );
+                          }
+
+                          const rawValue =
+                            column.source === "data"
+                              ? item.data?.[column.key]
+                              : (item as Record<string, unknown>)[column.key];
+
+                          const { content, className } = resolveCellDisplay(rawValue);
+
                           return (
-                            <TableCell key="__raw__" className="font-mono text-xs">
-                              {item.data && Object.keys(item.data).length > 0 ? (
-                                <pre className="max-h-48 w-full overflow-auto whitespace-pre-wrap">
-                                  {JSON.stringify(item.data, null, 2)}
-                                </pre>
-                              ) : (
-                                <span className="text-muted-foreground">Sin dato</span>
-                              )}
+                            <TableCell
+                              key={column.key}
+                              className={cn("text-base font-medium", className)}
+                            >
+                              {content}
                             </TableCell>
                           );
-                        }
-
-                        const rawValue =
-                          column.source === "data"
-                            ? item.data?.[column.key]
-                            : (item as Record<string, unknown>)[column.key];
-
-                        const formattedValue =
-                          rawValue instanceof Date
-                            ? rawValue.toLocaleString("es-ES")
-                            : typeof rawValue === "object" && rawValue !== null
-                            ? JSON.stringify(rawValue)
-                            : rawValue;
-
-                        return (
-                          <TableCell key={column.key}>
-                            {formattedValue !== undefined &&
-                            formattedValue !== null &&
-                            formattedValue !== "" ? (
-                              String(formattedValue)
-                            ) : (
-                              <span className="text-muted-foreground">Sin dato</span>
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell>
-                        <TaskStateBadge state={item.state} size="sm" />
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={item.status} size="sm" />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {item.updated_at
-                          ? new Date(item.updated_at).toLocaleString("es-ES")
-                          : new Date(item.created_at).toLocaleString("es-ES")}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        })}
+                        <TableCell>
+                          <TaskStateBadge state={item.state} size="sm" />
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={item.status} size="sm" />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {item.updated_at
+                            ? new Date(item.updated_at).toLocaleString("es-ES")
+                            : new Date(item.created_at).toLocaleString("es-ES")}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -32,14 +32,19 @@ type Screen = {
   } | null;
 };
 
-// Se añade la prop opcional screenId
 type DisplayPageProps = {
   screenId?: string;
+  fullWidth?: boolean;
+  advanceSignal?: number;
 };
 
-export default function DisplayPage({ screenId }: DisplayPageProps) {
+export default function DisplayPage({
+  screenId,
+  fullWidth = false,
+  advanceSignal,
+}: DisplayPageProps) {
   const params = useParams<{ id: string }>();
-  const id = screenId || params.id; // Usa la prop si existe, si no, usa el parámetro de la URL
+  const id = screenId || params.id; // Usa la prop si existe; en caso contrario usa el parametro de la URL
 
   const [screen, setScreen] = useState<Screen | null>(null);
   const [screenData, setScreenData] = useState<ScreenData[]>([]);
@@ -49,8 +54,9 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const itemsPerPage = 25;
+  const itemsPerPage = 10;
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastAdvanceSignalRef = useRef<number | undefined>(advanceSignal);
 
   const loadData = useCallback(async () => {
     try {
@@ -72,7 +78,7 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
       const isDataScreen = screenDetails.screen_type === 'data';
       const stateFilter = screenDetails.screen_type === 'pendiente' ? 'pendiente' : 'acabado';
 
-      // Obtener conteo total para paginación
+      // Obtener conteo total para paginacion
       let countQuery = supabase
         .from("screen_data")
         .select("*", { count: "exact", head: true })
@@ -140,6 +146,26 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
     };
   }, [id, screen?.refresh_interval_sec, loadData, currentPage]);
 
+  useEffect(() => {
+    if (advanceSignal === undefined) {
+      lastAdvanceSignalRef.current = advanceSignal;
+      return;
+    }
+
+    if (advanceSignal === lastAdvanceSignalRef.current) {
+      return;
+    }
+
+    lastAdvanceSignalRef.current = advanceSignal;
+
+    setCurrentPage((prev) => {
+      if (totalPages <= 1) {
+        return 1;
+      }
+      return prev >= totalPages ? 1 : prev + 1;
+    });
+  }, [advanceSignal, totalPages]);
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
@@ -153,6 +179,54 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
     );
   }
 
+  const getRowToneClass = (state: string | null | undefined) => {
+    const normalized = (state || '').toLowerCase().trim();
+
+    const tones: Record<string, string> = {
+      pendiente: 'bg-pulse-neutral border-l-4 border-l-gray-300',
+      incidente:
+        'bg-pulse-danger border-l-4 border-l-destructive/70',
+      arreglo:
+        'bg-pulse-info border-l-4 border-l-sky-500/70',
+      reposicion:
+        'bg-pulse-warning border-l-4 border-l-amber-500/70',
+      urgente:
+        'bg-pulse-critical border-l-4 border-l-red-700',
+    };
+
+    return tones[normalized] ?? null;
+  };
+
+  const resolveCellDisplay = (raw: unknown) => {
+    if (raw === null || raw === undefined || raw === '') {
+      return { content: '-', className: 'text-muted-foreground' };
+    }
+
+    if (typeof raw === 'number') {
+      return { content: raw, className: '' };
+    }
+
+    if (typeof raw !== 'string') {
+      return { content: String(raw), className: '' };
+    }
+
+    let text = raw.trim();
+    const classes: string[] = [];
+
+    const applyMarker = (start: string, end: string, className: string) => {
+      if (text.startsWith(start) && text.endsWith(end) && text.length > start.length + end.length) {
+        classes.push(className);
+        text = text.slice(start.length, -end.length).trim();
+      }
+    };
+
+    applyMarker('**', '**', 'font-semibold text-foreground');
+    applyMarker('##', '##', 'text-xl');
+    applyMarker('!!', '!!', 'uppercase tracking-wide');
+
+    return { content: text, className: classes.join(' ') };
+  };
+
   const getStatusBadge = (status: string, state: string) => {
     if (state === 'incidente') return <Badge className="bg-destructive text-destructive-foreground">Incidente</Badge>;
     if (state === 'arreglo') return <Badge className="bg-blue-500/70 text-white">En Arreglo</Badge>;
@@ -160,21 +234,23 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
     return <Badge className="bg-yellow-500/70 text-white">Pendiente</Badge>;
   };
 
-  const getRowClassName = (state: string) => {
-    if (state === 'incidente') return 'bg-destructive/10 hover:bg-destructive/20 border-l-4 border-l-destructive';
-    if (state === 'arreglo') return 'bg-blue-500/10 hover:bg-blue-500/20 border-l-4 border-l-blue-500';
-    return 'hover:bg-muted/30';
-  };
+
 
   const headerStyle = screen.header_color ? { backgroundColor: screen.header_color, color: '#fff' } : undefined;
   const headerClassName = screen.header_color
     ? 'sticky top-0 z-10 shadow-lg'
     : 'bg-primary text-primary-foreground sticky top-0 z-10 shadow-lg';
+  const headerInnerClass = fullWidth
+    ? 'mx-auto w-full max-w-[1800px] px-6 py-4'
+    : 'container mx-auto px-6 py-4';
+  const mainContainerClass = fullWidth
+    ? 'mx-auto w-full max-w-[1800px] px-12 py-8'
+    : 'container mx-auto px-12 py-8';
 
   return (
     <div className="min-h-screen bg-background">
       <header className={headerClassName} style={headerStyle}>
-        <div className="container mx-auto px-6 py-4">
+        <div className={headerInnerClass}>
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <Monitor className="h-8 w-8" />
@@ -191,17 +267,17 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
             </div>
             <div className="text-right text-sm">
               <div className="font-medium">
-                Última actualización: {lastUpdate.toLocaleTimeString()}
+                Ultima actualizacion: {lastUpdate.toLocaleTimeString()}
               </div>
               <div className="opacity-90">
-                Próxima en {screen.refresh_interval_sec || 30}s
+                Proxima en {screen.refresh_interval_sec || 30}s
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-12 py-8">
+      <main className={mainContainerClass}>
         {screenData.length === 0 ? (
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-2xl text-muted-foreground">No hay datos para mostrar</div>
@@ -219,23 +295,38 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {screenData.map((entry, index) => (
-                  <TableRow key={entry.id} className={cn(getRowClassName(entry.state), index % 2 === 0 ? 'bg-muted/25' : '', "transition-colors")}>
-                    {fields.map((field) => (
-                      <TableCell key={field.name} className="font-medium text-lg">{entry.data[field.name] || "-"}</TableCell>
-                    ))}
-                    <TableCell>{getStatusBadge(entry.status, entry.state)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(entry.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {screenData.map((entry, index) => {
+                  const rowTone = getRowToneClass(entry.state);
+                  return (
+                    <TableRow
+                      key={entry.id}
+                      className={cn(
+                        rowTone ?? 'hover:bg-muted/30',
+                        !rowTone && index % 2 === 0 ? 'bg-muted/25' : '',
+                        'transition-colors'
+                      )}
+                    >
+                      {fields.map((field) => {
+                        const { content, className } = resolveCellDisplay(entry.data?.[field.name]);
+                        return (
+                          <TableCell key={field.name} className={cn('text-base font-medium', className)}>
+                            {content}
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell>{getStatusBadge(entry.status, entry.state)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(entry.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
         )}
         
-        {/* Paginación */}
+        {/* Paginacion */}
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-6">
             <Button
@@ -294,4 +385,9 @@ export default function DisplayPage({ screenId }: DisplayPageProps) {
     </div>
   );
 }
+
+
+
+
+
 
