@@ -140,15 +140,15 @@ const ScreenDisplay = () => {
     const normalized = (state || "").toLowerCase().trim();
 
     const tones: Record<string, string> = {
-      pendiente: "bg-white hover:bg-muted/20 border-l-4 border-l-gray-300 animate-pulse text-black",
+      pendiente: "bg-pulse-neutral border-l-4 border-l-gray-300",
       incidente:
-        "bg-destructive/20 hover:bg-destructive/30 border-l-4 border-l-destructive/70 animate-pulse text-black",
+        "bg-pulse-danger border-l-4 border-l-destructive/70",
       arreglo:
-        "bg-sky-200 hover:bg-sky-300 border-l-4 border-l-sky-500/70 animate-pulse text-black",
+        "bg-pulse-info border-l-4 border-l-sky-500/70",
       reposicion:
-        "bg-amber-200 hover:bg-amber-300 border-l-4 border-l-amber-500/70 animate-pulse text-black",
+        "bg-pulse-warning border-l-4 border-l-amber-500/70",
       urgente:
-        "bg-red-500/70 hover:bg-red-500 border-l-4 border-l-red-700 animate-pulse text-black",
+        "bg-pulse-critical border-l-4 border-l-red-700",
     };
 
     return tones[normalized] ?? null;

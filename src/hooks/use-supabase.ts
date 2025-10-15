@@ -34,7 +34,13 @@ export const useUpdateProfile = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (profile: Partial<Profile> & { id: string }) => {
-      const { error } = await supabase.from('profiles').update({ full_name: profile.full_name, phone: profile.phone, role: profile.role }).eq('id', profile.id);
+      const updates: Record<string, unknown> = {};
+      if (profile.full_name !== undefined) updates.full_name = profile.full_name;
+      if (profile.phone !== undefined) updates.phone = profile.phone;
+      if (profile.role !== undefined) updates.role = profile.role;
+      if ('avatar_url' in profile) updates.avatar_url = profile.avatar_url ?? null;
+
+      const { error } = await supabase.from('profiles').update(updates).eq('id', profile.id);
       if (error) throw error;
     },
     onSuccess: () => {

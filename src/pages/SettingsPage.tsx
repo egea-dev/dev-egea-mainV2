@@ -33,6 +33,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/badges";
 import { Profile } from "@/types";
+import { UserDialog } from "@/components/users/UserDialog";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function SettingsPage() {
   const { data: profile, isLoading: loadingProfile } = useProfile();
@@ -42,6 +44,7 @@ export default function SettingsPage() {
   const updateConfigMutation = useUpdateSystemConfig();
   const createConfigMutation = useCreateSystemConfig();
   const deleteConfigMutation = useDeleteSystemConfig();
+  const queryClient = useQueryClient();
 
   const [fullName, setFullName] = useState('');
   const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
@@ -63,6 +66,15 @@ export default function SettingsPage() {
   
   // Estados para permisos
   const [rolePermissions, setRolePermissions] = useState<Record<string, Record<string, { can_view: boolean; can_edit: boolean }>>>({});
+  const handleUsersRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+  };
+  const handleUserDialogOpenChange = (open: boolean) => {
+    setIsUserDialogOpen(open);
+    if (!open) {
+      setSelectedUser(null);
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -231,17 +243,24 @@ export default function SettingsPage() {
                             return;
                           }
 
-                          const fileExt = avatarFile.name.split('.').pop();
-                          const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
+                          const fileExt = avatarFile.name.split('.').pop() || 'png';
+                          const { data: { user } } = await supabase.auth.getUser();
+                          if (!user) {
+                            toast.error('No se encontro una sesion activa. Vuelve a iniciar sesion.');
+                            return;
+                          }
+                          const storagePath = `${user.id}/${Date.now()}.${fileExt}`;
                           
                           // Eliminar avatar anterior si existe
                           if (profile.avatar_url) {
                             try {
-                              const oldFileName = profile.avatar_url.split('/').pop();
-                              if (oldFileName) {
+                              const segments = profile.avatar_url.split('/storage/v1/object/public/avatars/')[1];
+                              const fallback = profile.avatar_url.split('/avatars/')[1];
+                              const oldFilePath = (segments || fallback)?.split('?')[0];
+                              if (oldFilePath) {
                                 await supabase.storage
                                   .from('avatars')
-                                  .remove([`${profile.id}/${oldFileName}`]);
+                                  .remove([oldFilePath]);
                               }
                             } catch (err) {
                               console.log('No se pudo eliminar el avatar anterior:', err);
@@ -249,9 +268,9 @@ export default function SettingsPage() {
                           }
                           
                           // Subir nuevo avatar
-                          const { data, error: uploadError } = await supabase.storage
+                          const { error: uploadError } = await supabase.storage
                             .from('avatars')
-                            .upload(fileName, avatarFile, {
+                            .upload(storagePath, avatarFile, {
                               cacheControl: '3600',
                               upsert: true
                             });
@@ -264,7 +283,7 @@ export default function SettingsPage() {
                           // Obtener URL pública
                           const { data: { publicUrl } } = supabase.storage
                             .from('avatars')
-                            .getPublicUrl(fileName);
+                            .getPublicUrl(storagePath);
                           
                           // Actualizar perfil con nueva URL
                           await updateProfileMutation.mutateAsync({
@@ -460,6 +479,7 @@ export default function SettingsPage() {
                                     if (error) throw error;
                                     
                                     toast.success(`Usuario ${newStatus === 'activo' ? 'activado' : 'desactivado'}`);
+                                    handleUsersRefresh();
                                   } catch (error) {
                                     toast.error('Error al actualizar estado del usuario');
                                   }
@@ -862,6 +882,14 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      {isUserDialogOpen && (
+        <UserDialog
+          open={isUserDialogOpen}
+          onOpenChange={handleUserDialogOpenChange}
+          onSuccess={handleUsersRefresh}
+          user={selectedUser}
+        />
+      )}
     </div>
   );
 }
