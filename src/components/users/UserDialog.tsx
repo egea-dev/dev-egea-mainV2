@@ -66,7 +66,12 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
 
     if (error) {
       console.error('Supabase profiles error:', error);
-      toast.error(error.message || "Error al guardar el perfil.");
+      const normalizedMessage = error.message || "Error al guardar el perfil.";
+      if (normalizedMessage.includes('No existe un perfil asociado')) {
+        toast.error("Tu usuario no tiene un perfil vinculado. Revisa tu ficha en Configuración > Mi Perfil antes de crear operarios.");
+      } else {
+        toast.error(normalizedMessage);
+      }
       setLoading(false);
       return;
     }

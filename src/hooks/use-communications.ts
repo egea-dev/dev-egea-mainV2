@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 
 // Types
@@ -26,16 +27,21 @@ export interface UserMessage {
   created_at: string;
 }
 
+type CommunicationLogRow = Database['public']['Tables']['communication_logs']['Row'];
+
 export interface CommunicationLog {
-  id: string;
-  profile_id: string;
-  action: string;
-  target?: string;
-  content?: string;
-  status: 'pending' | 'sent' | 'failed';
-  error_message?: string;
+  id: CommunicationLogRow['id'];
+  type: CommunicationLogRow['type'];
+  recipient: CommunicationLogRow['recipient'];
+  subject: CommunicationLogRow['subject'];
+  message: CommunicationLogRow['message'];
+  status: CommunicationLogRow['status'];
+  sent_at: CommunicationLogRow['sent_at'];
+  delivered_at: CommunicationLogRow['delivered_at'];
+  error_message: CommunicationLogRow['error_message'];
   metadata: Record<string, any>;
-  created_at: string;
+  created_by: CommunicationLogRow['created_by'];
+  created_at: CommunicationLogRow['created_at'];
 }
 
 export interface OnlineUser {
@@ -176,7 +182,7 @@ export const useUserMessages = (userId?: string) => {
             avatar_url
           )
         `)
-        .or(`(from_profile_id.eq.${userId},to_profile_id.eq.${userId})`)
+        .or(`from_profile_id.eq.${userId},to_profile_id.eq.${userId}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -308,14 +314,37 @@ export const useCommunicationLogs = (profileId?: string) => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (profileId) {
-        query = query.eq('profile_id', profileId);
-      }
-
       const { data, error } = await query;
 
       if (error) throw error;
-      return data as CommunicationLog[];
+
+      const rows = (data ?? []) as CommunicationLogRow[];
+      const normalizedLogs: CommunicationLog[] = rows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        recipient: row.recipient,
+        subject: row.subject,
+        message: row.message,
+        status: row.status,
+        sent_at: row.sent_at,
+        delivered_at: row.delivered_at,
+        error_message: row.error_message,
+        metadata: (row.metadata as Record<string, any>) ?? {},
+        created_by: row.created_by,
+        created_at: row.created_at,
+      }));
+
+      if (!profileId) return normalizedLogs;
+
+      return normalizedLogs.filter((log) => {
+        const meta = log.metadata || {};
+        const targetProfile =
+          meta.profile_id ??
+          meta.target_profile_id ??
+          meta.user_profile_id ??
+          null;
+        return targetProfile === profileId;
+      });
     },
   });
 };
@@ -349,13 +378,32 @@ export const useResendWhatsApp = () => {
       if (error) throw error;
 
       // Registrar en logs
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      let actorProfileId: string | null = null;
+
+      if (currentUser) {
+        const { data: actorProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('auth_user_id', currentUser.id)
+          .single();
+
+        actorProfileId = actorProfile?.id ?? null;
+      }
+
       await supabase.from('communication_logs').insert({
-        profile_id: profileId,
-        action: 'whatsapp_resent',
-        target: profile.phone,
-        content: message,
+        type: 'whatsapp',
+        recipient: profile.phone,
+        subject: null,
+        message,
         status: 'sent',
-        metadata: { resent_at: new Date().toISOString() },
+        metadata: {
+          resent_at: new Date().toISOString(),
+          profile_id: profileId,
+          action: 'whatsapp_resent',
+          target: profile.phone,
+        },
+        created_by: actorProfileId,
       });
 
       return { profileId, message };

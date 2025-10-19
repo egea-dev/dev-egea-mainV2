@@ -15,6 +15,7 @@ type UserListProps = {
 export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [inviteLoadingId, setInviteLoadingId] = useState<string | null>(null);
 
   const handleOpenDialog = (user: Profile | null = null) => {
     setSelectedUser(user);
@@ -34,19 +35,39 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
     }
   };
 
-  const handleInviteUser = async (email: string) => {
-    if (!email) {
+  const handleInviteUser = async (user: Profile) => {
+    if (!user.email) {
       toast.error("Este operario no tiene un email guardado para poder invitarlo.");
       return;
     }
-    if (!confirm(`¿Enviar una invitación de acceso al sistema a ${email}?`)) return;
+    if (!confirm(`¿Enviar una invitación de acceso al sistema a ${user.email}?`)) return;
 
-    const { error } = await supabase.auth.admin.inviteUserByEmail(email);
+    try {
+      setInviteLoadingId(user.id);
+      const { data, error } = await supabase.functions.invoke("invite-user", {
+        body: {
+          email: user.email,
+          fullName: user.full_name,
+          role: user.role,
+        },
+      });
 
-    if (error) {
-      toast.error(`Error al invitar: ${error.message}`);
-    } else {
-      toast.success(`Invitación enviada a ${email}. El operario debe revisar su correo.`);
+      if (error) {
+        toast.error(error.message ?? "No se pudo enviar la invitación.");
+        return;
+      }
+
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      toast.success(`Invitación enviada a ${user.email}.`);
+    } catch (err) {
+      console.error("invite-user function error", err);
+      toast.error(err instanceof Error ? err.message : "Error inesperado al invitar.");
+    } finally {
+      setInviteLoadingId(null);
     }
   };
 
@@ -121,9 +142,10 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                      size="icon"
                      className="h-8 w-8"
                      title="Vincular cuenta de usuario"
-                     onClick={() => handleInviteUser(user.email!)}
+                     onClick={() => handleInviteUser(user)}
+                     disabled={inviteLoadingId === user.id}
                    >
-                      <Link2 className="h-4 w-4" />
+                      <Link2 className={`h-4 w-4 ${inviteLoadingId === user.id ? "animate-spin" : ""}`} />
                    </Button>
                 )}
                 <Button

@@ -36,10 +36,9 @@ import {
   useRealtimeMessages,
   useRealtimePresence,
   type OnlineUser,
-  type UserMessage
+  type UserMessage,
+  type CommunicationLog
 } from '@/hooks/use-communications';
-import { supabase } from '@/integrations/supabase/client';
-
 type UserStatus = {
   id: string;
   profile_id: string;
@@ -115,6 +114,32 @@ export default function CommunicationManagement() {
     refetchOnlineUsers();
     refetchMessages();
     refetchLogs();
+  };
+
+  const formatLogLabel = (log: CommunicationLog) => {
+    const rawLabel = (log.metadata?.action as string) ?? log.type ?? 'comunicación';
+    return rawLabel
+      .split('_')
+      .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join(' ');
+  };
+
+  const formatLogTarget = (log: CommunicationLog) => {
+    const target = (log.metadata?.target as string) ?? log.recipient;
+    return target || 'Sin destino';
+  };
+
+  const getStatusDotClass = (status: CommunicationLog['status']) => {
+    switch (status) {
+      case 'sent':
+      case 'delivered':
+        return 'bg-green-500';
+      case 'failed':
+      case 'bounced':
+        return 'bg-red-500';
+      default:
+        return 'bg-yellow-500';
+    }
   };
 
   const formatLastSeen = (lastSeen: string) => {
@@ -334,17 +359,13 @@ export default function CommunicationManagement() {
                       logs.map((log) => (
                         <div key={log.id} className="flex items-center justify-between p-2 border rounded">
                           <div className="flex items-center gap-2">
-                            <div className={cn(
-                              "w-2 h-2 rounded-full",
-                              log.status === 'sent' ? "bg-green-500" : 
-                              log.status === 'failed' ? "bg-red-500" : "bg-yellow-500"
-                            )} />
+                            <div className={cn("w-2 h-2 rounded-full", getStatusDotClass(log.status))} />
                             <div>
                               <div className="text-sm font-medium">
-                                {log.action.replace('_', ' ').charAt(0).toUpperCase() + log.action.replace('_', ' ').slice(1)}
+                                {formatLogLabel(log)}
                               </div>
                               <div className="text-xs text-muted-foreground">
-                                {log.target || 'Sin destino'} • {formatLastSeen(log.created_at)}
+                                {formatLogTarget(log)} - {formatLastSeen(log.created_at)}
                               </div>
                             </div>
                           </div>

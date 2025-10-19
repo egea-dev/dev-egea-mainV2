@@ -103,9 +103,9 @@ export default function SettingsPage() {
         if (error) throw error;
         
         const permissionsByRole: Record<string, Record<string, { can_view: boolean; can_edit: boolean }>> = {};
-        
+
         // Inicializar estructura base
-        ['admin', 'responsable', 'operario'].forEach(role => {
+        ['admin', 'manager', 'responsable', 'operario'].forEach(role => {
           permissionsByRole[role] = {};
           [
             '/admin', '/admin/installations', '/admin/data', '/admin/screens',
@@ -571,8 +571,12 @@ export default function SettingsPage() {
                   <Button onClick={async () => {
                     try {
                       // Guardar permisos en la base de datos
-                      const { error } = await supabase.from('role_permissions').delete().neq('id', '');
-                      
+                      const rolesToReset = Object.keys(rolePermissions);
+                      const { error } = await supabase
+                        .from('role_permissions')
+                        .delete()
+                        .in('role', rolesToReset.length ? rolesToReset : ['admin', 'manager', 'responsable', 'operario']);
+
                       if (error) throw error;
                       
                       // Insertar nuevos permisos
