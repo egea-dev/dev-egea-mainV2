@@ -55,3 +55,27 @@ export type Task = {
   task_profiles?: { profiles: Profile }[];
   task_vehicles?: { vehicles: Vehicle }[];
 };
+
+export type SessionLocation = {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  source?: 'geolocation' | 'manual';
+  note?: string | null;
+  collected_at?: string;
+};
+
+export type WorkSession = {
+  id: string;
+  profile_id: string;
+  task_id: string | null;
+  started_at: string;
+  ended_at: string | null;
+  start_location: Record<string, unknown> | null;
+  end_location: Record<string, unknown> | null;
+  device_info: Record<string, unknown> | null;
+  status: 'active' | 'completed' | 'cancelled' | string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};

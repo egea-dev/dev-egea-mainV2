@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CalendarCheck, Users, Car, ClipboardList, MoreHorizontal, Archive, Eye, Pencil, Filter, Clock, Settings, LogOut, User, AlertTriangle, CheckCircle, RotateCcw } from "lucide-react";
+import { CalendarCheck, Users, Car, ClipboardList, MoreHorizontal, Archive, Eye, Pencil, Filter, Clock, LogOut, User, AlertTriangle, CheckCircle, RotateCcw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,13 +61,55 @@ const SCREEN_FIELD_MAP: Record<string, { site: string[]; description: string[] }
 
 const DEFAULT_SITE_FIELDS = ['site', 'client', 'address', 'location', 'obra', 'obra_', 'ubicacion', 'ubicación'];
 const DEFAULT_DESCRIPTION_FIELDS = ['description', 'descripcion', 'descripción', 'notes', 'notas', 'detalle', 'trabajo'];
-
-const getCandidateFields = (group: string | null | undefined, type: 'site' | 'description') => {
-  const mapping = SCREEN_FIELD_MAP[group ?? ''];
-  const defaults = type === 'site' ? DEFAULT_SITE_FIELDS : DEFAULT_DESCRIPTION_FIELDS;
-  const groupFields = mapping ? mapping[type] : [];
-  return Array.from(new Set([...groupFields, ...defaults]));
+const TEMPLATE_FIELD_KEYWORDS = {
+  site: ['obra', 'site', 'ubicacion', 'ubicación', 'cliente', 'direccion', 'dirección', 'localizacion', 'localización', 'zona'],
+  description: ['descripcion', 'descripción', 'detalle', 'observaciones', 'trabajo', 'resumen', 'nota'],
+  order: ['orden', 'order', 'ot', 'pedido', 'ticket', 'numero', 'número', 'nº', 'n°'],
+  obra: ['obra', 'proyecto', 'site', 'cliente', 'zona'],
+  gestor: ['gestor', 'responsable', 'encargado', 'manager', 'coordinador', 'supervisor']
 };
+const ORDER_FIELD_FALLBACKS = [
+  'n_orden',
+  'numero_orden',
+  'num_orden',
+  'norden',
+  'n°_orden',
+  'nº_orden',
+  'nro_orden',
+  'nroorden',
+  'orden_trabajo',
+  'orden',
+  'order'
+];
+const OBRA_FIELD_FALLBACKS = [
+  'obra',
+  'obra_',
+  'nombre_obra',
+  'cliente',
+  'linea',
+  'línea',
+  'sector',
+  'zona',
+  'site',
+  'ubicacion',
+  'ubicación'
+];
+const GESTOR_FIELD_FALLBACKS = [
+  'gestor',
+  'gestión',
+  'gestion',
+  'manager',
+  'encargado',
+  'responsable',
+  'coordinador'
+];
+
+const sanitizeString = (value: string | null | undefined) =>
+  (value ?? '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
 const extractFieldValue = (task: DetailedTask, candidates: string[]) => {
   const data = (task.data ?? {}) as Record<string, any>;
@@ -121,8 +163,9 @@ export default function AdminPage() {
   const [selectedTask, setSelectedTask] = useState<DetailedTask | null>(null);
 
   // Usar hooks personalizados para datos del dashboard
-  const { confeccionTasks, tapiceriaTasks, pendingTasks, loading: tasksLoading, refresh: refreshDashboardTasks } = useDashboardTasks();
+  const { confeccionTasks, tapiceriaTasks, pendingTasks, loading: tasksLoading, templateFieldsByScreen, refresh: refreshDashboardTasks } = useDashboardTasks();
   const { stats, loading: statsLoading } = useDashboardStats();
+
   const { data: users = [] } = useUsers();
   const { data: vehicles = [] } = useVehicles();
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
@@ -208,6 +251,45 @@ export default function AdminPage() {
     refreshCalendarData();
   }, [refreshDashboardTasks, refreshCalendarData]);
 
+  const buildTemplateCandidates = useCallback((task: DetailedTask, keywords: string[]) => {
+    const screenId = task.screen_id;
+    if (!screenId) return [];
+    const templateFields = templateFieldsByScreen[screenId] ?? [];
+    if (templateFields.length === 0) return [];
+
+    const sanitizedKeywords = keywords.map(sanitizeString).filter(Boolean);
+    const matches: string[] = [];
+
+    templateFields.forEach((field) => {
+      const fieldName = typeof field?.name === 'string' ? field.name : '';
+      if (!fieldName) return;
+      const fieldLabel = typeof field?.label === 'string' ? field.label : '';
+      const normalizedName = sanitizeString(fieldName);
+      const normalizedLabel = sanitizeString(fieldLabel);
+
+      const hasMatch = sanitizedKeywords.some((keyword) =>
+        normalizedName.includes(keyword) || normalizedLabel.includes(keyword)
+      );
+
+      if (hasMatch) {
+        matches.push(fieldName);
+      }
+    });
+
+    return matches;
+  }, [templateFieldsByScreen]);
+
+  const getCandidateFields = useCallback((task: DetailedTask, type: 'site' | 'description') => {
+    const mapping = SCREEN_FIELD_MAP[task.screen_group ?? ''];
+    const defaults = type === 'site' ? DEFAULT_SITE_FIELDS : DEFAULT_DESCRIPTION_FIELDS;
+    const groupFields = mapping ? mapping[type] : [];
+    const templateKeywords = type === 'site'
+      ? TEMPLATE_FIELD_KEYWORDS.site
+      : TEMPLATE_FIELD_KEYWORDS.description;
+    const templateCandidates = buildTemplateCandidates(task, templateKeywords);
+    return Array.from(new Set([...templateCandidates, ...groupFields, ...defaults]));
+  }, [buildTemplateCandidates]);
+
   const getTaskDateLabel = useCallback((task: DetailedTask) => {
     if (!task.start_date) {
       return 'Sin fecha';
@@ -220,16 +302,72 @@ export default function AdminPage() {
   }, []);
 
   const getTaskSiteLabel = useCallback((task: DetailedTask) => {
-    const candidates = getCandidateFields(task.screen_group, 'site');
+    const candidates = getCandidateFields(task, 'site');
     const value = extractFieldValue(task, candidates);
     return value || 'Sin sitio definido';
+  }, [getCandidateFields]);
+
+  const getOrderNumberLabel = useCallback((task: DetailedTask) => {
+    const candidates = [
+      ...buildTemplateCandidates(task, TEMPLATE_FIELD_KEYWORDS.order),
+      ...ORDER_FIELD_FALLBACKS,
+    ];
+    const value = extractFieldValue(task, candidates);
+    if (value) {
+      return value;
+    }
+    if (typeof task.order === 'number') {
+      return String(task.order);
+    }
+    return 'Sin número';
+  }, [buildTemplateCandidates]);
+
+  const getConfeccionObraLabel = useCallback((task: DetailedTask) => {
+    const candidates = [
+      ...buildTemplateCandidates(task, TEMPLATE_FIELD_KEYWORDS.obra),
+      ...OBRA_FIELD_FALLBACKS,
+    ];
+    const value = extractFieldValue(task, candidates);
+    if (value) {
+      return value;
+    }
+    return getTaskSiteLabel(task);
+  }, [buildTemplateCandidates, getTaskSiteLabel]);
+
+  const getTapiceriaGestorLabel = useCallback((task: DetailedTask) => {
+    const candidates = [
+      ...buildTemplateCandidates(task, TEMPLATE_FIELD_KEYWORDS.gestor),
+      ...GESTOR_FIELD_FALLBACKS,
+    ];
+    const value = extractFieldValue(task, candidates);
+    if (value) {
+      return value;
+    }
+    return task.responsible_name || 'Sin gestor';
+  }, [buildTemplateCandidates]);
+
+  const getStateBadgeClasses = useCallback((state: string | null) => {
+    switch (state?.toLowerCase()) {
+      case 'urgente':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'en fabricacion':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+      case 'a la espera':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'terminado':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'pendiente':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
   }, []);
 
   const getTaskDescriptionLabel = useCallback((task: DetailedTask) => {
-    const candidates = getCandidateFields(task.screen_group, 'description');
+    const candidates = getCandidateFields(task, 'description');
     const value = extractFieldValue(task, candidates);
     return value || 'Sin descripción';
-  }, []);
+  }, [getCandidateFields]);
 
   const archiveTask = useCallback(async (taskId: string, options?: { skipRefresh?: boolean }) => {
     try {
@@ -383,10 +521,6 @@ export default function AdminPage() {
               <DropdownMenuItem onClick={() => navigate('/admin/settings')}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Perfil</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/admin/settings')}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Configuración</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
@@ -557,8 +691,8 @@ export default function AdminPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-sm">#</TableHead>
-                      <TableHead className="text-sm">Tipo</TableHead>
+                      <TableHead className="text-sm">Nº Orden</TableHead>
+                      <TableHead className="text-sm">Obra</TableHead>
                       <TableHead className="text-sm">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -578,20 +712,13 @@ export default function AdminPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      confeccionTasks.map((task, index) => {
-                        const statusColor =
-                          task.state === 'urgente' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                          task.state === 'en fabricacion' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                          task.state === 'a la espera' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                          task.state === 'terminado' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                          'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+                      confeccionTasks.map((task) => {
+                        const statusColor = getStateBadgeClasses(task.state);
 
                         return (
                           <TableRow key={task.id}>
-                            <TableCell className="text-sm font-medium">#{index + 1}</TableCell>
-                            <TableCell className="text-sm">
-                              {String((task.data as Record<string, unknown>)?.tipo || task.site || 'N/A')}
-                            </TableCell>
+                            <TableCell className="text-sm font-medium">{getOrderNumberLabel(task)}</TableCell>
+                            <TableCell className="text-sm">{getConfeccionObraLabel(task)}</TableCell>
                             <TableCell>
                               <Badge variant="secondary" className={statusColor}>
                                 {task.state}
@@ -620,7 +747,7 @@ export default function AdminPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-sm">#</TableHead>
+                      <TableHead className="text-sm">Nº Orden</TableHead>
                       <TableHead className="text-sm">Gestor</TableHead>
                       <TableHead className="text-sm">Estado</TableHead>
                     </TableRow>
@@ -641,20 +768,13 @@ export default function AdminPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      tapiceriaTasks.map((task, index) => {
-                        const statusColor =
-                          task.state === 'en fabricacion' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                          task.state === 'a la espera' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                          'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-
-                        const displayContent = task.state === 'pendiente'
-                          ? format(new Date(task.created_at), 'dd/MM/yyyy')
-                          : String((task.data as Record<string, unknown>)?.gestor || 'N/A');
+                      tapiceriaTasks.map((task) => {
+                        const statusColor = getStateBadgeClasses(task.state);
 
                         return (
                           <TableRow key={task.id}>
-                            <TableCell className="text-sm font-medium">#{index + 1}</TableCell>
-                            <TableCell className="text-sm">{displayContent}</TableCell>
+                            <TableCell className="text-sm font-medium">{getOrderNumberLabel(task)}</TableCell>
+                            <TableCell className="text-sm">{getTapiceriaGestorLabel(task)}</TableCell>
                             <TableCell>
                               <Badge variant="secondary" className={statusColor}>
                                 {task.state}

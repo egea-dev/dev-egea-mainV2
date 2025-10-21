@@ -32,6 +32,8 @@ type ScreenDialogProps = {
 
 export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }: ScreenDialogProps) => {
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [availableGroups, setAvailableGroups] = useState<string[]>([]);
+  const [groupInput, setGroupInput] = useState('');
   const [formData, setFormData] = useState<Partial<Screen>>({
     name: '',
     is_active: true,
@@ -47,7 +49,8 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
   useEffect(() => {
     if (open) {
       console.log('Dialog opened with screen:', screen);
-      loadTemplates();
+      loadTemplatesAndGroups();
+      const initialGroup = screen?.screen_group || '';
       setFormData({
         name: screen?.name || '',
         is_active: screen?.is_active ?? true,
@@ -55,15 +58,44 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
         screen_type: (screen?.screen_type as 'data' | 'display') || 'data',
         template_id: screen?.template_id || null,
         next_screen_id: screen?.next_screen_id || null,
-        screen_group: screen?.screen_group || '',
+        screen_group: initialGroup,
         header_color: screen?.header_color || '#000000',
       });
+      setGroupInput(initialGroup);
     }
   }, [open, screen]);
 
-  const loadTemplates = async () => {
-    const { data } = await supabase.from("templates").select("id, name");
-    setTemplates(data || []);
+  const loadTemplatesAndGroups = async () => {
+    try {
+      const [{ data: templatesData, error: templatesError }, { data: groupsData, error: groupsError }] = await Promise.all([
+        supabase.from("templates").select("id, name").order("name"),
+        supabase.from("screens").select("screen_group").order("screen_group")
+      ]);
+
+      if (templatesError) throw templatesError;
+      setTemplates(templatesData || []);
+
+      if (groupsError) {
+        console.error("Error loading screen groups:", groupsError);
+      }
+
+      const groupSet = new Set<string>();
+      Object.values(SCREEN_GROUPS).forEach((group) => groupSet.add(group));
+      (groupsData || []).forEach((entry) => {
+        const groupName = entry?.screen_group as string | null;
+        if (groupName) {
+          groupSet.add(groupName);
+        }
+      });
+
+      const sortedGroups = Array.from(groupSet)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+      setAvailableGroups(sortedGroups);
+    } catch (error) {
+      console.error("Error loading templates/groups:", error);
+      toast.error("No se pudieron cargar las plantillas o grupos disponibles.");
+    }
   };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,6 +117,7 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
     setLoading(true);
 
     try {
+      const normalizedGroup = groupInput.trim();
       const screenData = {
         name: formData.name,
         template_id: formData.template_id || null,
@@ -92,7 +125,7 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
         is_active: formData.is_active,
         screen_type: formData.screen_type,
         next_screen_id: formData.next_screen_id || null,
-        screen_group: formData.screen_group ? formData.screen_group : null,
+        screen_group: normalizedGroup !== '' ? normalizedGroup : null,
         header_color: formData.header_color || '#000000',
       };
 
@@ -137,17 +170,26 @@ export const ScreenDialog = ({ open, onOpenChange, onClose, screen, allScreens }
           
           <div className="space-y-2">
             <Label htmlFor="screen_group">Grupo de Pantallas</Label>
-            <Select value={formData.screen_group || "none"} onValueChange={(val) => handleSelectChange('screen_group', val === "none" ? "" : val)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un grupo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin grupo</SelectItem>
-                {Object.values(SCREEN_GROUPS).map(group => (
-                  <SelectItem key={group} value={group}>{group}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              id="screen_group"
+              name="screen_group"
+              value={groupInput}
+              onChange={(event) => {
+                const value = event.target.value;
+                setGroupInput(value);
+                setFormData((prev) => ({ ...prev, screen_group: value }));
+              }}
+              list="screen-groups-suggestions"
+              placeholder="Ej: Producción, Logística, etc."
+            />
+            <datalist id="screen-groups-suggestions">
+              {availableGroups.map((group) => (
+                <option key={group} value={group} />
+              ))}
+            </datalist>
+            <p className="text-xs text-muted-foreground">
+              Escribe un nombre nuevo o selecciona uno existente.
+            </p>
           </div>
 
           <div className="space-y-2">

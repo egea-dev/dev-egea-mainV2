@@ -9,7 +9,18 @@ type Screen = {
   id: string;
   name: string;
   refresh_interval_sec: number | null;
+  header_color?: string | null;
+  screen_group?: string | null;
 };
+
+const normalizeGroupName = (value: string | null | undefined) =>
+  (value ?? '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 
 export default function GroupDisplayPage() {
   const { groupName } = useParams<{ groupName: string }>();
@@ -67,21 +78,32 @@ export default function GroupDisplayPage() {
       if (!groupName) return;
       setLoading(true);
 
+      const normalizedGroup = normalizeGroupName(decodeURIComponent(groupName));
+
       const { data, error } = await supabase
         .from('screens')
-        .select('id, name, refresh_interval_sec')
-        .eq('screen_group', groupName)
+        .select('id, name, refresh_interval_sec, header_color, screen_group')
         .eq('is_active', true)
+        .not('screen_group', 'is', null)
         .order('name');
-      
+
       if (error) {
         console.error("Error loading group screens:", error);
         toast.error(`Error al cargar el grupo de pantallas: ${error.message}`);
         setScreens([]);
       } else {
-        setScreens(data || []);
+        const matchingScreens = (data || []).filter((screen) => {
+          return normalizeGroupName(screen.screen_group) === normalizedGroup;
+        });
+
+        setScreens(matchingScreens);
         shownScreensRef.current = {};
         setAdvanceSignals({});
+        if (matchingScreens.length === 0) {
+          console.warn(
+            `No se encontraron pantallas para el grupo "${groupName}". Verifica que el nombre coincide exactamente.`
+          );
+        }
       }
       setLoading(false);
     };

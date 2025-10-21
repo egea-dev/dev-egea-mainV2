@@ -135,6 +135,8 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
     setSaving(true);
     try {
       const formattedDate = dayjs(data.dueDate).format('YYYY-MM-DD');
+      const nextState = task?.state ?? 'pendiente';
+      const nextStatus = task?.status ?? 'pendiente';
 
       const { data: result, error } = await supabase.rpc('upsert_task', {
         p_task_id: task?.id || undefined,
@@ -143,8 +145,8 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
           site: data.site,
           description: data.description,
         },
-        p_state: 'pendiente',
-        p_status: 'pendiente',
+        p_state: nextState,
+        p_status: nextStatus,
         p_start_date: formattedDate,
         p_end_date: formattedDate,
         p_location: 'en la isla',

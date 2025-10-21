@@ -46,6 +46,12 @@ export const DataManagement = () => {
   const [deleteScreenDialogOpen, setDeleteScreenDialogOpen] = useState(false);
   const [screenToDelete, setScreenToDelete] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const dashboardOptions = [
+    { value: "none", label: "No mostrar en dashboard" },
+    { value: "confeccion", label: "Tarjeta Confeccion" },
+    { value: "tapiceria", label: "Tarjeta Tapiceria" },
+    { value: "pendientes", label: "Lista de pendientes" },
+  ];
   
   const { data: screens = [], isLoading: screensLoading, refetch: refetchScreens } = useScreens();
   const { data: screenInfo, isLoading: dataLoading } = useScreenData(selectedScreenId);
@@ -164,6 +170,25 @@ export const DataManagement = () => {
 
     setImportDialogOpen(true)
   }
+
+  const updateScreenDashboardSettings = async (updates: Partial<{ dashboard_section: string | null; dashboard_order: number }>) => {
+    if (!selectedScreenId) return;
+    try {
+      const { error } = await supabase
+        .from("screens")
+        .update(updates)
+        .eq("id", selectedScreenId);
+
+      if (error) throw error;
+
+      toast.success("Configuracion del dashboard actualizada");
+      await refetchScreens();
+      queryClient.invalidateQueries({ queryKey: ['screens'] });
+    } catch (error) {
+      console.error("Error updating dashboard settings:", error);
+      toast.error("No se pudo actualizar la configuracion del dashboard");
+    }
+  };
 
   const handleCellEdit = (itemId: string, field: string) => {
     setEditingCell(`${itemId}-${field}`);
@@ -492,6 +517,47 @@ export const DataManagement = () => {
                 </DropdownMenu>
                 <Button onClick={handleAddNewRow} disabled={!!newRowData}><Plus className="mr-2 h-4 w-4" />Añadir Fila</Button>
             </div>
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+          <div className="space-y-1">
+            <Label>Seccion en dashboard</Label>
+            <Select
+              value={(selectedScreen?.dashboard_section as string | undefined) ?? "none"}
+              onValueChange={(value) => updateScreenDashboardSettings({ dashboard_section: value === "none" ? null : value })}
+              disabled={!selectedScreen?.id}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona seccion" />
+              </SelectTrigger>
+              <SelectContent>
+                {dashboardOptions.map((option) => (
+                  <SelectItem key={option.value || "none"} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Orden dentro de la seccion</Label>
+            <Input
+              key={`order-${selectedScreen?.id ?? "none"}`}
+              type="number"
+              min={0}
+              defaultValue={selectedScreen?.dashboard_order ?? 0}
+              disabled={!selectedScreen?.id}
+              onBlur={(event) => {
+                const raw = Number(event.target.value || 0);
+                if (selectedScreen && raw !== (selectedScreen.dashboard_order ?? 0)) {
+                  updateScreenDashboardSettings({ dashboard_order: raw });
+                }
+              }}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Grupo actual</Label>
+            <Input value={selectedScreen?.screen_group ?? "Sin grupo"} disabled className="bg-muted" />
+          </div>
         </div>
       </CardHeader>
       

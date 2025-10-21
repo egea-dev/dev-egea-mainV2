@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthGuard } from "./components/AuthGuard";
 import { PermissionGuardEnhanced } from "./components/PermissionGuardEnhanced";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
+import { RolePreviewProvider } from "./context/RolePreviewContext";
 
 // --- PÁGINAS ---
 import IndexPage from "./pages/Index";
@@ -17,12 +18,14 @@ import NotFound from "./pages/NotFound";
 import GroupDisplayPage from "./pages/GroupDisplay";
 import InstallationsPage from "./pages/Installations";
 import UsersAndVehiclesPage from "./pages/UsersAndVehiclesPage";
+import CommunicationsPage from "./pages/CommunicationsPage";
 import SettingsPage from "./pages/SettingsPage";
 import ArchivePage from "./pages/ArchivePage";
 import SharedPlanPage from "./pages/SharedPlanPage";
 import DataEntryPage from "./pages/DataEntry";
 import TemplatesPage from "./pages/TemplatesPage";
 import MyTasksPage from "./pages/MyTasksPage";
+import WorkdayPage from "./pages/WorkdayPage";
 
 // --- LAYOUTS Y COMPONENTES PRINCIPALES ---
 import AdminLayout from "./pages/AdminLayout"; // CORRECCIÓN DEFINITIVA: Importación nombrada
@@ -38,8 +41,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Routes>
+      <RolePreviewProvider>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes>
           {/* Rutas Públicas */}
           <Route path="/" element={<IndexPage />} />
           <Route path="/auth" element={<AuthPage />} />
@@ -54,7 +58,19 @@ const App = () => (
           <Route path="/admin" element={<AuthGuard><PermissionGuardEnhanced resource="dashboard" action="view"><AdminLayout /></PermissionGuardEnhanced></AuthGuard>}>
             <Route index element={<PermissionGuardEnhanced resource="admin" action="view"><AdminPage /></PermissionGuardEnhanced>} />
             <Route path="installations" element={<InstallationsPage />} />
-            <Route path="users" element={<UsersAndVehiclesPage />} />
+            <Route
+              path="users"
+              element={
+                <PermissionGuardEnhanced resource="users" action="view">
+                  <UsersAndVehiclesPage />
+                </PermissionGuardEnhanced>
+              }
+            />
+            <Route
+              path="communications"
+              element={<CommunicationsPage />}
+            />
+            <Route path="workday" element={<WorkdayPage />} />
             <Route path="settings" element={<PermissionGuardEnhanced resource="admin" action="view"><SettingsPage /></PermissionGuardEnhanced>} />
             <Route path="archive" element={<PermissionGuardEnhanced resource="admin" action="view"><ArchivePage /></PermissionGuardEnhanced>} />
             <Route path="data" element={<PermissionGuardEnhanced resource="admin" action="view"><DataManagement /></PermissionGuardEnhanced>} />
@@ -65,8 +81,9 @@ const App = () => (
           <Route path="/data-entry/:id" element={<AuthGuard><DataEntryPage /></AuthGuard>} />
           
           <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </RolePreviewProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

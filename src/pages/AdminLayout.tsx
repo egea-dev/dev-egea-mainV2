@@ -1,23 +1,49 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Layout } from "@/components/Layout";
-import { useUsers, useVehicles } from "@/hooks/use-supabase";
+import Layout, { CompactLayout } from "@/components/Layout";
+import { useUsers, useVehicles, useProfile } from "@/hooks/use-supabase";
+import { getNavItemsForRole } from "@/config/navigation";
+import { useRolePreview } from "@/context/RolePreviewContext";
 function AdminLayout() {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { data: users = [], isLoading: isLoadingUsers } = useUsers();
   const { data: vehicles = [], isLoading: isLoadingVehicles } = useVehicles();
+  const { data: profile, isLoading: isLoadingProfile } = useProfile();
+  const { previewRole } = useRolePreview();
 
   const fetchData = () => {
     queryClient.invalidateQueries({ queryKey: ['users'] });
     queryClient.invalidateQueries({ queryKey: ['vehicles'] });
   };
 
-  if (isLoadingUsers || isLoadingVehicles) {
+  const effectiveRole = previewRole ?? profile?.role ?? 'operario';
+  const navItems = getNavItemsForRole(effectiveRole);
+  const useCompactLayout = effectiveRole !== 'admin' && effectiveRole !== 'manager';
+  const isLoading = isLoadingUsers || isLoadingVehicles || isLoadingProfile;
+
+  useEffect(() => {
+    if (!isLoading && useCompactLayout && location.pathname === '/admin') {
+      navigate('/admin/workday', { replace: true });
+    }
+  }, [isLoading, useCompactLayout, location.pathname, navigate]);
+
+  if (isLoading) {
     return <div>Loading...</div>;
   }
 
+  if (useCompactLayout) {
+    return (
+      <CompactLayout profile={profile} navItems={navItems}>
+        <Outlet context={{ users, vehicles, fetchData }} />
+      </CompactLayout>
+    );
+  }
+
   return (
-    <Layout>
+    <Layout profile={profile} navItems={navItems}>
       <Outlet context={{ users, vehicles, fetchData }} />
     </Layout>
   );

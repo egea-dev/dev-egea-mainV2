@@ -216,7 +216,9 @@ export const useUnreadMessageCount = (userId?: string) => {
     queryFn: async () => {
       if (!userId) return 0;
 
-      const { data, error } = await supabase.rpc('get_unread_count');
+      const { data, error } = await supabase.rpc('get_unread_message_count', {
+        user_profile_id: userId,
+      });
 
       if (error) throw error;
       return data as number;
@@ -549,3 +551,4 @@ export const useRealtimePresence = () => {
     };
   }, [queryClient]);
 };
+

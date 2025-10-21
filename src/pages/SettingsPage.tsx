@@ -144,6 +144,148 @@ export default function SettingsPage() {
     updateConfigMutation.mutate({ key, value });
   };
 
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
+
+  if (loadingProfile) {
+    return <div className="p-6 text-center text-muted-foreground">Cargando perfil...</div>;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col gap-6 p-4 md:p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Mi perfil</CardTitle>
+            <CardDescription>Actualiza tu información básica y tu foto de perfil.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label>Avatar</Label>
+              <div className="flex items-center gap-4">
+                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-muted">
+                  {avatarPreview || profile?.avatar_url ? (
+                    <img
+                      src={avatarPreview || profile?.avatar_url}
+                      alt="Avatar"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-sm text-muted-foreground">Sin foto</div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/png,image/jpeg,image/webp';
+                      input.onchange = (event: Event) => {
+                        const file = (event.target as HTMLInputElement)?.files?.[0];
+                        if (file) {
+                          setAvatarFile(file);
+                          const reader = new FileReader();
+                          reader.onloadend = () => setAvatarPreview(reader.result as string);
+                          reader.readAsDataURL(file);
+                        }
+                      };
+                      input.click();
+                    }}
+                  >
+                    Elegir imagen
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    disabled={!avatarFile || updateProfileMutation.isPending}
+                    onClick={async () => {
+                      if (!avatarFile || !profile) return;
+                      try {
+                        if (avatarFile.size > 2 * 1024 * 1024) {
+                          toast.error('El archivo es demasiado grande. Máximo 2MB');
+                          return;
+                        }
+                        const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+                        if (!validTypes.includes(avatarFile.type)) {
+                          toast.error('Formato no válido. Usa JPG, PNG o WEBP');
+                          return;
+                        }
+                        const fileExt = avatarFile.name.split('.').pop() || 'png';
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) {
+                          toast.error('No se encontró la sesión. Inicia sesión nuevamente.');
+                          return;
+                        }
+                        if (profile.avatar_url) {
+                          try {
+                            const segments = profile.avatar_url.split('/storage/v1/object/public/avatars/')[1];
+                            const fallback = profile.avatar_url.split('/avatars/')[1];
+                            const oldFilePath = (segments || fallback)?.split('?')[0];
+                            if (oldFilePath) {
+                              await supabase.storage.from('avatars').remove([oldFilePath]);
+                            }
+                          } catch (err) {
+                            console.log('No se pudo eliminar el avatar anterior:', err);
+                          }
+                        }
+                        const storagePath = `${user.id}.${fileExt}`;
+                        const { error: uploadError } = await supabase.storage
+                          .from('avatars')
+                          .upload(storagePath, avatarFile, { cacheControl: '3600', upsert: true });
+                        if (uploadError) throw uploadError;
+                        const { data: publicUrlData } = await supabase.storage
+                          .from('avatars')
+                          .getPublicUrl(storagePath);
+                        await updateProfileMutation.mutateAsync({
+                          ...profile,
+                          avatar_url: publicUrlData.publicUrl,
+                        });
+                        setAvatarFile(null);
+                        setAvatarPreview('');
+                        toast.success('Avatar actualizado correctamente');
+                      } catch (error: any) {
+                        console.error(error);
+                        toast.error(error.message || 'Error al subir avatar. Verifica el bucket "avatars".');
+                      }
+                    }}
+                  >
+                    {updateProfileMutation.isPending ? 'Subiendo...' : 'Subir Avatar'}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Formatos permitidos: JPG, PNG, WEBP. Tamaño máximo 2MB.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Nombre completo</Label>
+              <Input
+                id="fullName"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                placeholder="Tu nombre"
+              />
+              <Button
+                onClick={handleUpdateProfile}
+                disabled={updateProfileMutation.isPending}
+                className="self-start"
+              >
+                {updateProfileMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+              </Button>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Correo</Label>
+              <p className="text-sm text-muted-foreground">{profile?.email ?? 'Sin correo registrado'}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const handleCreateConfig = () => {
     try {
       const parsedValue = JSON.parse(newConfigValue);

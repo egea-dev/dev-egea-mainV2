@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, MessageCircle, User, ArrowLeft } from 'lucide-react';
+import { Send, MessageCircle, User, ArrowLeft, RefreshCcw } from 'lucide-react';
 import { useDirectMessages, Conversation, DirectMessage } from '@/hooks/use-direct-messages';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,7 +25,10 @@ export const DirectMessagesChat = ({ onBack }: DirectMessagesChatProps) => {
     selectedUserId,
     fetchConversation,
     sendMessage,
-    setSelectedUserId
+    setSelectedUserId,
+    loadMoreConversations,
+    hasMoreConversations,
+    refreshConversations
   } = useDirectMessages();
 
   const [messageInput, setMessageInput] = useState('');
@@ -52,6 +55,10 @@ export const DirectMessagesChat = ({ onBack }: DirectMessagesChatProps) => {
     } finally {
       setSendingMessage(false);
     }
+  };
+
+  const handleRefreshConversations = () => {
+    refreshConversations();
   };
 
   // Manejar Enter para enviar mensaje
@@ -95,11 +102,16 @@ export const DirectMessagesChat = ({ onBack }: DirectMessagesChatProps) => {
                 </Badge>
               )}
             </CardTitle>
-            {onBack && (
-              <Button variant="ghost" size="sm" onClick={onBack}>
-                <ArrowLeft className="h-4 w-4" />
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={handleRefreshConversations} disabled={loading}>
+                <RefreshCcw className="h-4 w-4" />
               </Button>
-            )}
+              {onBack && (
+                <Button variant="ghost" size="sm" onClick={onBack}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="flex-1 p-0">
@@ -154,6 +166,18 @@ export const DirectMessagesChat = ({ onBack }: DirectMessagesChatProps) => {
               </div>
             )}
           </ScrollArea>
+          {hasMoreConversations && (
+            <div className="p-4 pt-2">
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={loadMoreConversations}
+                disabled={loading}
+              >
+                {loading ? 'Cargando...' : 'Cargar más'}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     );

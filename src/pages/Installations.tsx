@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 dayjs.locale('es');
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, User, Car, Share2, Download, Users, MessageSquare, Send } from 'lucide-react';
@@ -20,7 +20,8 @@ import { DailyTaskTable } from '@/components/installations/DailyTaskTable';
 import { DraggableSidebarItem } from '@/components/installations/DraggableSidebarItem';
 import { TaskDialog } from '@/components/installations/TaskDialog';
 import { useAdminData } from '@/hooks/use-admin-data';
-import { useTasksByDate, useUpdateTaskOrder, useAssignToTask, useCreateSharedPlan } from '@/hooks/use-supabase';
+import { useTasksByDate, useUpdateTaskOrder, useAssignToTask, useCreateSharedPlan, useProfile } from '@/hooks/use-supabase';
+import "@/styles/installations.css";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -53,8 +54,111 @@ export default function InstallationsPage() {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const { data: profile } = useProfile();
+  const isManagerView = profile?.role === 'admin' || profile?.role === 'manager';
 
   const sensors = useSensors(useSensor(PointerSensor));
+
+  const calendarModifiers = {
+    today: new Date(),
+    pending: daysWithPendingTasks,
+    busy: daysWithTasks,
+  };
+
+  const modifiersClassNames = {
+    today: "bg-orange-500 text-white hover:bg-orange-600 rounded-md font-medium ring-2 ring-orange-300",
+    pending: "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 rounded-md font-medium",
+    busy: "bg-orange-200 text-orange-900 dark:bg-orange-900/50 dark:text-orange-200 rounded-md font-medium",
+  };
+
+  const formatTaskTime = (task: Task) => {
+    const start = task.start_date ? dayjs(task.start_date).format('HH:mm') : '--';
+    const end = task.end_date ? dayjs(task.end_date).format('HH:mm') : '--';
+    return `${start} - ${end}`;
+  };
+
+  if (!isManagerView) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold">Calendario de instalaciones</CardTitle>
+            <CardDescription>
+              Selecciona una fecha para ver las tareas asignadas. Los días resaltados en naranja tienen tareas pendientes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+              initialFocus
+              modifiers={calendarModifiers}
+              modifiersClassNames={modifiersClassNames}
+              className="rounded-md border"
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold">
+              Tareas para {date ? dayjs(date).format('dddd, D [de] MMMM') : '...'}
+            </CardTitle>
+            <CardDescription>
+              Visualiza tus asignaciones del día. Esta vista es solo informativa.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingTasks ? (
+              <div className="space-y-3">
+                <div className="h-16 w-full animate-pulse rounded-md bg-muted" />
+                <div className="h-16 w-full animate-pulse rounded-md bg-muted" />
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="rounded-md border-2 border-dashed border-muted p-6 text-center text-sm text-muted-foreground">
+                No hay tareas programadas para esta fecha.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tasks.map((task) => (
+                  <div key={task.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1">
+                        <h3 className="text-base font-semibold">
+                          {task.data?.site ?? task.data?.location ?? 'Sin sitio definido'}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {formatTaskTime(task)} • Responsable: {task.responsible?.full_name ?? 'Falta responsable'}
+                        </p>
+                        {task.data?.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {task.data.description}
+                          </p>
+                        )}
+                      </div>
+                      <Badge className="self-start uppercase">
+                        {task.state ?? 'pendiente'}
+                      </Badge>
+                    </div>
+                    {task.assigned_users && task.assigned_users.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {task.assigned_users.map((user) => (
+                          <Badge key={user.id} variant="outline" className="capitalize">
+                            {user.full_name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const refreshCalendarData = useCallback(async () => {
     try {
@@ -340,16 +444,8 @@ export default function InstallationsPage() {
                    selected={date}
                    onSelect={setDate}
                    locale={es}
-                   modifiers={{
-                     today: new Date(),
-                     pending: daysWithPendingTasks,
-                     hasTasks: daysWithTasks,
-                   }}
-                   modifiersClassNames={{
-                     today: "bg-orange-500 text-white hover:bg-orange-600 rounded-md font-medium ring-2 ring-orange-300",
-                     pending: "rdp-day_pending",
-                     hasTasks: "hasTasks",
-                   }}
+                  modifiers={calendarModifiers}
+                  modifiersClassNames={modifiersClassNames}
                  />
               </CardContent>
             </Card>

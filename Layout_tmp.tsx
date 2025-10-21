@@ -62,7 +62,7 @@ const SidebarContentComponent = ({
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      toast.error("Error al cerrar sesion");
+      toast.error("Error al cerrar sesión");
     } else {
       navigate("/auth");
     }
@@ -150,9 +150,9 @@ const SidebarContentComponent = ({
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleLogout} tooltip="Cerrar sesion">
+            <SidebarMenuButton onClick={handleLogout} tooltip="Cerrar sesión">
               <LogOut className="h-4 w-4 shrink-0" />
-              <span className={cn(isCollapsed && "hidden")}>Cerrar sesion</span>
+              <span className={cn(isCollapsed && "hidden")}>Cerrar sesión</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -282,9 +282,9 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
-      toast.error("Error al cerrar sesion");
+      toast.error("Error al cerrar sesión");
     } else {
-      toast.success("Sesion cerrada");
+      toast.success("Sesión cerrada");
       navigate("/auth", { replace: true });
     }
   };
@@ -321,7 +321,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
             <HeaderStatus />
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleLogout} className="hidden md:inline-flex">
-              Cerrar sesion
+              Cerrar sesión
             </Button>
           </div>
         </div>
@@ -352,10 +352,15 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
             </button>
           </div>
         )}
+        <div className="mx-2 mb-2 flex justify-end">
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            Cerrar sesión
+          </Button>
+        </div>
         <MobileNavigation currentUser={currentUser} navItems={navItems} />
       </div>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-24 pt-0 md:max-w-5xl md:pb-10 md:pt-6">
+      <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-24 pt-4 md:max-w-5xl md:pb-10 md:pt-6">
         {children}
       </main>
 
@@ -366,7 +371,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
       <Button
         size="icon"
         className="fixed bottom-20 right-4 z-40 h-12 w-12 rounded-full shadow-lg md:hidden"
-        onClick={() => toast.info("Acciones rapidas proximamente")}
+        onClick={() => toast.info("Acciones rápidas próximamente")}
       >
         <Plus className="h-5 w-5" />
       </Button>
@@ -375,6 +380,3 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
 };
 
 export default Layout;
-
-
-

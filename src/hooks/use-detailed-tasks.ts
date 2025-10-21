@@ -9,6 +9,14 @@ import type {
   Database
 } from '@/integrations/supabase/client';
 
+type TemplateFieldDefinition = {
+  name?: string | null;
+  label?: string | null;
+  type?: string | null;
+};
+
+export type DashboardTemplateFieldMap = Record<string, TemplateFieldDefinition[]>;
+
 interface UseDetailedTasksOptions {
   filters?: TaskFilters;
   sort?: SortOption;
@@ -298,39 +306,101 @@ export function useDashboardTasks() {
   const [tapiceriaTasks, setTapiceriaTasks] = useState<DetailedTask[]>([]);
   const [pendingTasks, setPendingTasks] = useState<DetailedTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [templateFieldsByScreen, setTemplateFieldsByScreen] = useState<DashboardTemplateFieldMap>({});
 
   const fetchDashboardTasks = useCallback(async () => {
     try {
       setLoading(true);
 
-      const [{ data: confeccionData }, { data: tapiceriaData }, { data: pendingData }] = await Promise.all([
-        supabase
+      const { data: dashboardScreens, error: dashboardError } = await supabase
+        .from('screens')
+        .select('id, dashboard_section, dashboard_order, template_id')
+        .eq('is_active', true)
+        .in('dashboard_section', ['confeccion', 'tapiceria', 'pendientes']);
+
+      if (dashboardError) throw dashboardError;
+
+      const templateIds = new Set<string>();
+      (dashboardScreens ?? []).forEach((screen) => {
+        if (screen.template_id) {
+          templateIds.add(screen.template_id);
+        }
+      });
+
+      let templateMapById = new Map<string, TemplateFieldDefinition[]>();
+      if (templateIds.size > 0) {
+        const { data: templatesData, error: templatesError } = await supabase
+          .from('templates')
+          .select('id, fields')
+          .in('id', Array.from(templateIds));
+
+        if (templatesError) throw templatesError;
+
+        templateMapById = new Map(
+          (templatesData ?? []).map((template) => {
+            const fields = Array.isArray(template.fields) ? template.fields : [];
+            return [template.id, fields as TemplateFieldDefinition[]];
+          })
+        );
+      }
+
+      const templateFieldsMapByScreen: DashboardTemplateFieldMap = {};
+
+      const sectionMap: Record<'confeccion' | 'tapiceria' | 'pendientes', string[]> = {
+        confeccion: [],
+        tapiceria: [],
+        pendientes: [],
+      };
+
+      (dashboardScreens ?? []).forEach((screen) => {
+        const section = screen.dashboard_section as 'confeccion' | 'tapiceria' | 'pendientes' | null;
+        if (section && sectionMap[section]) {
+          sectionMap[section].push(screen.id);
+        }
+
+        const fields = screen.template_id ? (templateMapById.get(screen.template_id) ?? []) : [];
+        templateFieldsMapByScreen[screen.id] = fields;
+      });
+
+      setTemplateFieldsByScreen(templateFieldsMapByScreen);
+
+      const fetchSectionTasks = async (
+        section: 'confeccion' | 'tapiceria' | 'pendientes',
+        fallbackGroups: string[],
+        limit: number | null
+      ) => {
+        let query = supabase
           .from('detailed_tasks')
           .select('*')
-          .eq('screen_group', 'Confección')
           .neq('state', 'terminado')
           .order('is_urgent', { ascending: false })
-          .order('start_date', { ascending: true })
-          .limit(4),
-        supabase
-          .from('detailed_tasks')
-          .select('*')
-          .eq('screen_group', 'Tapicería')
-          .neq('state', 'terminado')
-          .order('is_urgent', { ascending: false })
-          .order('start_date', { ascending: true })
-          .limit(4),
-        supabase
-          .from('detailed_tasks')
-          .select('*')
-          .neq('state', 'terminado')
-          .order('is_urgent', { ascending: false })
-          .order('start_date', { ascending: true, nullsFirst: true })
+          .order('start_date', { ascending: true, nullsFirst: true });
+
+        const screenIds = sectionMap[section];
+        if (screenIds.length > 0) {
+          query = query.in('screen_id', screenIds);
+        } else if (fallbackGroups.length > 0) {
+          query = query.in('screen_group', fallbackGroups);
+        }
+
+        if (limit) {
+          query = query.limit(limit);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data ?? [];
+      };
+
+      const [confeccionData, tapiceriaData, pendingData] = await Promise.all([
+        fetchSectionTasks('confeccion', ['Confección', 'Confeccion'], 4),
+        fetchSectionTasks('tapiceria', ['Tapicería', 'Tapiceria'], 4),
+        fetchSectionTasks('pendientes', [], null),
       ]);
 
-      setConfeccionTasks(confeccionData || []);
-      setTapiceriaTasks(tapiceriaData || []);
-      setPendingTasks(pendingData || []);
+      setConfeccionTasks(confeccionData);
+      setTapiceriaTasks(tapiceriaData);
+      setPendingTasks(pendingData);
     } catch (err) {
       console.error('Error fetching dashboard tasks:', err);
     } finally {
@@ -349,7 +419,8 @@ export function useDashboardTasks() {
     tapiceriaTasks,
     pendingTasks,
     loading,
-    refresh: fetchDashboardTasks
+    templateFieldsByScreen,
+    refresh: fetchDashboardTasks,
   };
 }
 

@@ -1,442 +1,556 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { 
-  Users, 
-  MessageSquare, 
-  Send, 
-  RefreshCw, 
-  Wifi, 
-  WifiOff,
-  Bell,
-  BellOff,
-  Clock,
-  CheckCircle,
-  AlertCircle
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import { StatusBadge } from '@/components/badges';
-import { useAdminData } from '@/hooks/use-admin-data';
-import { useProfile } from '@/hooks/use-supabase';
-import { 
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, MessageSquare, RefreshCcw, Send } from "lucide-react";
+import { useAdminData } from "@/hooks/use-admin-data";
+import {
   useOnlineUsers,
+  useCommunicationLogs,
+  useSendMessage,
   useUserMessages,
   useUnreadMessageCount,
-  useSendMessage,
-  useMarkMessagesAsRead,
-  useCommunicationLogs,
   useResendWhatsApp,
-  useRealtimeMessages,
   useRealtimePresence,
-  type OnlineUser,
-  type UserMessage,
-  type CommunicationLog
-} from '@/hooks/use-communications';
-type UserStatus = {
-  id: string;
-  profile_id: string;
-  full_name: string;
-  email: string;
-  status: string;
-  is_online: boolean;
-  last_seen: string;
-  has_viewed_plan: boolean;
-  unread_count: number;
+  useRealtimeMessages,
+  type CommunicationLog,
+} from "@/hooks/use-communications";
+import type { Profile } from "@/types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+
+type ListedUser = Profile & {
+  isOnline: boolean;
+  lastSeen: string | null;
+};
+
+const MS_IN_MINUTE = 60 * 1000;
+const MS_IN_HOUR = 60 * MS_IN_MINUTE;
+const MS_IN_DAY = 24 * MS_IN_HOUR;
+
+const defaultWhatsAppMessage =
+  "Hola, este es un recordatorio de tus tareas pendientes. Si necesitas ayuda, responde a este mensaje.";
+
+const formatRelativeTime = (timestamp?: string | null) => {
+  if (!timestamp) return "Sin actividad reciente";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "Sin actividad reciente";
+
+  const diff = Date.now() - date.getTime();
+  if (diff < 0) return "En el futuro";
+  if (diff < MS_IN_MINUTE) return "Hace instantes";
+
+  if (diff < MS_IN_HOUR) {
+    const minutes = Math.floor(diff / MS_IN_MINUTE);
+    return `Hace ${minutes} min`;
+  }
+
+  if (diff < MS_IN_DAY) {
+    const hours = Math.floor(diff / MS_IN_HOUR);
+    return `Hace ${hours} h`;
+  }
+
+  return date.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
+};
+
+const truncate = (value: string | null, limit = 160) => {
+  if (!value) return "Sin descripcion disponible";
+  return value.length > limit ? `${value.slice(0, limit)}...` : value;
+};
+
+const getInitials = (value: string) => {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "US";
 };
 
 export default function CommunicationManagement() {
-  const { data: profile } = useProfile();
-  const { users } = useAdminData();
-  
-  const [selectedUser, setSelectedUser] = useState<UserStatus | null>(null);
-  
-  const { data: onlineUsers = [], refetch: refetchOnlineUsers } = useOnlineUsers();
-  const { data: messages = [], refetch: refetchMessages } = useUserMessages(selectedUser?.id);
-  const { data: logs = [], refetch: refetchLogs } = useCommunicationLogs(selectedUser?.id);
-  
-  const sendMessageMutation = useSendMessage();
-  const markAsReadMutation = useMarkMessagesAsRead();
-  const resendWhatsAppMutation = useResendWhatsApp();
-  
-  // Suscribirse a actualizaciones en tiempo real
-  useRealtimeMessages(selectedUser?.id);
+  const { users: rawUsers = [] } = useAdminData();
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [messageDraft, setMessageDraft] = useState("");
+  const [logPage, setLogPage] = useState(0);
+  const [logsAccumulator, setLogsAccumulator] = useState<CommunicationLog[]>([]);
+
+  const {
+    data: onlineUsers = [],
+    isLoading: loadingOnlineUsers,
+  } = useOnlineUsers();
+  const {
+    data: logsResult,
+    isLoading: loadingLogs,
+    isFetching: fetchingLogs,
+  } = useCommunicationLogs({
+    profileId: selectedUserId ?? undefined,
+    page: logPage,
+    limit: 25,
+  });
+  const pageLogs = logsResult?.logs ?? [];
+  const hasMoreLogs = logsResult?.hasMore ?? false;
+  const resultPage = logsResult?.page ?? logPage;
+  const isInitialLogLoading = loadingLogs && logPage === 0;
+  const displayedLogs = logsAccumulator;
+  const {
+    data: messages = [],
+    isLoading: loadingMessages,
+  } = useUserMessages(selectedUserId ?? undefined);
+  const { data: unreadCount = 0 } = useUnreadMessageCount(selectedUserId ?? undefined);
+
+  const sendMessage = useSendMessage();
+  const resendWhatsApp = useResendWhatsApp();
+
   useRealtimePresence();
-  
-  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
-  const [messageText, setMessageText] = useState('');
+  useRealtimeMessages(selectedUserId ?? undefined);
+
+  const onlineMap = useMemo(() => {
+    const map = new Map<string, { last_seen: string }>();
+    onlineUsers.forEach((user) => {
+      map.set(user.profile_id, { last_seen: user.last_seen });
+    });
+    return map;
+  }, [onlineUsers]);
+
+  const users: ListedUser[] = useMemo(() => {
+    return rawUsers.map((user) => {
+      const session = onlineMap.get(user.id);
+      return {
+        ...user,
+        isOnline: Boolean(session),
+        lastSeen: session?.last_seen ?? null,
+      };
+    });
+  }, [rawUsers, onlineMap]);
+
+  const emptyDirectory = users.length === 0;
+
+  const sortedUsers = useMemo(() => {
+    const normalizedTerm = searchTerm.trim().toLowerCase();
+    return users
+      .filter((user) => {
+        if (!normalizedTerm) return true;
+        const haystack = `${user.full_name} ${user.email ?? ""}`.toLowerCase();
+        return haystack.includes(normalizedTerm);
+      })
+      .sort((a, b) => {
+        if (a.isOnline === b.isOnline) {
+          return a.full_name.localeCompare(b.full_name);
+        }
+        return a.isOnline ? -1 : 1;
+      });
+  }, [users, searchTerm]);
+
+  useEffect(() => {
+    if (!sortedUsers.length) {
+      setSelectedUserId(null);
+      return;
+    }
+    if (!selectedUserId || !sortedUsers.some((user) => user.id === selectedUserId)) {
+      setSelectedUserId(sortedUsers[0]?.id ?? null);
+    }
+  }, [sortedUsers, selectedUserId]);
+
+  useEffect(() => {
+    setLogPage(0);
+    setLogsAccumulator([]);
+  }, [selectedUserId]);
+
+  useEffect(() => {
+    if (resultPage !== logPage) return;
+    if (logPage === 0) {
+      if (loadingLogs) return;
+      setLogsAccumulator(pageLogs);
+      return;
+    }
+    if (pageLogs.length === 0) return;
+    setLogsAccumulator((previous) => {
+      const map = new Map<string, CommunicationLog>();
+      previous.forEach((log) => map.set(log.id, log));
+      pageLogs.forEach((log) => map.set(log.id, log));
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    });
+  }, [pageLogs, logPage, loadingLogs, resultPage]);
+
+  const selectedUser = useMemo(
+    () => users.find((user) => user.id === selectedUserId) ?? null,
+    [users, selectedUserId]
+  );
+
+  const sortedMessages = useMemo(() => {
+    return [...messages].reverse();
+  }, [messages]);
+
+  const onlineCount = useMemo(
+    () => users.filter((user) => user.isOnline).length,
+    [users]
+  );
 
   const handleSendMessage = async () => {
-    if (!selectedUser || !messageText.trim()) return;
-    
+    if (!selectedUser || !messageDraft.trim()) return;
     try {
-      await sendMessageMutation.mutateAsync({
-        toProfileId: selectedUser.profile_id,
-        message: messageText.trim(),
+      await sendMessage.mutateAsync({
+        toProfileId: selectedUser.id,
+        message: messageDraft.trim(),
       });
-      
-      setMessageText('');
-      setIsMessageDialogOpen(false);
+      setMessageDraft("");
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error("Error sending message", error);
     }
   };
 
-  const handleResendNotification = (userId: string) => {
-    const user = users.find(u => u.id === userId);
-    if (!user) return;
-    
-    resendWhatsAppMutation.mutate({
-      profileId: userId,
-      message: `Hola ${user.full_name}, este es un mensaje de recordatorio sobre tu plan de trabajo.`,
-    });
-  };
-
-  const handleMarkAsRead = async (userId: string) => {
-    const unreadMessages = messages.filter(
-      m => m.to_profile_id === userId && !m.is_read
+  if (emptyDirectory) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              Comunicaciones internas
+            </CardTitle>
+            <CardDescription>
+              Aún no hay perfiles cargados en el directorio. Añade operarios/administradores para iniciar conversaciones.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Ve a <span className="font-medium text-foreground">Usuarios</span> para crear o importar perfiles, y luego regresa aquí para gestionar los mensajes.
+          </CardContent>
+        </Card>
+      </div>
     );
-    
-    if (unreadMessages.length > 0) {
-      await markAsReadMutation.mutateAsync(
-        unreadMessages.map(m => m.id)
-      );
+  }
+
+  const handleLoadMoreLogs = () => {
+    if (!hasMoreLogs || fetchingLogs) return;
+    setLogPage((previous) => previous + 1);
+  };
+
+  const handleResendWhatsApp = async () => {
+    if (!selectedUser) return;
+    try {
+      await resendWhatsApp.mutateAsync({
+        profileId: selectedUser.id,
+        message: defaultWhatsAppMessage,
+      });
+    } catch (error) {
+      console.error("Error resending WhatsApp", error);
     }
   };
-
-  const refreshData = () => {
-    refetchOnlineUsers();
-    refetchMessages();
-    refetchLogs();
-  };
-
-  const formatLogLabel = (log: CommunicationLog) => {
-    const rawLabel = (log.metadata?.action as string) ?? log.type ?? 'comunicación';
-    return rawLabel
-      .split('_')
-      .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join(' ');
-  };
-
-  const formatLogTarget = (log: CommunicationLog) => {
-    const target = (log.metadata?.target as string) ?? log.recipient;
-    return target || 'Sin destino';
-  };
-
-  const getStatusDotClass = (status: CommunicationLog['status']) => {
-    switch (status) {
-      case 'sent':
-      case 'delivered':
-        return 'bg-green-500';
-      case 'failed':
-      case 'bounced':
-        return 'bg-red-500';
-      default:
-        return 'bg-yellow-500';
-    }
-  };
-
-  const formatLastSeen = (lastSeen: string) => {
-    const date = new Date(lastSeen);
-    const now = new Date();
-    const diffMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffMinutes < 1) return 'Ahora mismo';
-    if (diffMinutes < 60) return `Hace ${diffMinutes} min`;
-    if (diffMinutes < 1440) return `Hace ${Math.floor(diffMinutes / 60)} h`;
-    return `Hace ${Math.floor(diffMinutes / 1440)} d`;
-  };
-
-  // Combinar datos de usuarios con estado online
-  const userStatuses: UserStatus[] = users.map(user => {
-    const onlineUser = onlineUsers.find(ou => ou.profile_id === user.id);
-    const unreadCount = messages.filter(
-      m => m.to_profile_id === user.id && !m.is_read
-    ).length;
-    
-    return {
-      id: user.id,
-      profile_id: user.id,
-      full_name: user.full_name,
-      email: user.email,
-      status: user.status,
-      is_online: !!onlineUser,
-      last_seen: onlineUser?.last_seen || new Date().toISOString(),
-      has_viewed_plan: true, // TODO: Implementar con task_notifications
-      unread_count: unreadCount,
-    };
-  });
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            Gestión de Comunicaciones
-          </h2>
-          <p className="text-muted-foreground">Monitoriza y gestiona las comunicaciones con los operarios</p>
+          <h2 className="text-2xl font-semibold">Gestion de comunicaciones</h2>
+          <p className="text-sm text-muted-foreground">
+            Monitoriza la actividad de los operarios y envia recordatorios personalizados.
+          </p>
         </div>
-        <Button variant="outline" onClick={refreshData}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Actualizar
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="default">{onlineCount} online</Badge>
+          <Badge variant="outline">{users.length} usuarios</Badge>
+          {selectedUser && unreadCount > 0 && (
+            <Badge variant="destructive">{unreadCount} mensajes sin leer</Badge>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Lista de Usuarios con Estado */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Estado de Usuarios ({userStatuses.length})</CardTitle>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Listado de usuarios</CardTitle>
+            <CardDescription>
+              Selecciona un usuario para revisar sus comunicaciones recientes.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-96">
-              <div className="space-y-2">
-                {userStatuses.map((user) => (
-                  <div
-                    key={user.id}
-                    className={cn(
-                      "p-3 rounded-lg border cursor-pointer transition-colors",
-                      selectedUser?.id === user.id ? "border-primary bg-primary/5" : "hover:bg-muted"
-                    )}
-                    onClick={() => setSelectedUser(user)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={cn(
-                          "w-2 h-2 rounded-full",
-                          user.is_online ? "bg-green-500" : "bg-gray-400"
-                        )} />
-                        <div>
-                          <div className="font-medium">{user.full_name}</div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1">
-                            {user.is_online ? (
-                              <>
-                                <Wifi className="h-3 w-3" />
-                                <span>En línea</span>
-                              </>
-                            ) : (
-                              <>
-                                <WifiOff className="h-3 w-3" />
-                                <span>{formatLastSeen(user.last_seen)}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={user.status} size="sm" />
-                        {user.has_viewed_plan ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-orange-500" />
-                        )}
-                        {user.unread_count > 0 && (
-                          <Badge variant="destructive" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                            {user.unread_count}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+          <CardContent className="space-y-4">
+            <Input
+              placeholder="Buscar por nombre o correo"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+            <div className="rounded-lg border">
+              <ScrollArea className="max-h-[460px]">
+                {loadingOnlineUsers && (
+                  <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Actualizando presencia...
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Detalles y Acciones del Usuario Seleccionado */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            {selectedUser ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={cn(
-                    "w-4 h-4 rounded-full",
-                    selectedUser?.is_online ? "bg-green-500" : "bg-gray-400"
-                  )} />
-                  <CardTitle className="text-lg">{selectedUser.full_name}</CardTitle>
-                  <StatusBadge status={selectedUser.status} />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleMarkAsRead(selectedUser?.id || '')}
-                    disabled={selectedUser?.unread_count === 0}
-                  >
-                    Marcar como leído
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsMessageDialogOpen(true)}
-                  >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Enviar Mensaje
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <CardTitle className="text-lg text-muted-foreground">
-                Selecciona un usuario para ver detalles
-              </CardTitle>
-            )}
-          </CardHeader>
-          <CardContent>
-            {selectedUser ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <Label>Email</Label>
-                    <p className="font-medium">{selectedUser.email}</p>
-                  </div>
-                  <div>
-                    <Label>Estado</Label>
-                    <p className="font-medium">
-                      {selectedUser?.is_online ? 'En línea' : `Desconectado (${formatLastSeen(selectedUser?.last_seen || '')})`}
-                    </p>
-                  </div>
-                  <div>
-                    <Label>Plan del día</Label>
-                    <p className="font-medium">
-                      {selectedUser?.has_viewed_plan ? 'Visto ✓' : 'No visto ⚠️'}
-                    </p>
-                  </div>
-                  <div>
-                    <Label>Mensajes no leídos</Label>
-                    <p className="font-medium">{selectedUser?.unread_count || 0}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Historial de Mensajes</Label>
-                  <ScrollArea className="h-64 mt-2 border rounded-md p-4">
-                    {messages.length > 0 ? (
-                      <div className="space-y-4">
-                        {messages.slice().reverse().map((message) => (
-                          <div
-                            key={message.id}
-                            className={cn(
-                              "flex items-end gap-2",
-                              message.from_profile_id === profile?.id ? "justify-end" : "justify-start"
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                "max-w-xs rounded-lg p-3 text-sm",
-                                message.from_profile_id === profile?.id
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-muted"
-                              )}
-                            >
-                              <p>{message.message}</p>
-                              <p className="mt-1 text-xs opacity-70 text-right">
-                                {formatLastSeen(message.created_at)}
+                )}
+                {!sortedUsers.length ? (
+                  <p className="p-4 text-sm text-muted-foreground">
+                    No hay usuarios disponibles con el filtro actual.
+                  </p>
+                ) : (
+                  <div className="divide-y">
+                    {sortedUsers.map((user) => {
+                      const isSelected = user.id === selectedUserId;
+                      return (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => setSelectedUserId(user.id)}
+                          className={cn(
+                            "w-full cursor-pointer p-4 text-left transition-colors",
+                            isSelected ? "bg-accent" : "hover:bg-muted/40"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={user.avatar_url ?? undefined} alt={user.full_name} />
+                              <AvatarFallback>{getInitials(user.full_name)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="font-medium">{user.full_name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {user.email ?? "Sin correo registrado"}
                               </p>
                             </div>
+                            <Badge variant={user.isOnline ? "default" : "outline"}>
+                              {user.isOnline ? "En linea" : "Offline"}
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground text-center py-8">
-                        No hay mensajes.
-                      </div>
-                    )}
-                  </ScrollArea>
-                </div>
-                
-                <div>
-                  <Label>Historial de Comunicaciones</Label>
-                  <div className="mt-2 space-y-2">
-                    {logs.length > 0 ? (
-                      logs.map((log) => (
-                        <div key={log.id} className="flex items-center justify-between p-2 border rounded">
-                          <div className="flex items-center gap-2">
-                            <div className={cn("w-2 h-2 rounded-full", getStatusDotClass(log.status))} />
-                            <div>
-                              <div className="text-sm font-medium">
-                                {formatLogLabel(log)}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {formatLogTarget(log)} - {formatLastSeen(log.created_at)}
-                              </div>
-                            </div>
-                          </div>
-                          {log.status === 'failed' && selectedUser && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleResendNotification(selectedUser.profile_id)}
-                              disabled={resendWhatsAppMutation.isPending}
-                            >
-                              Reenviar
-                            </Button>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-muted-foreground p-4 border rounded-lg text-center">
-                        No hay registros de comunicaciones.
-                      </div>
-                    )}
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {user.lastSeen
+                              ? `Ultimo visto: ${formatRelativeTime(user.lastSeen)}`
+                              : "Sin actividad reciente"}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <Users className="mx-auto h-12 w-12 mb-4" />
-                <p>Selecciona un usuario de la lista para ver y gestionar sus comunicaciones.</p>
-              </div>
-            )}
+                )}
+              </ScrollArea>
+            </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Diálogo para enviar mensaje */}
-      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enviar Mensaje</DialogTitle>
-            <DialogDescription>
-              Envía un mensaje directo al operario seleccionado.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Para: {selectedUser?.full_name}</Label>
-            </div>
-            <div>
-              <Label htmlFor="message">Mensaje</Label>
-              <Textarea
-                id="message"
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                placeholder="Escribe tu mensaje aquí..."
-                rows={4}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsMessageDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleSendMessage} 
-                disabled={!messageText.trim() || sendMessageMutation.isPending}
-              >
-                <Send className="mr-2 h-4 w-4" />
-                {sendMessageMutation.isPending ? 'Enviando...' : 'Enviar Mensaje'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        <div className="space-y-6 lg:col-span-2">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <MessageSquare className="h-5 w-5" />
+                {selectedUser ? selectedUser.full_name : "Selecciona un usuario"}
+              </CardTitle>
+              <CardDescription>
+                {selectedUser
+                  ? "Resumen de estado, contacto y mensajes directos."
+                  : "Elige un usuario en el listado para ver sus detalles."}
+              </CardDescription>
+            </CardHeader>
+            {selectedUser ? (
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Estado</Label>
+                    <div className="flex items-center gap-2 font-medium">
+                      <span
+                        className={cn(
+                          "h-2.5 w-2.5 rounded-full",
+                          selectedUser.isOnline ? "bg-emerald-500" : "bg-muted-foreground/60"
+                        )}
+                      />
+                      {selectedUser.isOnline ? "En linea" : "Fuera de linea"}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedUser.lastSeen
+                        ? `Ultimo visto: ${formatRelativeTime(selectedUser.lastSeen)}`
+                        : "Sin actividad registrada"}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contacto</Label>
+                    <p className="font-medium">{selectedUser.phone ?? "Sin telefono registrado"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedUser.email ?? "Sin correo registrado"}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Rol</Label>
+                    <p className="font-medium capitalize">{selectedUser.role}</p>
+                    {selectedUser.status && (
+                      <p className="text-xs text-muted-foreground">Estado: {selectedUser.status}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Mensajes sin leer</Label>
+                    <p className="font-medium">{unreadCount}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResendWhatsApp}
+                    disabled={!selectedUser.phone || resendWhatsApp.isPending}
+                  >
+                    {resendWhatsApp.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCcw className="mr-2 h-4 w-4" />
+                    )}
+                    Reenviar WhatsApp
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Mensajes recientes</Label>
+                    {loadingMessages && (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="rounded-lg border bg-muted/40">
+                    <ScrollArea className="max-h-[260px] p-3">
+                      {!sortedMessages.length ? (
+                        <p className="text-sm text-muted-foreground">
+                          No hay mensajes registrados con este usuario.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {sortedMessages.map((message) => {
+                            const incoming = message.from_profile_id === selectedUser.id;
+                            return (
+                              <div
+                                key={message.id}
+                                className={cn("flex", incoming ? "justify-start" : "justify-end")}
+                              >
+                                <div
+                                  className={cn(
+                                    "max-w-[80%] rounded-lg px-3 py-2 text-sm",
+                                    incoming
+                                      ? "bg-background text-foreground shadow-sm"
+                                      : "bg-primary text-primary-foreground"
+                                  )}
+                                >
+                                  <p>{message.message}</p>
+                                  <span
+                                    className={cn(
+                                      "mt-1 block text-[11px]",
+                                      incoming ? "text-muted-foreground" : "text-primary-foreground/70"
+                                    )}
+                                  >
+                                    {formatRelativeTime(message.created_at)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="communication-message">Enviar mensaje directo</Label>
+                  <Textarea
+                    id="communication-message"
+                    placeholder="Escribe un mensaje para el operario..."
+                    rows={3}
+                    value={messageDraft}
+                    onChange={(event) => setMessageDraft(event.target.value)}
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={!messageDraft.trim() || sendMessage.isPending}
+                    >
+                      {sendMessage.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="mr-2 h-4 w-4" />
+                      )}
+                      Enviar mensaje
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            ) : (
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Selecciona un usuario para ver su informacion.
+              </CardContent>
+            )}
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Historial de comunicaciones</CardTitle>
+              <CardDescription>
+                {selectedUser
+                  ? `Eventos vinculados a ${selectedUser.full_name}.`
+                  : "Selecciona un usuario para consultar su historial."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isInitialLogLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Consultando historial...
+                </div>
+              ) : !displayedLogs.length ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay registros de comunicaciones para este usuario.
+                </p>
+              ) : (
+                <>
+                  <ScrollArea className="max-h-[340px] pr-2">
+                    <div className="space-y-3">
+                      {displayedLogs.map((log) => (
+                        <div key={log.id} className="space-y-2 rounded-lg border bg-card/40 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge variant="outline" className="capitalize">
+                              {log.type ?? "evento"}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {formatRelativeTime(log.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium">{log.subject ?? "Sin asunto"}</p>
+                          <p className="text-sm text-muted-foreground">{truncate(log.message)}</p>
+                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            <span>Destino: {log.recipient ?? "No indicado"}</span>
+                            <span className="font-medium uppercase">
+                              {log.status ?? "sin estado"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  {hasMoreLogs && (
+                    <div className="mt-3 flex justify-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLoadMoreLogs}
+                        disabled={fetchingLogs}
+                      >
+                        {fetchingLogs ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Cargando...
+                          </>
+                        ) : (
+                          "Cargar más"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

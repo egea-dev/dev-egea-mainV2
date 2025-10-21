@@ -8,6 +8,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Vehicle } from "@/types";
 
+const VEHICLE_TYPE_OPTIONS = [
+  { value: "jumper", label: "Jumper" },
+  { value: "camion", label: "Camión" },
+  { value: "furgoneta", label: "Furgoneta" },
+  { value: "otro", label: "Otro" }
+];
+
 type VehicleDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -17,8 +24,9 @@ type VehicleDialogProps = {
 
 export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: VehicleDialogProps) => {
   const [currentVehicle, setCurrentVehicle] = useState<Partial<Vehicle>>({
+    id: undefined,
     name: '',
-    type: '',
+    type: 'otro',
     license_plate: '',
     capacity: 1,
     km: 0,
@@ -29,9 +37,15 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
 
   useEffect(() => {
     if (vehicle) {
+      const normalizedType = vehicle.type ? vehicle.type.toLowerCase() : '';
+      const allowedType = VEHICLE_TYPE_OPTIONS.some(option => option.value === normalizedType)
+        ? normalizedType
+        : 'otro';
+
       setCurrentVehicle({
+        id: vehicle.id,
         name: vehicle.name,
-        type: vehicle.type,
+        type: allowedType,
         license_plate: vehicle.license_plate || '',
         capacity: vehicle.capacity || 1,
         km: vehicle.km || 0,
@@ -40,8 +54,9 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
       });
     } else {
       setCurrentVehicle({
+        id: undefined,
         name: '',
-        type: '',
+        type: 'otro',
         license_plate: '',
         capacity: 1,
         km: 0,
@@ -64,36 +79,44 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
   };
 
   const handleSubmit = async () => {
-    if (!currentVehicle.name || !currentVehicle.type) {
+    const name = currentVehicle.name?.trim();
+    const type = currentVehicle.type?.toString().trim().toLowerCase();
+
+    if (!name || !type) {
       toast.error("El nombre y tipo son obligatorios.");
       return;
     }
+
+    const isValidType = VEHICLE_TYPE_OPTIONS.some(option => option.value === type);
+    if (!isValidType) {
+      toast.error("Selecciona un tipo de vehículo válido.");
+      return;
+    }
+
     setLoading(true);
 
-    const vehicleData = {
-      name: currentVehicle.name,
-      type: currentVehicle.type,
-      license_plate: currentVehicle.license_plate || null,
-      capacity: currentVehicle.capacity || 1,
-      km: currentVehicle.km || 0,
-      status: currentVehicle.status || 'normal',
-      is_active: currentVehicle.is_active !== undefined ? currentVehicle.is_active : true
-    };
-
-    let error;
-    if (currentVehicle.id) {
-      ({ error } = await supabase.from('vehicles').update(vehicleData).eq('id', currentVehicle.id));
-    } else {
-      ({ error } = await supabase.from('vehicles').insert(vehicleData));
-    }
+    const { data, error } = await supabase.rpc('upsert_vehicle', {
+      p_vehicle_id: currentVehicle.id ?? null,
+      p_name: name,
+      p_type: type,
+      p_license_plate: currentVehicle.license_plate?.trim() || null,
+      p_capacity: currentVehicle.capacity ?? 1,
+      p_is_active: currentVehicle.is_active !== undefined ? currentVehicle.is_active : true,
+      p_km: currentVehicle.km ?? 0,
+      p_status: currentVehicle.status ?? 'normal'
+    });
 
     if (error) {
-      toast.error("Error al guardar el vehículo.");
-    } else {
-      toast.success(`Vehículo ${currentVehicle.id ? 'actualizado' : 'creado'}.`);
-      onSuccess();
-      onOpenChange(false);
+      console.error('Error al guardar vehículo vía RPC:', error);
+      toast.error(error.message || "Error al guardar el vehículo.");
+      setLoading(false);
+      return;
     }
+
+    const action = Array.isArray(data) ? data[0]?.result_action : undefined;
+    toast.success(action === 'updated' ? 'Vehículo actualizado.' : 'Vehículo creado.');
+    onSuccess();
+    onOpenChange(false);
     setLoading(false);
   };
 
@@ -119,7 +142,21 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
           </div>
           <div className="space-y-2">
             <Label htmlFor="type">Tipo</Label>
-            <Input id="type" name="type" value={currentVehicle.type} onChange={handleChange} placeholder="Ej: CAMION, JUMPER..." />
+            <Select
+              value={currentVehicle.type ?? 'otro'}
+              onValueChange={(value) => handleSelectChange('type', value)}
+            >
+              <SelectTrigger id="type">
+                <SelectValue placeholder="Seleccionar tipo de vehículo" />
+              </SelectTrigger>
+              <SelectContent>
+                {VEHICLE_TYPE_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">

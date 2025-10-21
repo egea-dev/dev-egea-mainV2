@@ -7,6 +7,13 @@ type AdminContextType = {
   fetchData: () => void;
 };
 
-export function useAdminData() {
-  return useOutletContext<AdminContextType>();
+const fallbackAdminContext: AdminContextType = {
+  users: [],
+  vehicles: [],
+  fetchData: () => void 0,
+};
+
+export function useAdminData(): AdminContextType {
+  const context = useOutletContext<AdminContextType | null | undefined>();
+  return context ?? fallbackAdminContext;
 }

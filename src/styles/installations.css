@@ -1,0 +1,3 @@
+.rdp-day_pending { @apply bg-amber-200 text-amber-900 rounded-md font-medium; }
+.rdp-day_busy { @apply bg-sky-200 text-sky-900 rounded-md font-medium; }
+

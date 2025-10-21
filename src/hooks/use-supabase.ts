@@ -57,7 +57,10 @@ export const useUsers = () => {
     queryKey: ['users'],
     queryFn: async () => {
       const { data, error } = await supabase.from('profiles').select('*, user_availability(*)').order('full_name');
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching users:', error);
+        return [];
+      }
       const today = dayjs();
       return (data as Profile[]).map(p => {
         const availability = p.user_availability || [];
@@ -74,7 +77,10 @@ export const useVehicles = () => {
     queryKey: ['vehicles'],
     queryFn: async () => {
       const { data, error } = await supabase.from('vehicles').select('*').order('name');
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching vehicles:', error);
+        return [];
+      }
       return data as Vehicle[];
     },
   });
@@ -222,7 +228,7 @@ export const useUpdateTaskState = () => {
         },
         onSuccess: () => {
             toast.success("Estado de la tarea actualizado.");
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'], exact: false });
             queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
         },
         onError: (error) => toast.error(`Error al actualizar estado: ${error.message}`)
@@ -238,7 +244,7 @@ export const useArchiveTask = () => {
         },
         onSuccess: () => {
             toast.success("Tarea archivada correctamente.");
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'], exact: false });
             queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
             queryClient.invalidateQueries({ queryKey: ['archived_tasks'] });
         },
@@ -291,7 +297,7 @@ export const useScreenData = (screenId: string | null) => {
       ] = await Promise.all([
         supabase
           .from("screens")
-          .select("id, name, header_color, screen_group, screen_type, template_id, next_screen_id, templates(name, fields)")
+          .select("id, name, header_color, screen_group, screen_type, template_id, next_screen_id, dashboard_section, dashboard_order, templates(name, fields)")
           .eq("id", screenId)
           .maybeSingle(),
         supabase
