@@ -32,13 +32,18 @@ export default function AuthPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
-            <div className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              EGEA
-            </div>
+            <img
+              src="/logo-placeholder.png"
+              alt="EGEA Main Control"
+              className="h-16 w-auto"
+            />
           </div>
-          <CardTitle className="text-xl sm:text-2xl font-semibold text-muted-foreground">
-            Chrono Display
+          <CardTitle className="text-xl sm:text-2xl font-semibold text-primary uppercase tracking-wide">
+            Main Control
           </CardTitle>
+          <p className="text-sm text-muted-foreground tracking-wide text-balance">
+            Sistema de gestión de recursos y planificación de producción
+          </p>
         </CardHeader>
         <CardContent>
           <Auth
