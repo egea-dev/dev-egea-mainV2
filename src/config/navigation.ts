@@ -30,7 +30,6 @@ const adminNav: AppNavItem[] = [
   { path: '/admin/users', label: 'Usuarios', icon: Users },
   { path: '/admin/communications', label: 'Comunicaciones', icon: MessageCircle },
   { path: '/admin/archive', label: 'Historial', icon: Archive },
-  { path: '/admin/settings', label: 'Configuración', icon: Settings },
 ];
 
 const managerNav: AppNavItem[] = adminNav;

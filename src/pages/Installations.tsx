@@ -77,89 +77,6 @@ export default function InstallationsPage() {
     return `${start} - ${end}`;
   };
 
-  if (!isManagerView) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold">Calendario de instalaciones</CardTitle>
-            <CardDescription>
-              Selecciona una fecha para ver las tareas asignadas. Los días resaltados en naranja tienen tareas pendientes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              initialFocus
-              modifiers={calendarModifiers}
-              modifiersClassNames={modifiersClassNames}
-              className="rounded-md border"
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold">
-              Tareas para {date ? dayjs(date).format('dddd, D [de] MMMM') : '...'}
-            </CardTitle>
-            <CardDescription>
-              Visualiza tus asignaciones del día. Esta vista es solo informativa.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingTasks ? (
-              <div className="space-y-3">
-                <div className="h-16 w-full animate-pulse rounded-md bg-muted" />
-                <div className="h-16 w-full animate-pulse rounded-md bg-muted" />
-              </div>
-            ) : tasks.length === 0 ? (
-              <div className="rounded-md border-2 border-dashed border-muted p-6 text-center text-sm text-muted-foreground">
-                No hay tareas programadas para esta fecha.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {tasks.map((task) => (
-                  <div key={task.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-1">
-                        <h3 className="text-base font-semibold">
-                          {task.data?.site ?? task.data?.location ?? 'Sin sitio definido'}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {formatTaskTime(task)} • Responsable: {task.responsible?.full_name ?? 'Falta responsable'}
-                        </p>
-                        {task.data?.description && (
-                          <p className="text-sm text-muted-foreground">
-                            {task.data.description}
-                          </p>
-                        )}
-                      </div>
-                      <Badge className="self-start uppercase">
-                        {task.state ?? 'pendiente'}
-                      </Badge>
-                    </div>
-                    {task.assigned_users && task.assigned_users.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {task.assigned_users.map((user) => (
-                          <Badge key={user.id} variant="outline" className="capitalize">
-                            {user.full_name}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const refreshCalendarData = useCallback(async () => {
     try {
       const sixtyDaysAgo = subDays(new Date(), 60);
@@ -402,6 +319,89 @@ export default function InstallationsPage() {
     refetch();
     onDataUpdate();
   };
+
+  if (!isManagerView) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold">Calendario de instalaciones</CardTitle>
+            <CardDescription>
+              Selecciona una fecha para ver las tareas asignadas. Los días resaltados en naranja tienen tareas pendientes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+              initialFocus
+              modifiers={calendarModifiers}
+              modifiersClassNames={modifiersClassNames}
+              className="rounded-md border"
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold">
+              Tareas para {date ? dayjs(date).format('dddd, D [de] MMMM') : '...'}
+            </CardTitle>
+            <CardDescription>
+              Visualiza tus asignaciones del día. Esta vista es solo informativa.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingTasks ? (
+              <div className="space-y-3">
+                <div className="h-16 w-full animate-pulse rounded-md bg-muted" />
+                <div className="h-16 w-full animate-pulse rounded-md bg-muted" />
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="rounded-md border-2 border-dashed border-muted p-6 text-center text-sm text-muted-foreground">
+                No hay tareas programadas para esta fecha.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tasks.map((task) => (
+                  <div key={task.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1">
+                        <h3 className="text-base font-semibold">
+                          {task.data?.site ?? task.data?.location ?? 'Sin sitio definido'}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {formatTaskTime(task)} • Responsable: {task.responsible?.full_name ?? 'Falta responsable'}
+                        </p>
+                        {task.data?.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {task.data.description}
+                          </p>
+                        )}
+                      </div>
+                      <Badge className="self-start uppercase">
+                        {task.state ?? 'pendiente'}
+                      </Badge>
+                    </div>
+                    {task.assigned_users && task.assigned_users.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {task.assigned_users.map((user) => (
+                          <Badge key={user.id} variant="outline" className="capitalize">
+                            {user.full_name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <>

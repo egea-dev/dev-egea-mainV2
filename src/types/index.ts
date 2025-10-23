@@ -1,3 +1,5 @@
+import type { JsonObject, JsonValue, TaskState, TaskStatus, VehicleType } from '@/integrations/supabase/types';
+
 export type Profile = {
   id: string;
   auth_user_id?: string | null;
@@ -10,14 +12,13 @@ export type Profile = {
   avatar_url?: string | null;
   created_at?: string;
   updated_at?: string;
-  // El campo 'status' ahora se calcula dinámicamente, por lo que puede ser opcional o añadido en el frontend.
   status?: 'activo' | 'baja' | 'vacaciones';
 };
 
 export type Vehicle = {
   id: string;
   name: string;
-  type: string;
+  type: VehicleType | string;
   license_plate?: string | null;
   capacity?: number;
   is_active?: boolean;
@@ -25,11 +26,10 @@ export type Vehicle = {
   status?: 'normal' | 'accidentado' | 'revision';
 };
 
-export type TaskData = {
-  site?: string;
-  description?: string;
-  [key: string]: string | number | null;
-};
+export interface TaskData extends JsonObject {
+  site?: string | null;
+  description?: string | null;
+}
 
 export type Task = {
   id: string;
@@ -37,8 +37,9 @@ export type Task = {
   start_date: string;
   end_date: string;
   order: number;
-  state: 'urgente' | 'pendiente' | 'a la espera' | 'en fabricacion' | 'terminado';
-  location: 'en la isla' | 'fuera';
+  state: TaskState;
+  status: TaskStatus;
+  location: string | null;
   data: TaskData;
   responsible_profile_id: string | null;
   
@@ -71,11 +72,11 @@ export type WorkSession = {
   task_id: string | null;
   started_at: string;
   ended_at: string | null;
-  start_location: Record<string, unknown> | null;
-  end_location: Record<string, unknown> | null;
-  device_info: Record<string, unknown> | null;
+  start_location: JsonObject | null;
+  end_location: JsonObject | null;
+  device_info: JsonObject | null;
   status: 'active' | 'completed' | 'cancelled' | string;
-  metadata: Record<string, unknown> | null;
+  metadata: JsonValue | null;
   created_at: string;
   updated_at: string;
 };

@@ -42,9 +42,24 @@ export const useGroups = () => {
         .order('name');
 
       if (error) throw error;
-      return data as Group[];
+      return (data ?? []) as Group[];
     },
   });
+};
+
+type GroupMemberRow = {
+  profile_id: string;
+  role_in_group: string | null;
+  profiles: {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    status: string | null;
+  } | null;
+};
+
+type GroupRow = Group & {
+  profile_groups?: GroupMemberRow[] | null;
 };
 
 export const useGroupsWithMembers = () => {
@@ -70,18 +85,26 @@ export const useGroupsWithMembers = () => {
 
       if (error) throw error;
 
+      const rows = (data ?? []) as GroupRow[];
+
       // Transformar datos para incluir miembros y conteo
-      return data.map((group: any) => ({
-        ...group,
-        members: (group.profile_groups || []).map((pg: any) => ({
-            profile_id: pg.profile_id,
-            full_name: pg.profiles?.full_name || 'Usuario',
-            email: pg.profiles?.email || '',
-            status: pg.profiles?.status || 'activo',
-            role_in_group: pg.role_in_group || 'miembro',
-        })),
-        member_count: (group.profile_groups || []).length,
-      })) as GroupWithMembers[];
+      return rows.map((group) => {
+        const members = Array.isArray(group.profile_groups)
+          ? group.profile_groups.map((pg) => ({
+              profile_id: pg.profile_id,
+              full_name: pg.profiles?.full_name ?? 'Usuario',
+              email: pg.profiles?.email ?? '',
+              status: pg.profiles?.status ?? 'activo',
+              role_in_group: pg.role_in_group ?? 'miembro',
+            }))
+          : [];
+
+        return {
+          ...group,
+          members,
+          member_count: members.length,
+        } satisfies GroupWithMembers;
+      });
     },
   });
 };
@@ -105,8 +128,9 @@ export const useCreateGroup = () => {
       queryClient.invalidateQueries({ queryKey: ['groups', 'with-members'] });
       toast.success('Grupo creado exitosamente');
     },
-    onError: (error) => {
-      toast.error('Error al crear grupo: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al crear grupo';
+      toast.error('Error al crear grupo: ' + message);
     },
   });
 };
@@ -131,8 +155,9 @@ export const useUpdateGroup = () => {
       queryClient.invalidateQueries({ queryKey: ['groups', 'with-members'] });
       toast.success('Grupo actualizado exitosamente');
     },
-    onError: (error) => {
-      toast.error('Error al actualizar grupo: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al actualizar grupo';
+      toast.error('Error al actualizar grupo: ' + message);
     },
   });
 };
@@ -155,8 +180,9 @@ export const useDeleteGroup = () => {
       queryClient.invalidateQueries({ queryKey: ['groups', 'with-members'] });
       toast.success('Grupo eliminado exitosamente');
     },
-    onError: (error) => {
-      toast.error('Error al eliminar grupo: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al eliminar grupo';
+      toast.error('Error al eliminar grupo: ' + message);
     },
   });
 };
@@ -193,8 +219,9 @@ export const useAddUserToGroup = () => {
       queryClient.invalidateQueries({ queryKey: ['user-groups'] });
       toast.success('Usuario añadido al grupo exitosamente');
     },
-    onError: (error) => {
-      toast.error('Error al añadir usuario al grupo: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al añadir usuario al grupo';
+      toast.error('Error al añadir usuario al grupo: ' + message);
     },
   });
 };
@@ -218,8 +245,9 @@ export const useRemoveUserFromGroup = () => {
       queryClient.invalidateQueries({ queryKey: ['user-groups'] });
       toast.success('Usuario eliminado del grupo exitosamente');
     },
-    onError: (error) => {
-      toast.error('Error al eliminar usuario del grupo: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al eliminar usuario del grupo';
+      toast.error('Error al eliminar usuario del grupo: ' + message);
     },
   });
 };
@@ -253,8 +281,9 @@ export const useUpdateUserRoleInGroup = () => {
       queryClient.invalidateQueries({ queryKey: ['user-groups'] });
       toast.success('Rol actualizado exitosamente');
     },
-    onError: (error) => {
-      toast.error('Error al actualizar rol: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al actualizar rol';
+      toast.error('Error al actualizar rol: ' + message);
     },
   });
 };

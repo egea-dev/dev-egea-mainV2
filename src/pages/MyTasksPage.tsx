@@ -1,30 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  MapPin, 
-  Clock, 
-  Car, 
-  CheckCircle, 
+import {
+  MapPin,
+  Clock,
+  Car,
+  CheckCircle,
   AlertTriangle,
   RefreshCw,
-  Phone,
-  MessageSquare
 } from "lucide-react";
 import { TaskStateBadge, VehicleBadge } from "@/components/badges";
 import dayjs from "dayjs";
+import { buildMapsDirectionsUrl, buildMapsSearchUrl } from "@/utils/maps";
 
 interface Task {
   id: string;
+  location?: string | null;
   data: {
     site: string;
     client?: string;
-    address: string;
+    address?: string;
     description?: string;
   };
   state: string;
@@ -53,24 +52,17 @@ export default function MyTasksPage() {
   const [notificationData, setNotificationData] = useState<NotificationData | null>(null);
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!token) {
-      navigate("/");
-      return;
-    }
-
-    loadTasks();
-  }, [token, navigate]);
-
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .rpc('get_tasks_by_token', { p_token: token });
 
       if (error) {
-        if (error.message.includes('Rate limit exceeded')) {
+        const message = error.message ?? '';
+        if (message.includes('Rate limit exceeded')) {
           toast.error("Demasiadas solicitudes. Inténtalo de nuevo en un minuto.");
-        } else if (error.message.includes('Enlace no válido')) {
+        } else if (message.includes('Enlace no válido')) {
           toast.error("Enlace no válido o expirado");
         } else {
           throw error;
@@ -106,7 +98,16 @@ export default function MyTasksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      navigate("/");
+      return;
+    }
+
+    void loadTasks();
+  }, [token, navigate, loadTasks]);
 
   const updateTaskState = async (taskId: string, newState: string) => {
     setUpdatingTask(taskId);
@@ -141,13 +142,23 @@ export default function MyTasksPage() {
     }
   };
 
-  const getMapsUrl = (address: string) => {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-  };
+  const getMapsUrl = (address: string) => buildMapsSearchUrl(address);
+  const getDirectionsUrl = (address: string) => buildMapsDirectionsUrl(address);
 
-  const getDirectionsUrl = (address: string) => {
-    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
-  };
+  const tasks = useMemo(
+    () => (notificationData ? notificationData.tasks : []),
+    [notificationData]
+  );
+
+  const pendingTasks = useMemo(
+    () => tasks.filter((task) => task.state !== "terminado"),
+    [tasks]
+  );
+
+  const completedTasks = useMemo(
+    () => tasks.filter((task) => task.state === "terminado"),
+    [tasks]
+  );
 
   if (loading) {
     return (
@@ -181,6 +192,105 @@ export default function MyTasksPage() {
     );
   }
 
+  const renderTaskCard = (task: Task, { showStatusActions }: { showStatusActions: boolean }) => {
+    const locationLabel =
+      task.location || task.data.address || task.data.site || task.data.client || "";
+    const hasLocation = Boolean(locationLabel && locationLabel.trim());
+
+    return (
+      <Card key={task.id} className="w-full">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <CardTitle className="text-lg">
+                📍 {task.data.site ?? "Tarea asignada"}
+              </CardTitle>
+              {(task.data.client || task.data.site) && (
+                <p className="text-muted-foreground">
+                  {task.data.client ? `Cliente: ${task.data.client}` : `Sitio: ${task.data.site}`}
+                </p>
+              )}
+              {hasLocation && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span className="truncate">{locationLabel}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>
+                  {dayjs(task.start_date).format("HH:mm")} - {dayjs(task.end_date).format("HH:mm")}
+                </span>
+              </div>
+            </div>
+            <TaskStateBadge state={task.state} />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {task.data.description && (
+            <p className="text-sm text-muted-foreground">{task.data.description}</p>
+          )}
+
+          {task.assigned_vehicles && task.assigned_vehicles.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Car className="h-4 w-4 text-muted-foreground" />
+              <div className="flex flex-wrap gap-2">
+                {task.assigned_vehicles.map((vehicle) => (
+                  <VehicleBadge key={vehicle.id} name={vehicle.name} type={vehicle.type} size="sm" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2 border-t pt-4">
+            {hasLocation && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(getMapsUrl(locationLabel), "_blank")}
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Ver en Maps
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(getDirectionsUrl(locationLabel), "_blank")}
+                >
+                  <Car className="h-4 w-4 mr-2" />
+                  Cómo Llegar
+                </Button>
+              </>
+            )}
+
+            {showStatusActions && (
+              <>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => updateTaskState(task.id, "incidente")}
+                  disabled={updatingTask === task.id}
+                >
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  {updatingTask === task.id ? "Actualizando..." : "Incidente"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => updateTaskState(task.id, "terminado")}
+                  disabled={updatingTask === task.id}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  {updatingTask === task.id ? "Actualizando..." : "Terminado"}
+                </Button>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -202,126 +312,50 @@ export default function MyTasksPage() {
 
       {/* Tasks List */}
       <div className="max-w-4xl mx-auto p-6 space-y-4">
-        <ScrollArea className="h-[calc(100vh-200px)]">
-          {notificationData.tasks.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold">¡No tienes tareas asignadas!</h3>
-                <p className="text-muted-foreground">Disfruta de tu día libre.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            notificationData.tasks.map((task) => (
-              <Card key={task.id} className="w-full">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-2">
-                        📍 {task.data.site}
-                      </CardTitle>
-                      {task.data.client && (
-                        <p className="text-muted-foreground mb-2">
-                          Cliente: {task.data.client}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span>{task.data.address}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                          {dayjs(task.start_date).format('HH:mm')} - {dayjs(task.end_date).format('HH:mm')}
-                        </span>
-                      </div>
-                    </div>
-                    <TaskStateBadge state={task.state} />
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {task.data.description && (
-                    <p className="text-sm text-muted-foreground">
-                      {task.data.description}
-                    </p>
-                  )}
-
-                  {task.assigned_vehicles && task.assigned_vehicles.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Car className="h-4 w-4 text-muted-foreground" />
-                      <div className="flex gap-2">
-                        {task.assigned_vehicles.map((vehicle) => (
-                          <VehicleBadge
-                            key={vehicle.id}
-                            name={vehicle.name}
-                            type={vehicle.type}
-                            size="sm"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="flex flex-wrap gap-2 pt-4 border-t">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => window.open(getMapsUrl(task.data.address), '_blank')}
-                    >
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Ver en Maps
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => window.open(getDirectionsUrl(task.data.address), '_blank')}
-                    >
-                      <Car className="h-4 w-4 mr-2" />
-                      Cómo Llegar
-                    </Button>
-                    
-                    {task.state !== 'terminado' && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => updateTaskState(task.id, 'incidente')}
-                          disabled={updatingTask === task.id}
-                        >
-                          <AlertTriangle className="h-4 w-4 mr-2" />
-                          {updatingTask === task.id ? 'Actualizando...' : 'Incidente'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => updateTaskState(task.id, 'terminado')}
-                          disabled={updatingTask === task.id}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          {updatingTask === task.id ? 'Actualizando...' : 'Terminado'}
-                        </Button>
-                      </>
-                    )}
-                  </div>
+        <ScrollArea className="h-[calc(100vh-200px)] space-y-6">
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Tareas pendientes</h2>
+            {pendingTasks.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <CheckCircle className="mx-auto mb-4 h-12 w-12 text-green-500" />
+                  <h3 className="text-lg font-semibold">¡No tienes tareas pendientes!</h3>
+                  <p className="text-muted-foreground">
+                    Revisa las tareas completadas para confirmar tu jornada.
+                  </p>
                 </CardContent>
               </Card>
-            ))
-          )}
-        </ScrollArea>
+            ) : (
+              pendingTasks.map((task) => renderTaskCard(task, { showStatusActions: true }))
+            )}
+          </section>
 
-        {/* Footer */}
-        <div className="text-center py-4 text-sm text-muted-foreground">
-          <p>Última actualización: {dayjs().format('HH:mm:ss')}</p>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={loadTasks}
-            className="mt-2"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Actualizar
-          </Button>
-        </div>
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Tareas completadas</h2>
+            {completedTasks.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  Aún no tienes tareas registradas como completadas.
+                </CardContent>
+              </Card>
+            ) : (
+              completedTasks.map((task) => renderTaskCard(task, { showStatusActions: false }))
+            )}
+          </section>
+
+          <div className="border-t pt-4 text-center text-sm text-muted-foreground">
+            <p>Última actualización: {dayjs().format("HH:mm:ss")}</p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={loadTasks}
+              className="mt-2 gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Actualizar
+            </Button>
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );

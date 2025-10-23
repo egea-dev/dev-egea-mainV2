@@ -89,7 +89,8 @@ export default function GroupDisplayPage() {
 
       if (error) {
         console.error("Error loading group screens:", error);
-        toast.error(`Error al cargar el grupo de pantallas: ${error.message}`);
+        const message = error.message ?? 'Error desconocido al cargar pantallas';
+        toast.error(`Error al cargar el grupo de pantallas: ${message}`);
         setScreens([]);
       } else {
         const matchingScreens = (data || []).filter((screen) => {

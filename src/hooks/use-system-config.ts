@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { JsonValue } from '@/integrations/supabase/types';
 
 export type SystemConfig = {
   id: string;
   key: string;
-  value: any;
-  description?: string;
+  value: JsonValue | null;
+  description?: string | null;
   category: string;
   created_at: string;
   updated_at: string;
@@ -23,7 +24,8 @@ export function useSystemConfig() {
         .order('key', { ascending: true });
 
       if (error) throw error;
-      return data as SystemConfig[];
+      const records = (data ?? []) as SystemConfig[];
+      return records;
     },
   });
 }
@@ -32,7 +34,7 @@ export function useUpdateSystemConfig() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: any }) => {
+    mutationFn: async ({ key, value }: { key: string; value: JsonValue | null }) => {
       const { data, error } = await supabase
         .from('system_config')
         .update({ value })
@@ -41,14 +43,15 @@ export function useUpdateSystemConfig() {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as SystemConfig;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['system-config'] });
       toast.success('Configuración actualizada correctamente');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Error al actualizar configuración');
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al actualizar configuración';
+      toast.error(message);
     },
   });
 }
@@ -65,14 +68,15 @@ export function useCreateSystemConfig() {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as SystemConfig;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['system-config'] });
       toast.success('Configuración creada correctamente');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Error al crear configuración');
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al crear configuración';
+      toast.error(message);
     },
   });
 }
@@ -93,8 +97,9 @@ export function useDeleteSystemConfig() {
       queryClient.invalidateQueries({ queryKey: ['system-config'] });
       toast.success('Configuración eliminada correctamente');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Error al eliminar configuración');
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al eliminar configuración';
+      toast.error(message);
     },
   });
 }

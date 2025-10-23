@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, FileDown, ArrowLeft, Database, PlusCircle, MoreHorizontal, UploadCloud, Eye } from "lucide-react";
+import { Trash2, Plus, FileDown, ArrowLeft, Database, PlusCircle, MoreHorizontal, UploadCloud, Eye, Pencil } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,7 +27,9 @@ type TemplateField = {
 
 export const DataManagement = () => {
   const queryClient = useQueryClient();
-  const [selectedScreenId, setSelectedScreenId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialScreenParam = searchParams.get("screen");
+  const [selectedScreenId, setSelectedScreenIdState] = useState<string | null>(initialScreenParam);
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string | number>("");
   const [newRowData, setNewRowData] = useState<Record<string, string | number | null> | null>(null);
@@ -46,18 +49,47 @@ export const DataManagement = () => {
   const [deleteScreenDialogOpen, setDeleteScreenDialogOpen] = useState(false);
   const [screenToDelete, setScreenToDelete] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [renameScreenDialogOpen, setRenameScreenDialogOpen] = useState(false);
+  const [screenToRename, setScreenToRename] = useState<{ id: string; name: string } | null>(null);
+  const [renameScreenName, setRenameScreenName] = useState("");
   const dashboardOptions = [
     { value: "none", label: "No mostrar en dashboard" },
     { value: "confeccion", label: "Tarjeta Confeccion" },
     { value: "tapiceria", label: "Tarjeta Tapiceria" },
     { value: "pendientes", label: "Lista de pendientes" },
+    { value: "data_shortcuts", label: "Accesos rápidos a tablas" },
   ];
   
   const { data: screens = [], isLoading: screensLoading, refetch: refetchScreens } = useScreens();
-  const { data: screenInfo, isLoading: dataLoading } = useScreenData(selectedScreenId);
+  const { data: screenInfo, isLoading: dataLoading, refetch: refetchScreenInfo } = useScreenData(selectedScreenId);
   const updateMutation = useUpdateScreenData(selectedScreenId);
   const deleteMutation = useDeleteScreenData(selectedScreenId);
   const createMutation = useCreateScreenData(selectedScreenId);
+
+  const navigate = useNavigate();
+
+  const selectScreen = useCallback(
+    (screenId: string | null, options?: { preserveFrom?: boolean }) => {
+      setSelectedScreenIdState(screenId);
+      const next = new URLSearchParams(searchParams);
+      const preserveFrom = options?.preserveFrom ?? false;
+
+      if (screenId) {
+        next.set("screen", screenId);
+        if (!preserveFrom) {
+          next.delete("from");
+        }
+      } else {
+        next.delete("screen");
+        if (!preserveFrom) {
+          next.delete("from");
+        }
+      }
+
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
 
   // Cargar plantillas disponibles
   const loadTemplates = async () => {
@@ -96,6 +128,18 @@ export const DataManagement = () => {
   useEffect(() => {
     loadGroups();
   }, []);
+
+  useEffect(() => {
+    const paramId = searchParams.get("screen");
+
+    if (paramId) {
+      if (paramId !== selectedScreenId && screens.some((screen) => screen.id === paramId)) {
+        setSelectedScreenIdState(paramId);
+      }
+    } else if (!paramId && selectedScreenId) {
+      setSelectedScreenIdState(null);
+    }
+  }, [searchParams, screens, selectedScreenId]);
 
   // Crear nueva pantalla
   const handleCreateScreen = async () => {
@@ -182,8 +226,9 @@ export const DataManagement = () => {
       if (error) throw error;
 
       toast.success("Configuracion del dashboard actualizada");
-      await refetchScreens();
+      await Promise.all([refetchScreens(), refetchScreenInfo()]);
       queryClient.invalidateQueries({ queryKey: ['screens'] });
+      queryClient.invalidateQueries({ queryKey: ['screen_data', selectedScreenId] });
     } catch (error) {
       console.error("Error updating dashboard settings:", error);
       toast.error("No se pudo actualizar la configuracion del dashboard");
@@ -201,12 +246,12 @@ export const DataManagement = () => {
     const item = dataList.find(d => d.id === itemId);
     if (!item) return;
 
-    const selectedScreen = screens.find(s => s.id === selectedScreenId);
+    const targetScreen = (screenInfo?.screen ?? screens.find((s) => s.id === selectedScreenId)) ?? null;
     const newValue = newValueOverride ?? editValue;
     
     // Lógica especial para cuando se marca como "terminado"
     if (field === 'state' && newValue === 'terminado') {
-      await handleCompleteTask(itemId, selectedScreen?.next_screen_id);
+      await handleCompleteTask(itemId, targetScreen?.next_screen_id);
       return;
     }
     
@@ -300,6 +345,12 @@ export const DataManagement = () => {
     setDeleteScreenDialogOpen(true);
   };
 
+  const handleOpenRenameDialog = (screen: { id: string; name: string }) => {
+    setScreenToRename({ id: screen.id, name: screen.name ?? "" });
+    setRenameScreenName(screen.name ?? "");
+    setRenameScreenDialogOpen(true);
+  };
+
   const confirmDeleteScreen = async () => {
     if (screenToDelete) {
       try {
@@ -314,6 +365,33 @@ export const DataManagement = () => {
         setScreenToDelete(null);
         setDeleteScreenDialogOpen(false);
       }
+    }
+  };
+
+  const handleRenameScreen = async () => {
+    if (!screenToRename) return;
+    const newName = renameScreenName.trim();
+    if (!newName) {
+      toast.error("El nombre de la tabla es obligatorio");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('screens')
+        .update({ name: newName })
+        .eq('id', screenToRename.id);
+
+      if (error) throw error;
+
+      toast.success("Nombre de la tabla actualizado");
+      setRenameScreenDialogOpen(false);
+      setScreenToRename(null);
+      setRenameScreenName("");
+      await refetchScreens();
+    } catch (error) {
+      console.error("Error renombrando tabla:", error);
+      toast.error("No se pudo actualizar el nombre");
     }
   };
 
@@ -434,6 +512,10 @@ export const DataManagement = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleOpenRenameDialog(screen)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Renombrar
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDeleteScreen(screen.id)}>
                           <Trash2 className="mr-2 h-4 w-4 text-destructive" />
                           <span className="text-destructive">Eliminar</span>
@@ -450,7 +532,7 @@ export const DataManagement = () => {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Button className="w-full" onClick={() => setSelectedScreenId(screen.id)}>
+                    <Button className="w-full" onClick={() => selectScreen(screen.id)}>
                       <Database className="mr-2 h-4 w-4" />
                       Gestionar Datos
                     </Button>
@@ -477,32 +559,87 @@ export const DataManagement = () => {
           confirmText="ELIMINAR"
           requiredWord="ELIMINAR"
       />
+      <Dialog
+        open={renameScreenDialogOpen}
+        onOpenChange={(open) => {
+          setRenameScreenDialogOpen(open);
+          if (!open) {
+            setScreenToRename(null);
+            setRenameScreenName("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Renombrar tabla de datos</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename-screen-name">Nuevo nombre</Label>
+              <Input
+                id="rename-screen-name"
+                value={renameScreenName}
+                onChange={(e) => setRenameScreenName(e.target.value)}
+                placeholder="Introduce el nuevo nombre de la tarjeta"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRenameScreenDialogOpen(false);
+                  setScreenToRename(null);
+                  setRenameScreenName("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleRenameScreen} disabled={!renameScreenName.trim()}>
+                Guardar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       </div>
     );
   }
-  
-  const selectedScreen = screens.find(s => s.id === selectedScreenId);
+
+  const screenMeta = (screenInfo?.screen ?? screens.find((s) => s.id === selectedScreenId)) ?? null;
+  const currentScreen = screenMeta;
+  const returnToDashboard = searchParams.get("from") === "dashboard";
 
   return (
     <div className="p-4 sm:p-8 space-y-6">
     <Card className="shadow-sm">
-      <CardHeader>
+      <CardHeader className="space-y-6">
         <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-                <Button variant="outline" size="icon" onClick={() => setSelectedScreenId(null)}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (returnToDashboard) {
+                      navigate("/admin");
+                    } else {
+                      selectScreen(null);
+                    }
+                  }}
+                >
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                    <CardTitle>Gestionando: {selectedScreen?.name}</CardTitle>
+                    <CardTitle>Gestionando: {currentScreen?.name}</CardTitle>
                     <CardDescription>Haz clic en una celda para editarla directamente.</CardDescription>
                 </div>
             </div>
             <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => selectedScreen?.id && window.open(`/screen/${selectedScreen.id}`, "_blank")}
-                  disabled={!selectedScreen?.id}
+                  onClick={() => currentScreen?.id && window.open(`/screen/${currentScreen.id}`, "_blank")}
+                  disabled={!currentScreen?.id}
                 >
                   <Eye className="mr-2 h-4 w-4" />
                   Ver Pantalla
@@ -518,13 +655,13 @@ export const DataManagement = () => {
                 <Button onClick={handleAddNewRow} disabled={!!newRowData}><Plus className="mr-2 h-4 w-4" />Añadir Fila</Button>
             </div>
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+        <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(180px,0.5fr)_minmax(180px,0.5fr)]">
           <div className="space-y-1">
-            <Label>Seccion en dashboard</Label>
+            <Label className="text-sm font-medium">Seccion en dashboard</Label>
             <Select
-              value={(selectedScreen?.dashboard_section as string | undefined) ?? "none"}
+              value={(currentScreen?.dashboard_section as string | undefined) ?? "none"}
               onValueChange={(value) => updateScreenDashboardSettings({ dashboard_section: value === "none" ? null : value })}
-              disabled={!selectedScreen?.id}
+              disabled={!currentScreen?.id}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecciona seccion" />
@@ -539,24 +676,24 @@ export const DataManagement = () => {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Orden dentro de la seccion</Label>
+            <Label className="text-sm font-medium">Orden dentro de la seccion</Label>
             <Input
-              key={`order-${selectedScreen?.id ?? "none"}`}
+              key={`order-${currentScreen?.id ?? "none"}`}
               type="number"
               min={0}
-              defaultValue={selectedScreen?.dashboard_order ?? 0}
-              disabled={!selectedScreen?.id}
+              defaultValue={currentScreen?.dashboard_order ?? 0}
+              disabled={!currentScreen?.id}
               onBlur={(event) => {
                 const raw = Number(event.target.value || 0);
-                if (selectedScreen && raw !== (selectedScreen.dashboard_order ?? 0)) {
+                if (currentScreen && raw !== (currentScreen.dashboard_order ?? 0)) {
                   updateScreenDashboardSettings({ dashboard_order: raw });
                 }
               }}
             />
           </div>
           <div className="space-y-1">
-            <Label>Grupo actual</Label>
-            <Input value={selectedScreen?.screen_group ?? "Sin grupo"} disabled className="bg-muted" />
+            <Label className="text-sm font-medium">Grupo actual</Label>
+            <Input value={currentScreen?.screen_group ?? "Sin grupo"} disabled className="bg-muted" />
           </div>
         </div>
       </CardHeader>

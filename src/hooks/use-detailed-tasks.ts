@@ -17,6 +17,60 @@ type TemplateFieldDefinition = {
 
 export type DashboardTemplateFieldMap = Record<string, TemplateFieldDefinition[]>;
 
+export type DashboardTaskSessionInfo = {
+  lastArrival?: string | null;
+  lastDeparture?: string | null;
+  active: boolean;
+};
+
+type AssignedProfileRecord = {
+  id: string;
+  full_name: string;
+  email?: string | null;
+};
+
+type AssignedVehicleRecord = {
+  id: string;
+  name: string;
+  type?: string | null;
+};
+
+const normalizeAssignedProfiles = (value: unknown): AssignedProfileRecord[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      const id = typeof record.id === 'string' ? record.id : null;
+      const fullName = typeof record.full_name === 'string' ? record.full_name : null;
+      if (!id || !fullName) return null;
+      return {
+        id,
+        full_name: fullName,
+        email: typeof record.email === 'string' ? record.email : null,
+      };
+    })
+    .filter((profile): profile is AssignedProfileRecord => profile !== null);
+};
+
+const normalizeAssignedVehicles = (value: unknown): AssignedVehicleRecord[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      const id = typeof record.id === 'string' ? record.id : null;
+      const name = typeof record.name === 'string' ? record.name : null;
+      if (!id || !name) return null;
+      return {
+        id,
+        name,
+        type: typeof record.type === 'string' ? record.type : null,
+      };
+    })
+    .filter((vehicle): vehicle is AssignedVehicleRecord => vehicle !== null);
+};
+
 interface UseDetailedTasksOptions {
   filters?: TaskFilters;
   sort?: SortOption;
@@ -37,7 +91,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     autoRefresh = false
   } = options;
 
-  const buildQuery = () => {
+  const buildQuery = useCallback(() => {
     let query = supabase
       .from('detailed_tasks')
       .select('*', { count: 'exact' });
@@ -80,9 +134,23 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     query = query.range(from, to);
 
     return query;
-  };
+  }, [
+    filters.client_id,
+    filters.date_from,
+    filters.date_to,
+    filters.search,
+    filters.selectedGroups,
+    filters.responsible_profile_id,
+    filters.screen_group,
+    filters.state,
+    filters.status,
+    pagination.page,
+    pagination.pageSize,
+    sort.direction,
+    sort.field,
+  ]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -102,7 +170,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [buildQuery]);
 
   const createTask = async (taskData: TaskFormData) => {
     try {
@@ -185,7 +253,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
   const completeTask = async (taskId: string, nextScreenId?: string) => {
     try {
       // Intentar obtener la tarea desde el estado local (vista detailed_tasks)
-      let task = tasks.find(t => t.id === taskId) as any | undefined;
+      let task = tasks.find((candidate) => candidate.id === taskId);
 
       // Si no está en memoria, obtenerla desde la vista
       if (!task) {
@@ -195,16 +263,16 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
           .eq('id', taskId)
           .single();
         if (error) throw error;
-        task = data as any;
+        task = data as DetailedTask;
+      }
+
+      if (!task) {
+        throw new Error('No se encontró la tarea a completar');
       }
 
       // Preparar asignaciones para el archivado
-      const assignedUsers = Array.isArray(task?.assigned_profiles)
-        ? task.assigned_profiles.map((p: any) => ({ id: p.id, full_name: p.full_name, email: p.email }))
-        : [];
-      const assignedVehicles = Array.isArray(task?.assigned_vehicles)
-        ? task.assigned_vehicles.map((v: any) => ({ id: v.id, name: v.name, type: v.type }))
-        : [];
+      const assignedUsers = normalizeAssignedProfiles(task.assigned_profiles);
+      const assignedVehicles = normalizeAssignedVehicles(task.assigned_vehicles);
 
       // Archivar la tarea con datos reales
       const { error: archiveError } = await supabase
@@ -239,8 +307,8 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
           location: task.location || null,
           responsible_profile_id: task.responsible_profile_id || null,
           assigned_to: task.assigned_to || null,
-          assigned_profiles: Array.isArray(task.assigned_profiles) ? task.assigned_profiles.map((p: any) => p.id) : [],
-          assigned_vehicles: Array.isArray(task.assigned_vehicles) ? task.assigned_vehicles.map((v: any) => v.id) : [],
+          assigned_profiles: normalizeAssignedProfiles(task.assigned_profiles).map((profile) => profile.id),
+          assigned_vehicles: normalizeAssignedVehicles(task.assigned_vehicles).map((vehicle) => vehicle.id),
         });
       }
 
@@ -272,7 +340,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
   // Fetch inicial
   useEffect(() => {
     fetchTasks();
-  }, [filters, sort, pagination]);
+  }, [fetchTasks]);
 
   // Auto-refresh si está habilitado
   useEffect(() => {
@@ -283,7 +351,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     }, 30000); // Refrescar cada 30 segundos
 
     return () => clearInterval(interval);
-  }, [autoRefresh, filters, sort, pagination]);
+  }, [autoRefresh, fetchTasks]);
 
   return {
     tasks,
@@ -307,6 +375,7 @@ export function useDashboardTasks() {
   const [pendingTasks, setPendingTasks] = useState<DetailedTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [templateFieldsByScreen, setTemplateFieldsByScreen] = useState<DashboardTemplateFieldMap>({});
+  const [sessionInfoByTask, setSessionInfoByTask] = useState<Record<string, DashboardTaskSessionInfo>>({});
 
   const fetchDashboardTasks = useCallback(async () => {
     try {
@@ -372,9 +441,12 @@ export function useDashboardTasks() {
         let query = supabase
           .from('detailed_tasks')
           .select('*')
-          .neq('state', 'terminado')
           .order('is_urgent', { ascending: false })
           .order('start_date', { ascending: true, nullsFirst: true });
+
+        if (section !== 'pendientes') {
+          query = query.neq('state', 'terminado');
+        }
 
         const screenIds = sectionMap[section];
         if (screenIds.length > 0) {
@@ -393,16 +465,50 @@ export function useDashboardTasks() {
       };
 
       const [confeccionData, tapiceriaData, pendingData] = await Promise.all([
-        fetchSectionTasks('confeccion', ['Confección', 'Confeccion'], 4),
-        fetchSectionTasks('tapiceria', ['Tapicería', 'Tapiceria'], 4),
+        fetchSectionTasks('confeccion', ['Confección', 'Confeccion'], 6),
+        fetchSectionTasks('tapiceria', ['Tapicería', 'Tapiceria'], 6),
         fetchSectionTasks('pendientes', [], null),
       ]);
 
-      setConfeccionTasks(confeccionData);
-      setTapiceriaTasks(tapiceriaData);
+      const shouldHighlight = (task: DetailedTask) => {
+        const state = (task.state ?? '').toLowerCase();
+        return state === 'incidente' || state === 'arreglo' || state === 'urgente';
+      };
+
+      setConfeccionTasks(confeccionData.filter(shouldHighlight));
+      setTapiceriaTasks(tapiceriaData.filter(shouldHighlight));
       setPendingTasks(pendingData);
+
+      const allTasks = [...confeccionData, ...tapiceriaData, ...pendingData];
+      const taskIds = Array.from(new Set(allTasks.map((task) => task.id)));
+
+      if (taskIds.length > 0) {
+        const { data: sessionsData, error: sessionsError } = await supabase
+          .from('work_sessions')
+          .select('task_id, status, started_at, ended_at')
+          .in('task_id', taskIds)
+          .order('started_at', { ascending: false });
+
+        if (sessionsError) throw sessionsError;
+
+        const summaryMap: Record<string, DashboardTaskSessionInfo> = {};
+        (sessionsData ?? []).forEach((session) => {
+          const taskId = session.task_id as string | null;
+          if (!taskId || summaryMap[taskId]) return;
+          summaryMap[taskId] = {
+            active: session.status === 'active' && !session.ended_at,
+            lastArrival: session.started_at ?? null,
+            lastDeparture: session.ended_at ?? null,
+          };
+        });
+
+        setSessionInfoByTask(summaryMap);
+      } else {
+        setSessionInfoByTask({});
+      }
     } catch (err) {
       console.error('Error fetching dashboard tasks:', err);
+      setSessionInfoByTask({});
     } finally {
       setLoading(false);
     }
@@ -420,6 +526,7 @@ export function useDashboardTasks() {
     pendingTasks,
     loading,
     templateFieldsByScreen,
+    sessionInfoByTask,
     refresh: fetchDashboardTasks,
   };
 }

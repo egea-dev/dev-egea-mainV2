@@ -8,32 +8,87 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Trash2, Copy } from "lucide-react";
 
-type Template = {
-  id: string;
-  name: string;
-  template_type: string;
-  fields: Field[];
-};
-
-type Field = {
+type TemplateFieldPreview = {
   name: string;
   label: string;
   type: "text" | "number" | "date";
+};
+
+type TemplateRecord = {
+  id: string;
+  name: string;
+  template_type: string;
+  category?: string | null;
+  fields: TemplateFieldPreview[];
+};
+
+type TaskDataRecord = {
+  client?: string | null;
+  screen_group?: string | null;
+  data?: Record<string, unknown> | null;
 };
 
 type TemplateDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onClose: () => void;
-  template?: Template | null;
-  fromTaskData?: any; // Para crear plantilla desde tarea existente
+  template?: TemplateRecord | null;
+  fromTaskData?: TaskDataRecord;
+};
+
+const inferFieldType = (value: unknown): TemplateFieldPreview["type"] => {
+  if (typeof value === "number") return "number";
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return "text";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed) || !Number.isNaN(Date.parse(trimmed))) {
+      return "date";
+    }
+    return "text";
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return "date";
+  }
+  return "text";
+};
+
+const normalizeFieldName = (label: string, used: Set<string>): string => {
+  const base = label
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'campo';
+
+  let candidate = base;
+  let suffix = 1;
+  while (used.has(candidate)) {
+    candidate = `${base}_${suffix++}`;
+  }
+  used.add(candidate);
+  return candidate;
+};
+
+const buildFieldsFromTask = (taskData?: TaskDataRecord): TemplateFieldPreview[] => {
+  if (!taskData?.data) return [];
+
+  const entries = Object.entries(taskData.data).filter(([, value]) => value !== null && value !== undefined);
+  if (!entries.length) return [];
+
+  const usedNames = new Set<string>();
+  return entries.map(([rawKey, value]) => {
+    const label = rawKey.charAt(0).toUpperCase() + rawKey.slice(1);
+    const name = normalizeFieldName(rawKey, usedNames);
+    const type = inferFieldType(value);
+    return { name, label, type };
+  });
 };
 
 export const TemplateDialog = ({ open, onOpenChange, onClose, template, fromTaskData }: TemplateDialogProps) => {
   const [name, setName] = useState("");
   const [templateType, setTemplateType] = useState("");
   const [category, setCategory] = useState("");
-  const [fields, setFields] = useState<Field[]>([]);
+  const [fields, setFields] = useState<TemplateFieldPreview[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -44,39 +99,18 @@ export const TemplateDialog = ({ open, onOpenChange, onClose, template, fromTask
         setCategory(template.category || "");
         setFields(template.fields);
       } else if (fromTaskData) {
-        // Crear plantilla desde datos de tarea existente
-        setName(`Plantilla basada en ${fromTaskData.client || 'tarea'}`);
-        setTemplateType(fromTaskData.screen_group || "general");
-        setCategory(fromTaskData.screen_group || "general");
-        
-        // Extraer campos del JSON data
-        const taskFields: Field[] = [];
-        if (fromTaskData.data) {
-          Object.entries(fromTaskData.data).forEach(([key, value]) => {
-            if (key && value) {
-              taskFields.push({
-                name: key.toLowerCase().replace(/\s+/g, '_'),
-                label: key.charAt(0).toUpperCase() + key.slice(1),
-                type: typeof value === 'number' ? 'number' :
-                      typeof value === 'string' && value.includes('-') ? 'date' : 'text'
-              });
-            }
-          });
+        const clientLabel = typeof fromTaskData.client === 'string' ? fromTaskData.client : 'tarea';
+        const group = typeof fromTaskData.screen_group === 'string' ? fromTaskData.screen_group : 'general';
+        setName(`Plantilla basada en ${clientLabel}`);
+        setTemplateType(group);
+        setCategory(group);
+
+        const derivedFields = buildFieldsFromTask(fromTaskData);
+        if (derivedFields.length > 0) {
+          setFields(derivedFields);
+        } else {
+          setFields([{ name: "", label: "", type: "text" }]);
         }
-        
-        // Añadir campos estándar si no existen
-        const standardFields = ['cliente', 'direccion', 'descripcion', 'notas'];
-        standardFields.forEach(field => {
-          if (!taskFields.find(f => f.name === field)) {
-            taskFields.push({
-              name: field,
-              label: field.charAt(0).toUpperCase() + field.slice(1),
-              type: field === 'notas' ? 'text' : 'text'
-            });
-          }
-        });
-        
-        setFields(taskFields.length > 0 ? taskFields : [{ name: "", label: "", type: "text" }]);
       } else {
         setName("");
         setTemplateType("");
@@ -94,7 +128,7 @@ export const TemplateDialog = ({ open, onOpenChange, onClose, template, fromTask
     setFields(fields.filter((_, i) => i !== index));
   };
 
-  const updateField = (index: number, key: keyof Field, value: string) => {
+  const updateField = (index: number, key: keyof TemplateFieldPreview, value: string) => {
     const newFields = [...fields];
     newFields[index] = { ...newFields[index], [key]: value };
     setFields(newFields);
@@ -151,40 +185,33 @@ export const TemplateDialog = ({ open, onOpenChange, onClose, template, fromTask
       console.log('Guardando plantilla:', templateData);
 
       if (template) {
-        const { error, data } = await supabase
+        const { error } = await supabase
           .from("templates")
           .update(templateData)
-          .eq("id", template.id)
-          .select()
-          .single();
-        
+          .eq("id", template.id);
+
         if (error) {
-          console.error('Error actualizando plantilla:', error);
           throw error;
         }
-        
-        console.log('Plantilla actualizada:', data);
+
         toast.success("Plantilla actualizada correctamente");
       } else {
-        const { error, data } = await supabase
+        const { error } = await supabase
           .from("templates")
-          .insert(templateData)
-          .select()
-          .single();
-        
+          .insert(templateData);
+
         if (error) {
-          console.error('Error creando plantilla:', error);
           throw error;
         }
-        
-        console.log('Plantilla creada:', data);
+
         toast.success("Plantilla creada correctamente");
       }
 
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving template:", error);
-      toast.error(`Error al guardar la plantilla: ${error.message || 'Error desconocido'}`);
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error(`Error al guardar la plantilla: ${message}`);
     } finally {
       setLoading(false);
     }

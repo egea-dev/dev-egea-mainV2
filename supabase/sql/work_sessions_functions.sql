@@ -35,16 +35,17 @@ RETURNS TABLE (
 ) AS $$
 DECLARE
   v_now timestamptz := now();
+  v_session public.work_sessions%ROWTYPE;
 BEGIN
   -- Cerrar sesiones activas previas
-  UPDATE public.work_sessions
+  UPDATE public.work_sessions AS ws
      SET status = 'completed',
-         ended_at = COALESCE(ended_at, v_now),
-         end_location = COALESCE(end_location, p_start_location),
+         ended_at = COALESCE(ws.ended_at, v_now),
+         end_location = COALESCE(ws.end_location, p_start_location),
          updated_at = v_now
-   WHERE profile_id = p_profile_id
-     AND status = 'active'
-     AND ended_at IS NULL;
+   WHERE ws.profile_id = p_profile_id
+     AND ws.status = 'active'
+     AND ws.ended_at IS NULL;
 
   -- Insertar nueva sesión
   INSERT INTO public.work_sessions (
@@ -65,21 +66,24 @@ BEGIN
     'active',
     COALESCE(p_metadata, '{}'::jsonb)
   )
-  RETURNING * INTO STRICT
-    id,
-    profile_id,
-    task_id,
-    started_at,
-    ended_at,
-    start_location,
-    end_location,
-    device_info,
-    status,
-    metadata,
-    created_at,
-    updated_at;
+  RETURNING * INTO v_session;
 
-  RETURN NEXT;
+  RETURN QUERY
+    SELECT
+      w.id,
+      w.profile_id,
+      w.task_id,
+      w.started_at,
+      w.ended_at,
+      w.start_location,
+      w.end_location,
+      w.device_info,
+      w.status,
+      w.metadata,
+      w.created_at,
+      w.updated_at
+    FROM public.work_sessions w
+    WHERE w.id = v_session.id;
 END;
 $$ LANGUAGE plpgsql
   SECURITY DEFINER
@@ -104,17 +108,17 @@ DECLARE
   v_now timestamptz := now();
   v_session public.work_sessions;
 BEGIN
-  UPDATE public.work_sessions
-     SET ended_at = COALESCE(ended_at, v_now),
-         end_location = COALESCE(p_end_location, end_location),
-         status = COALESCE(p_status, status),
+  UPDATE public.work_sessions AS ws
+     SET ended_at = COALESCE(ws.ended_at, v_now),
+         end_location = COALESCE(p_end_location, ws.end_location),
+         status = COALESCE(p_status, ws.status),
          metadata = CASE
-           WHEN p_metadata IS NULL THEN metadata
-           ELSE jsonb_strip_nulls(metadata || p_metadata)
+           WHEN p_metadata IS NULL THEN ws.metadata
+           ELSE jsonb_strip_nulls(ws.metadata || p_metadata)
          END,
          updated_at = v_now
-   WHERE id = p_session_id
-     AND (p_profile_id IS NULL OR profile_id = p_profile_id)
+   WHERE ws.id = p_session_id
+     AND (p_profile_id IS NULL OR ws.profile_id = p_profile_id)
   RETURNING * INTO v_session;
 
   IF NOT FOUND THEN
@@ -150,10 +154,10 @@ DECLARE
   v_session_task uuid;
   v_record public.incident_reports;
 BEGIN
-  SELECT task_id
+  SELECT ws.task_id
     INTO v_session_task
-    FROM public.work_sessions
-   WHERE id = p_session_id;
+    FROM public.work_sessions AS ws
+   WHERE ws.id = p_session_id;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Sesión % no existe', p_session_id

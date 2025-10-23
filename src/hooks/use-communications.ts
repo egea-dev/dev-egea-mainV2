@@ -29,6 +29,8 @@ export interface UserMessage {
 
 type CommunicationLogRow = Database['public']['Tables']['communication_logs']['Row'];
 
+type CommunicationLogMetadata = Record<string, string | number | boolean | null>;
+
 export interface CommunicationLog {
   id: CommunicationLogRow['id'];
   type: CommunicationLogRow['type'];
@@ -39,7 +41,7 @@ export interface CommunicationLog {
   sent_at: CommunicationLogRow['sent_at'];
   delivered_at: CommunicationLogRow['delivered_at'];
   error_message: CommunicationLogRow['error_message'];
-  metadata: Record<string, any>;
+  metadata: CommunicationLogMetadata;
   created_by: CommunicationLogRow['created_by'];
   created_at: CommunicationLogRow['created_at'];
 }
@@ -167,6 +169,13 @@ export const useOnlineUsers = () => {
 };
 
 // Hook para mensajes entre usuarios
+type UserMessageProfile = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  avatar_url: string | null;
+};
+
 export const useUserMessages = (userId?: string) => {
   return useQuery<CommunicationLogQueryResult>({
     queryKey: ['user-messages', userId],
@@ -201,8 +210,8 @@ export const useUserMessages = (userId?: string) => {
         throw error;
       }
       return data as (UserMessage & {
-        from_profile: any;
-        to_profile: any;
+        from_profile: UserMessageProfile;
+        to_profile: UserMessageProfile;
       })[];
     },
     enabled: !!userId,
@@ -285,8 +294,9 @@ export const useSendMessage = () => {
       queryClient.invalidateQueries({ queryKey: ['unread-messages'] });
       toast.success('Mensaje enviado exitosamente');
     },
-    onError: (error) => {
-      toast.error('Error al enviar mensaje: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al enviar mensaje';
+      toast.error(`Error al enviar mensaje: ${message}`);
     },
   });
 };
@@ -373,7 +383,7 @@ export const useCommunicationLogs = (filters: CommunicationLogFilters = {}) => {
         sent_at: row.sent_at,
         delivered_at: row.delivered_at,
         error_message: row.error_message,
-        metadata: (row.metadata as Record<string, any>) ?? {},
+        metadata: (row.metadata as CommunicationLogMetadata) ?? {},
         created_by: row.created_by,
         created_at: row.created_at,
       }));
@@ -481,8 +491,9 @@ export const useResendWhatsApp = () => {
       queryClient.invalidateQueries({ queryKey: ['communication-logs'] });
       toast.success('Notificación WhatsApp reenviada exitosamente');
     },
-    onError: (error) => {
-      toast.error('Error al reenviar WhatsApp: ' + error.message);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al reenviar WhatsApp';
+      toast.error(`Error al reenviar WhatsApp: ${message}`);
     },
   });
 };

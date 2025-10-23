@@ -9,7 +9,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useEffect } from "react";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -98,22 +98,14 @@ export const SidebarContentComponent = () => {
         <div className="w-full px-3 py-2 text-center">
           <p className="text-xs text-muted-foreground">Versión {appVersion}</p>
         </div>
-          <SidebarMenu>
-              <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Configuración">
-                    <Link to="/admin/settings">
-                        <Settings className="h-4 w-4 shrink-0" />
-                        <span className={cn(isCollapsed && "hidden")}>Configuración</span>
-                    </Link>
-                  </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                  <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
-                      <LogOut className="h-4 w-4 shrink-0" />
-                      <span className={cn(isCollapsed && "hidden")}>Logout</span>
-                  </SidebarMenuButton>
-              </SidebarMenuItem>
-          </SidebarMenu>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
+              <LogOut className="h-4 w-4 shrink-0" />
+              <span className={cn(isCollapsed && "hidden")}>Logout</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </>
   );

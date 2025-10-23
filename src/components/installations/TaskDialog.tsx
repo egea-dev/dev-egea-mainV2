@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Task, Profile, Vehicle } from '@/types';
+import type { Task, Profile, Vehicle } from '@/types';
 import dayjs from 'dayjs';
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, ExternalLink } from "lucide-react";
+import { buildMapsSearchUrl, formatLocationLabel } from "@/utils/maps";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import type { Screen } from "@/integrations/supabase/client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,7 @@ import { MultiSelectCombobox } from "./MultiSelectCombobox"; // Asumo que este c
 // Tarea 3.3: Esquema de validación con Zod
 const taskSchema = z.object({
   site: z.string().min(1, { message: "El sitio de trabajo es obligatorio." }),
+  location: z.string().min(1, { message: "La ubicación es obligatoria." }),
   description: z.string().min(1, { message: "La descripción es obligatoria." }),
   dueDate: z.date({ required_error: "La fecha es obligatoria." }),
   selectedUsers: z.array(z.object({ id: z.string(), name: z.string() })),
@@ -30,6 +33,15 @@ const taskSchema = z.object({
 });
 
 type TaskFormData = z.infer<typeof taskSchema>;
+
+type UpsertTaskResult = {
+  action: 'created' | 'updated';
+  task_id: string;
+};
+
+type DraggedItem =
+  | { type: 'user'; item: Profile }
+  | { type: 'vehicle'; item: Vehicle };
 
 type TaskDialogProps = {
   open: boolean;
@@ -39,7 +51,7 @@ type TaskDialogProps = {
   selectedDate: Date;
   users: Profile[];
   vehicles: Vehicle[];
-  draggedItem?: { type: string; item: Profile | Vehicle } | null;
+  draggedItem?: DraggedItem | null;
 };
 
 export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, users, vehicles, draggedItem }: TaskDialogProps) => {
@@ -50,6 +62,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
     resolver: zodResolver(taskSchema),
     defaultValues: {
       site: '',
+      location: '',
       description: '',
       dueDate: selectedDate,
       selectedUsers: [],
@@ -71,7 +84,11 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
         return;
       }
 
-      const allScreens = Array.isArray(data) ? data : data ? [data] : [];
+      const allScreens: Pick<Screen, 'id' | 'name' | 'screen_group' | 'screen_type' | 'is_active'>[] = Array.isArray(data)
+        ? data
+        : data
+        ? [data]
+        : [];
       if (allScreens.length === 0) {
         toast.error('No hay pantallas configuradas.');
         console.warn('No screens returned from Supabase.');
@@ -79,11 +96,11 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
       }
 
       const normalized = allScreens.map((screen) => ({
-        id: (screen as { id: string }).id,
-        name: ((screen as { name?: string }).name || '').trim().toLowerCase(),
-        group: ((screen as { screen_group?: string }).screen_group || '').trim().toLowerCase(),
-        type: ((screen as { screen_type?: string }).screen_type || '').trim().toLowerCase(),
-        isActive: (screen as { is_active?: boolean }).is_active ?? true,
+        id: screen.id,
+        name: (screen.name ?? '').trim().toLowerCase(),
+        group: (screen.screen_group ?? '').trim().toLowerCase(),
+        type: (screen.screen_type ?? '').trim().toLowerCase(),
+        isActive: screen.is_active ?? true,
       }));
 
       const matchExact = normalized.find((screen) => screen.group === 'instalaciones' && screen.isActive);
@@ -105,25 +122,38 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
   }, []);
 
   useEffect(() => {
-    if (open) {
-      if (task) {
-        form.reset({
-          site: task.data?.site || '',
-          description: task.data?.description || '',
-          dueDate: dayjs(task.start_date).toDate(),
-          selectedUsers: task.assigned_users?.map(u => ({ id: u.id, name: u.full_name })) || [],
-          selectedVehicles: task.assigned_vehicles?.map(v => ({ id: v.id, name: v.name })) || [],
-        });
-      } else {
-        form.reset({
-          site: '',
-          description: '',
-          dueDate: selectedDate,
-          selectedUsers: draggedItem?.type === 'user' ? [{ id: (draggedItem.item as Profile).id, name: (draggedItem.item as Profile).full_name }] : [],
-          selectedVehicles: draggedItem?.type === 'vehicle' ? [{ id: (draggedItem.item as Vehicle).id, name: (draggedItem.item as Vehicle).name }] : [],
-        });
-      }
+    if (!open) {
+      return;
     }
+
+    if (task) {
+      form.reset({
+        site: task.data?.site || '',
+        location: task.location || '',
+        description: task.data?.description || '',
+        dueDate: dayjs(task.start_date).toDate(),
+        selectedUsers: task.assigned_users?.map((user) => ({ id: user.id, name: user.full_name })) || [],
+        selectedVehicles: task.assigned_vehicles?.map((vehicle) => ({ id: vehicle.id, name: vehicle.name })) || [],
+      });
+      return;
+    }
+
+    const initialUsers = draggedItem?.type === 'user'
+      ? [{ id: draggedItem.item.id, name: draggedItem.item.full_name }]
+      : [];
+
+    const initialVehicles = draggedItem?.type === 'vehicle'
+      ? [{ id: draggedItem.item.id, name: draggedItem.item.name }]
+      : [];
+
+    form.reset({
+      site: '',
+      location: '',
+      description: '',
+      dueDate: selectedDate,
+      selectedUsers: initialUsers,
+      selectedVehicles: initialVehicles,
+    });
   }, [task, open, selectedDate, draggedItem, form]);
 
   const onSubmit = async (data: TaskFormData) => {
@@ -138,7 +168,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
       const nextState = task?.state ?? 'pendiente';
       const nextStatus = task?.status ?? 'pendiente';
 
-      const { data: result, error } = await supabase.rpc('upsert_task', {
+      const { data: result, error } = await supabase.rpc<UpsertTaskResult[]>('upsert_task', {
         p_task_id: task?.id || undefined,
         p_screen_id: installationsScreenId,
         p_data: {
@@ -149,7 +179,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
         p_status: nextStatus,
         p_start_date: formattedDate,
         p_end_date: formattedDate,
-        p_location: 'en la isla',
+        p_location: formatLocationLabel(data.location),
         p_responsible_profile_id: null,
         p_assigned_to: null,
         p_assigned_profiles: data.selectedUsers.map(u => u.id),
@@ -158,16 +188,23 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
 
       if (error) {
         console.error('Error saving task:', error);
-        toast.error('Error al guardar la tarea: ' + error.message);
+        const message = error.message ?? 'Error desconocido al guardar la tarea';
+        toast.error(`Error al guardar la tarea: ${message}`);
         return;
+      }
+
+      const outcome = Array.isArray(result) ? result[0] : null;
+      if (!outcome) {
+        console.warn('Respuesta inesperada de upsert_task', result);
       }
 
       toast.success(task ? 'Tarea actualizada correctamente' : 'Tarea creada correctamente');
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving task:', error);
-      toast.error('Error al guardar la tarea: ' + error.message);
+      const message = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error('Error al guardar la tarea: ' + message);
     } finally {
       setSaving(false);
     }
@@ -192,6 +229,48 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                   <FormMessage />
                 </FormItem>
               )}
+            />
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => {
+                const value = field.value ?? '';
+                const mapsUrl = value.trim()
+                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value.trim())}`
+                  : null;
+
+                return (
+                  <FormItem>
+                    <FormLabel>Ubicación</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <div className="relative flex-1">
+                          <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            {...field}
+                            value={value}
+                            className="pl-9"
+                            placeholder="Dirección, coordenadas o referencia"
+                          />
+                        </div>
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!value.trim()}
+                        onClick={() => {
+                          if (!value.trim()) return;
+                          const targetUrl = buildMapsSearchUrl(value);
+                          window.open(targetUrl, "_blank", "noopener");
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <FormField
               control={form.control}

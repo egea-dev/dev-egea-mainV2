@@ -2,7 +2,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Plus, User, Edit, Trash2, Link2, Mail, Phone, MessageCircle, ExternalLink } from "lucide-react";
+import { Plus, User, Edit, Trash2, Link2, Mail, Phone, MessageCircle, ExternalLink, Eye } from "lucide-react";
 import { UserDialog } from "./UserDialog";
 import { Profile } from "@/types";
 import { StatusBadge } from "@/components/badges";
@@ -53,7 +53,8 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
       });
 
       if (error) {
-        toast.error(error.message ?? "No se pudo enviar la invitación.");
+        const message = error.message ?? "No se pudo enviar la invitación.";
+        toast.error(message);
         return;
       }
 
@@ -153,7 +154,7 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => handleOpenDialog(user)}
-                  title="Editar operario"
+                  title="Ver / editar operario"
                 >
                   <Edit className="h-4 w-4" />
                 </Button>

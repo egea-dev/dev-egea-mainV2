@@ -1,7 +1,7 @@
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { EventDropArg } from '@fullcalendar/core'
+import { EventDropArg, EventApi } from '@fullcalendar/core'
 
 interface CalendarEvent {
   id: string
@@ -17,7 +17,7 @@ interface CalendarEvent {
 interface InstallationsCalendarProps {
   events: CalendarEvent[]
   onCreate: (date: Date) => void
-  onMove: (event: any) => Promise<void>
+  onMove: (event: EventApi) => Promise<void>
 }
 
 export default function InstallationsCalendar({ events, onCreate, onMove }: InstallationsCalendarProps) {

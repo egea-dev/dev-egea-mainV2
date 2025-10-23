@@ -35,6 +35,24 @@ import { StatusBadge } from "@/components/badges";
 import { Profile } from "@/types";
 import { UserDialog } from "@/components/users/UserDialog";
 import { useQueryClient } from "@tanstack/react-query";
+import type { JsonValue } from "@/integrations/supabase/types";
+
+type ConfigValues = Record<string, JsonValue | undefined>;
+
+const getStringConfigValue = (values: ConfigValues, key: string, fallback = ''): string => {
+  const value = values[key];
+  return typeof value === 'string' ? value : fallback;
+};
+
+const getBooleanConfigValue = (values: ConfigValues, key: string, fallback = false): boolean => {
+  const value = values[key];
+  return typeof value === 'boolean' ? value : fallback;
+};
+
+const getNumberConfigValue = (values: ConfigValues, key: string, fallback: number): number => {
+  const value = values[key];
+  return typeof value === 'number' && !Number.isNaN(value) ? value : fallback;
+};
 
 export default function SettingsPage() {
   const { data: profile, isLoading: loadingProfile } = useProfile();
@@ -47,7 +65,7 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
 
   const [fullName, setFullName] = useState('');
-  const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
+  const [configValues, setConfigValues] = useState<ConfigValues>({});
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newConfigKey, setNewConfigKey] = useState('');
   const [newConfigValue, setNewConfigValue] = useState('');
@@ -82,11 +100,15 @@ export default function SettingsPage() {
     }
   }, [profile]);
 
+  const stringConfig = (key: string, fallback = '') => getStringConfigValue(configValues, key, fallback);
+  const booleanConfig = (key: string, fallback = false) => getBooleanConfigValue(configValues, key, fallback);
+  const numberConfig = (key: string, fallback: number) => getNumberConfigValue(configValues, key, fallback);
+
   useEffect(() => {
     if (configs) {
-      const values: Record<string, unknown> = {};
-      configs.forEach(config => {
-        values[config.key] = config.value;
+      const values: ConfigValues = {};
+      configs.forEach((config) => {
+        values[config.key] = config.value ?? null;
       });
       setConfigValues(values);
     }
@@ -140,8 +162,9 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateConfig = (key: string, value: unknown) => {
-    updateConfigMutation.mutate({ key, value });
+  const handleUpdateConfig = (key: string, value: JsonValue | undefined) => {
+    const persistedValue = value ?? null;
+    updateConfigMutation.mutate({ key, value: persistedValue });
   };
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
@@ -244,9 +267,10 @@ export default function SettingsPage() {
                         setAvatarFile(null);
                         setAvatarPreview('');
                         toast.success('Avatar actualizado correctamente');
-                      } catch (error: any) {
+                      } catch (error: unknown) {
                         console.error(error);
-                        toast.error(error.message || 'Error al subir avatar. Verifica el bucket "avatars".');
+                        const message = error instanceof Error ? error.message : 'Error al subir avatar. Verifica el bucket "avatars".';
+                        toast.error(message);
                       }
                     }}
                   >
@@ -288,7 +312,7 @@ export default function SettingsPage() {
 
   const handleCreateConfig = () => {
     try {
-      const parsedValue = JSON.parse(newConfigValue);
+      const parsedValue = JSON.parse(newConfigValue) as JsonValue;
       createConfigMutation.mutate({
         key: newConfigKey,
         value: parsedValue,
@@ -436,9 +460,10 @@ export default function SettingsPage() {
                           setAvatarFile(null);
                           setAvatarPreview('');
                           toast.success('Avatar actualizado correctamente');
-                        } catch (error: any) {
+                        } catch (error: unknown) {
                           console.error('Error completo:', error);
-                          toast.error(error.message || 'Error al subir avatar. Verifica que el bucket "avatars" exista en Supabase Storage.');
+                          const message = error instanceof Error ? error.message : 'Error al subir avatar. Verifica que el bucket "avatars" exista en Supabase Storage.';
+                          toast.error(message);
                         }
                       }}
                       disabled={!avatarFile || updateProfileMutation.isPending}
@@ -777,9 +802,11 @@ export default function SettingsPage() {
                 </Label>
                 <Input
                   id="company_name"
-                  value={(configValues.company_name as string) || ''}
-                  onChange={(e) => setConfigValues({ ...configValues, company_name: e.target.value })}
-                  onBlur={() => handleUpdateConfig('company_name', configValues.company_name)}
+                  value={stringConfig('company_name')}
+                  onChange={(event) =>
+                    setConfigValues((prev) => ({ ...prev, company_name: event.target.value }))
+                  }
+                  onBlur={(event) => handleUpdateConfig('company_name', event.currentTarget.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -790,9 +817,11 @@ export default function SettingsPage() {
                 <Input
                   id="company_email"
                   type="email"
-                  value={(configValues.company_email as string) || ''}
-                  onChange={(e) => setConfigValues({ ...configValues, company_email: e.target.value })}
-                  onBlur={() => handleUpdateConfig('company_email', configValues.company_email)}
+                  value={stringConfig('company_email')}
+                  onChange={(event) =>
+                    setConfigValues((prev) => ({ ...prev, company_email: event.target.value }))
+                  }
+                  onBlur={(event) => handleUpdateConfig('company_email', event.currentTarget.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -802,9 +831,11 @@ export default function SettingsPage() {
                 </Label>
                 <Input
                   id="company_phone"
-                  value={(configValues.company_phone as string) || ''}
-                  onChange={(e) => setConfigValues({ ...configValues, company_phone: e.target.value })}
-                  onBlur={() => handleUpdateConfig('company_phone', configValues.company_phone)}
+                  value={stringConfig('company_phone')}
+                  onChange={(event) =>
+                    setConfigValues((prev) => ({ ...prev, company_phone: event.target.value }))
+                  }
+                  onBlur={(event) => handleUpdateConfig('company_phone', event.currentTarget.value)}
                 />
               </div>
               <div className="space-y-2">
@@ -815,9 +846,11 @@ export default function SettingsPage() {
                 <Input
                   id="company_logo"
                   placeholder="https://ejemplo.com/logo.png"
-                  value={(configValues.company_logo as string) || ''}
-                  onChange={(e) => setConfigValues({ ...configValues, company_logo: e.target.value })}
-                  onBlur={() => handleUpdateConfig('company_logo', configValues.company_logo)}
+                  value={stringConfig('company_logo')}
+                  onChange={(event) =>
+                    setConfigValues((prev) => ({ ...prev, company_logo: event.target.value }))
+                  }
+                  onBlur={(event) => handleUpdateConfig('company_logo', event.currentTarget.value)}
                 />
                 <p className="text-xs text-muted-foreground">URL pública de la imagen del logo</p>
               </div>
@@ -843,16 +876,24 @@ export default function SettingsPage() {
                     id="theme_primary_color"
                     type="color"
                     className="w-20 h-10"
-                    value={(configValues.theme_primary_color as string) || '#0ea5e9'}
-                    onChange={(e) => {
-                      setConfigValues({ ...configValues, theme_primary_color: e.target.value });
-                      handleUpdateConfig('theme_primary_color', e.target.value);
+                    value={stringConfig('theme_primary_color', '#0ea5e9')}
+                    onChange={(event) => {
+                      setConfigValues((prev) => ({
+                        ...prev,
+                        theme_primary_color: event.target.value
+                      }));
+                      handleUpdateConfig('theme_primary_color', event.target.value);
                     }}
                   />
                   <Input
-                    value={(configValues.theme_primary_color as string) || '#0ea5e9'}
-                    onChange={(e) => setConfigValues({ ...configValues, theme_primary_color: e.target.value })}
-                    onBlur={() => handleUpdateConfig('theme_primary_color', configValues.theme_primary_color)}
+                    value={stringConfig('theme_primary_color', '#0ea5e9')}
+                    onChange={(event) =>
+                      setConfigValues((prev) => ({
+                        ...prev,
+                        theme_primary_color: event.target.value
+                      }))
+                    }
+                    onBlur={(event) => handleUpdateConfig('theme_primary_color', event.currentTarget.value)}
                   />
                 </div>
               </div>
@@ -877,9 +918,9 @@ export default function SettingsPage() {
                   <p className="text-sm text-muted-foreground">Habilitar notificaciones del sistema</p>
                 </div>
                 <Switch
-                  checked={(configValues.enable_notifications as boolean) || false}
+                  checked={booleanConfig('enable_notifications')}
                   onCheckedChange={(checked) => {
-                    setConfigValues({ ...configValues, enable_notifications: checked });
+                    setConfigValues((prev) => ({ ...prev, enable_notifications: checked }));
                     handleUpdateConfig('enable_notifications', checked);
                   }}
                 />
@@ -892,16 +933,25 @@ export default function SettingsPage() {
                   type="number"
                   min="1"
                   max="24"
-                  value={(configValues.default_task_duration as number) || 8}
-                  onChange={(e) => setConfigValues({ ...configValues, default_task_duration: parseInt(e.target.value) })}
-                  onBlur={() => handleUpdateConfig('default_task_duration', configValues.default_task_duration)}
+                  value={numberConfig('default_task_duration', 8)}
+                  onChange={(event) => {
+                    const parsed = Number.parseInt(event.target.value, 10);
+                    setConfigValues((prev) => ({
+                      ...prev,
+                      default_task_duration: Number.isNaN(parsed) ? null : parsed
+                    }));
+                  }}
+                  onBlur={(event) => {
+                    const parsed = Number.parseInt(event.currentTarget.value, 10);
+                    handleUpdateConfig('default_task_duration', Number.isNaN(parsed) ? null : parsed);
+                  }}
                 />
               </div>
               <Separator />
               <div className="space-y-2">
                 <Label>Versión de la Aplicación</Label>
                 <Input
-                  value={(configValues.app_version as string) || '1.0.0-alpha'}
+                  value={stringConfig('app_version', '1.0.0-alpha')}
                   disabled
                   className="bg-muted"
                 />

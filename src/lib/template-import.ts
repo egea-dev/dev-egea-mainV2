@@ -2,6 +2,8 @@ import { read, utils } from 'xlsx'
 
 type FieldType = 'text' | 'number' | 'date'
 
+type RawCell = string | number | boolean | Date | null | undefined
+
 export interface TemplateFieldDefinition {
   name: string
   label: string
@@ -13,7 +15,7 @@ export interface ImportedTemplate {
   template_type: string
   category?: string | null
   fields: TemplateFieldDefinition[]
-  rows: Record<string, any>[]
+  rows: Record<string, RawCell>[]
   metadata: {
     sheetName: string
     source?: string
@@ -33,7 +35,7 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
 
-const inferFieldType = (values: any[]): FieldType => {
+const inferFieldType = (values: RawCell[]): FieldType => {
   const sample = values.find((value) => {
     if (value === null || value === undefined) return false
     const text = String(value).trim()
@@ -60,11 +62,11 @@ const parseSheet = (
   sheetName: string,
   options: ParseTemplateOptions
 ): ImportedTemplate => {
-  const matrix = utils.sheet_to_json<any[]>(sheet, {
+  const matrix = utils.sheet_to_json(sheet, {
     header: 1,
     defval: '',
     blankrows: false
-  })
+  }) as RawCell[][]
 
   if (!matrix.length) {
     return {
@@ -105,7 +107,7 @@ const parseSheet = (
     }
     usedSlugs.add(finalSlug)
 
-    const columnValues = bodyRows.map((row) => (row ? row[columnIndex] : undefined))
+    const columnValues = bodyRows.map((row) => (row ? row[columnIndex] : undefined)) as RawCell[]
 
     return {
       name: finalSlug,
@@ -115,7 +117,7 @@ const parseSheet = (
   })
 
   const rows = bodyRows.map((row) => {
-    const entry: Record<string, any> = {}
+    const entry: Record<string, RawCell> = {}
     fields.forEach((field, columnIndex) => {
       const value = row?.[columnIndex] ?? ''
       entry[field.name] = value
@@ -162,14 +164,14 @@ export const parseTemplatesFromUrl = async (
 }
 
 export const mapRowToTemplateData = (
-  row: Record<string, any>,
+  row: Record<string, unknown>,
   fields: TemplateFieldDefinition[]
-) => {
-  const payload: Record<string, any> = {}
+): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {}
 
   fields.forEach((field) => {
-    const raw = row[field.label] ?? row[field.name] ?? ''
-    if (raw === null || raw === undefined || String(raw).trim() === '') return
+    const raw = row[field.label] ?? row[field.name]
+    if (raw === null || raw === undefined) return
 
     if (field.type === 'number') {
       const parsed = Number(raw)
@@ -177,12 +179,15 @@ export const mapRowToTemplateData = (
         payload[field.name] = parsed
       }
     } else if (field.type === 'date') {
-      const dateValue = new Date(raw)
+      const dateValue = new Date(raw as Date | string | number)
       if (!Number.isNaN(dateValue.getTime())) {
         payload[field.name] = dateValue.toISOString().split('T')[0]
       }
     } else {
-      payload[field.name] = String(raw).trim()
+      const value = String(raw).trim()
+      if (value) {
+        payload[field.name] = value
+      }
     }
   })
 

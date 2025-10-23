@@ -3,9 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import type { SessionLocation, WorkSession } from '@/types';
+import type { SessionLocation, Task, WorkSession } from '@/types';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/es';
+import { normalizeTaskLocation } from '@/utils/task';
 
 dayjs.extend(relativeTime);
 dayjs.locale('es');
@@ -16,6 +17,7 @@ type StartSessionOptions = {
   taskId?: string | null;
   manualLocation?: ManualLocation | null;
   metadata?: Record<string, unknown>;
+  taskLocation?: string | null;
 };
 
 type EndSessionOptions = {
@@ -23,11 +25,13 @@ type EndSessionOptions = {
   manualLocation?: ManualLocation | null;
   status?: string;
   metadata?: Record<string, unknown>;
+  taskLocation?: string | null;
 };
 
 type UseWorkSessionParams = {
   profileId?: string | null;
   taskId?: string | null;
+  task?: Task | null;
 };
 
 const sessionQueryKey = (profileId?: string | null) => ['work-session', profileId];
@@ -66,13 +70,26 @@ const requestManualLocation = (): Record<string, unknown> | null => {
   });
 };
 
-const resolveLocation = async (manual?: ManualLocation | null): Promise<Record<string, unknown> | null> => {
+const asLocationLabelPayload = (label: string): Record<string, unknown> => ({
+  label,
+  source: 'task',
+  collected_at: new Date().toISOString(),
+});
+
+const resolveLocation = async (
+  manual?: ManualLocation | null,
+  fallbackLabel?: string | null
+): Promise<Record<string, unknown> | null> => {
   if (manual) {
     return asLocationPayload({ ...manual, source: manual.source ?? 'manual' });
   }
 
+  const fallbackPayload = typeof fallbackLabel === 'string' && fallbackLabel.trim().length > 0
+    ? asLocationLabelPayload(fallbackLabel)
+    : null;
+
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
-    return requestManualLocation();
+    return fallbackPayload ?? requestManualLocation();
   }
 
   return new Promise((resolve) => {
@@ -86,7 +103,13 @@ const resolveLocation = async (manual?: ManualLocation | null): Promise<Record<s
           collected_at: new Date(position.timestamp || Date.now()).toISOString(),
         });
       },
-      () => resolve(requestManualLocation()),
+      () => {
+        if (fallbackPayload) {
+          resolve(fallbackPayload);
+          return;
+        }
+        resolve(requestManualLocation());
+      },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 60_000 }
     );
   });
@@ -123,8 +146,9 @@ const formatDuration = (milliseconds: number): string => {
   return [hours, minutes, seconds].map((value) => value.toString().padStart(2, '0')).join(':');
 };
 
-export const useWorkSession = ({ profileId, taskId }: UseWorkSessionParams = {}) => {
+export const useWorkSession = ({ profileId, taskId, task }: UseWorkSessionParams = {}) => {
   const queryClient = useQueryClient();
+  const taskLocation = useMemo(() => normalizeTaskLocation(task), [task]);
 
   const sessionQuery = useQuery<WorkSession | null>({
     queryKey: sessionQueryKey(profileId),
@@ -146,34 +170,35 @@ export const useWorkSession = ({ profileId, taskId }: UseWorkSessionParams = {})
     },
   });
 
+  const sessionData = sessionQuery.data ?? null;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!sessionQuery.data || sessionQuery.data.status !== 'active') return;
+    if (!sessionData || sessionData.status !== 'active') return;
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
-  }, [sessionQuery.data?.id, sessionQuery.data?.status]);
+  }, [sessionData]);
 
   const durationMs = useMemo(() => {
-    const session = sessionQuery.data;
+    const session = sessionData;
     if (!session) return 0;
     const start = dayjs(session.started_at);
     const end = session.ended_at ? dayjs(session.ended_at) : dayjs(now);
     return end.diff(start);
-  }, [sessionQuery.data, now]);
+  }, [sessionData, now]);
 
   const durationLabel = useMemo(() => formatDuration(durationMs), [durationMs]);
 
   const stateLabel = useMemo(() => {
-    const session = sessionQuery.data;
+    const session = sessionData;
     if (!session) return 'Sin sesion activa';
     if (session.status === 'active') return 'En turno';
-    if (session.status === 'completed') return 'Sesion finalizada';
+    if (session.status === 'completed') return 'Realizado';
     return session.status || 'Sesion sin estado';
-  }, [sessionQuery.data]);
+  }, [sessionData]);
 
   const lastEventLabel = useMemo(() => {
-    const session = sessionQuery.data;
+    const session = sessionData;
     if (!session) return 'Sin registros';
     if (session.status === 'active') {
       return `Iniciada ${dayjs(session.started_at).fromNow()}`;
@@ -182,7 +207,7 @@ export const useWorkSession = ({ profileId, taskId }: UseWorkSessionParams = {})
       return `Finalizada ${dayjs(session.ended_at).fromNow()}`;
     }
     return 'Sesion sin informacion de cierre';
-  }, [sessionQuery.data]);
+  }, [sessionData]);
 
   const invalidateRelatedQueries = useCallback(() => {
     if (profileId) {
@@ -196,7 +221,10 @@ export const useWorkSession = ({ profileId, taskId }: UseWorkSessionParams = {})
     mutationFn: async (options: StartSessionOptions = {}) => {
       if (!profileId) throw new Error('Perfil no disponible');
 
-      const locationPayload = await resolveLocation(options.manualLocation);
+      const locationPayload = await resolveLocation(
+        options.manualLocation,
+        options.taskLocation ?? taskLocation
+      );
       const deviceInfo = collectDeviceInfo();
 
       const { data, error } = await supabase.rpc('start_work_session', {
@@ -223,10 +251,13 @@ export const useWorkSession = ({ profileId, taskId }: UseWorkSessionParams = {})
 
   const endMutation = useMutation({
     mutationFn: async (options: EndSessionOptions = {}) => {
-      const sessionId = options.sessionId ?? sessionQuery.data?.id;
+      const sessionId = options.sessionId ?? sessionData?.id;
       if (!sessionId) throw new Error('No hay sesion activa para cerrar');
 
-      const locationPayload = await resolveLocation(options.manualLocation);
+      const locationPayload = await resolveLocation(
+        options.manualLocation,
+        options.taskLocation ?? taskLocation
+      );
 
       const { data, error } = await supabase.rpc('end_work_session', {
         p_session_id: sessionId,
@@ -260,7 +291,7 @@ export const useWorkSession = ({ profileId, taskId }: UseWorkSessionParams = {})
   );
 
   return {
-    session: sessionQuery.data ?? null,
+    session: sessionData,
     isLoading: sessionQuery.isLoading,
     isFetching: sessionQuery.isFetching,
     startSession,
@@ -270,7 +301,7 @@ export const useWorkSession = ({ profileId, taskId }: UseWorkSessionParams = {})
     durationLabel,
     stateLabel,
     lastEventLabel,
-    isActive: sessionQuery.data?.status === 'active',
+    isActive: sessionData?.status === 'active',
     error: sessionQuery.error ?? startMutation.error ?? endMutation.error ?? null,
     refetch: sessionQuery.refetch,
   };

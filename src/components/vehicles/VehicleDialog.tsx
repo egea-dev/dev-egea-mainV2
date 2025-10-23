@@ -108,7 +108,8 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
 
     if (error) {
       console.error('Error al guardar vehículo vía RPC:', error);
-      toast.error(error.message || "Error al guardar el vehículo.");
+      const message = error.message ?? "Error al guardar el vehículo.";
+      toast.error(message);
       setLoading(false);
       return;
     }

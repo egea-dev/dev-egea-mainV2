@@ -1,14 +1,13 @@
 // Types generados para la base de datos de Egea Productivity App
 // Basado en la estructura de la base de datos PostgreSQL
 
-export interface Json {
-  [key: string]: JsonValue | null;
-}
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
 export interface JsonObject {
   [key: string]: JsonValue | null;
 }
-export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
-export interface JsonArray extends Array<JsonValue> {}
+export type JsonArray = JsonValue[];
+export type Json = JsonValue;
 
 // =====================================================================
 // TIPOS DE TABLAS PRINCIPALES
@@ -381,13 +380,13 @@ export interface ScreenFormData {
 // TIPOS PARA RESPUESTAS DE API
 // =====================================================================
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
   message?: string;
 }
 
-export interface PaginatedResponse<T = any> {
+export interface PaginatedResponse<T = unknown> {
   data: T[];
   count: number;
   page: number;
@@ -464,14 +463,17 @@ export interface VehicleFilters {
 // TIPOS PARA CALENDARIO Y PLANIFICACIÓN
 // =====================================================================
 
-export interface CalendarEvent {
+export interface CalendarEvent<
+  Resource = unknown,
+  ExtendedProps extends Record<string, unknown> = Record<string, unknown>
+> {
   id: string;
   title: string;
   start: Date;
   end: Date;
   allDay?: boolean;
-  resource?: any;
-  extendedProps?: any;
+  resource?: Resource;
+  extendedProps?: ExtendedProps;
 }
 
 export interface PlanDay {

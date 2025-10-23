@@ -30,8 +30,74 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
+type ArchivedTaskParticipant = {
+  id: string;
+  full_name: string;
+  email?: string | null;
+  role?: string | null;
+  status?: string | null;
+};
+
+type ArchivedTaskVehicle = {
+  id: string;
+  name: string;
+  type?: string | null;
+};
+
+type ArchivedTaskRecord = {
+  id: string;
+  archived_at: string;
+  screen_group: string | null;
+  state: string | null;
+  data: Record<string, unknown> | null;
+  responsible_name: string | null;
+  assigned_users?: unknown;
+  assigned_vehicles?: unknown;
+  vehicle_type?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+};
+
+const normalizeArchivedUsers = (value: unknown): ArchivedTaskParticipant[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      const id = typeof record.id === 'string' ? record.id : null;
+      const fullName = typeof record.full_name === 'string' ? record.full_name : null;
+      if (!id || !fullName) return null;
+      return {
+        id,
+        full_name: fullName,
+        email: typeof record.email === 'string' ? record.email : null,
+        role: typeof record.role === 'string' ? record.role : null,
+        status: typeof record.status === 'string' ? record.status : null,
+      };
+    })
+    .filter((profile): profile is ArchivedTaskParticipant => profile !== null);
+};
+
+const normalizeArchivedVehicles = (value: unknown): ArchivedTaskVehicle[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      const id = typeof record.id === 'string' ? record.id : null;
+      const name = typeof record.name === 'string' ? record.name : null;
+      if (!id || !name) return null;
+      return {
+        id,
+        name,
+        type: typeof record.type === 'string' ? record.type : null,
+      };
+    })
+    .filter((vehicle): vehicle is ArchivedTaskVehicle => vehicle !== null);
+};
+
 const useArchivedTasks = () => {
-  return useQuery({
+  return useQuery<ArchivedTaskRecord[]>({
     queryKey: ['archived_tasks'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -39,7 +105,7 @@ const useArchivedTasks = () => {
         .select('*')
         .order('archived_at', { ascending: false });
       if (error) throw error;
-      return data;
+      return (data ?? []) as ArchivedTaskRecord[];
     },
   });
 };
@@ -53,10 +119,11 @@ interface ChartData {
   Otros: number;
 }
 
-const ArchiveChart = ({ data }: { data: any[] }) => {
+const ArchiveChart = ({ data }: { data: ArchivedTaskRecord[] }) => {
   const chartData = useMemo(() => {
-    const monthlyData = data.reduce((acc, task) => {
-      const month = dayjs(task.archived_at).format('YYYY-MM');
+    const monthlyData = data.reduce<Record<string, ChartData>>((acc, task) => {
+      const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
+      const month = archivedAt?.isValid() ? archivedAt.format('YYYY-MM') : 'Sin fecha';
       const group = task.screen_group || 'Sin grupo';
       
       if (!acc[month]) {
@@ -69,7 +136,7 @@ const ArchiveChart = ({ data }: { data: any[] }) => {
       else acc[month].Otros++;
       
       return acc;
-    }, {} as Record<string, ChartData>);
+    }, {});
     
     return Object.values(monthlyData).slice(-12); // Últimos 12 meses
   }, [data]);
@@ -157,15 +224,22 @@ export default function ArchivePage() {
   const [itemsPerPage] = useState(50);
 
   // Filtrar tareas
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((task: any) => {
+  const filteredTasks = useMemo<ArchivedTaskRecord[]>(() => {
+    return tasks.filter((task) => {
+      const dataRecord = (task.data ?? {}) as Record<string, unknown>;
+      const site = typeof dataRecord.site === 'string' ? dataRecord.site : '';
+      const client = typeof dataRecord.client === 'string' ? dataRecord.client : '';
+      const address = typeof dataRecord.address === 'string' ? dataRecord.address : '';
+      const description = typeof dataRecord.description === 'string' ? dataRecord.description : '';
+      const responsibleName = task.responsible_name ?? '';
+
       // Búsqueda de texto libre
       const searchMatch = !searchTerm ||
-        (task.data?.site || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (task.data?.client || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (task.data?.address || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (task.data?.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (task.responsible_name || "").toLowerCase().includes(searchTerm.toLowerCase());
+        site.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        responsibleName.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Filtro por grupo
       const groupMatch = groupFilter === "all" ||
@@ -176,9 +250,9 @@ export default function ArchivePage() {
       const stateMatch = stateFilter === "all" || task.state === stateFilter;
 
       // Filtro por rango de fechas
-      const taskDate = dayjs(task.archived_at);
-      const dateMatch = (!dateFrom || taskDate.isAfter(dayjs(dateFrom))) &&
-                      (!dateTo || taskDate.isBefore(dayjs(dateTo).add(1, 'day')));
+      const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
+      const dateMatch = (!dateFrom || (archivedAt?.isValid() ? archivedAt.isAfter(dayjs(dateFrom)) : false)) &&
+                      (!dateTo || (archivedAt?.isValid() ? archivedAt.isBefore(dayjs(dateTo).add(1, 'day')) : false));
 
       return searchMatch && groupMatch && stateMatch && dateMatch;
     });
@@ -197,18 +271,25 @@ export default function ArchivePage() {
       'Responsable', 'Operarios', 'Vehículos', 'Estado', 'Grupo'
     ];
     
-    const csvData = filteredTasks.map((task: any) => [
-      dayjs(task.archived_at).format('DD/MM/YYYY HH:mm'),
-      task.data?.site || '',
-      task.data?.client || '',
-      task.data?.address || '',
-      task.data?.description || '',
-      task.responsible_name || '',
-      task.assigned_users?.map((u: any) => u.full_name).join('; ') || '',
-      task.assigned_vehicles?.map((v: any) => v.name).join('; ') || '',
-      task.state || '',
-      task.screen_group || ''
-    ]);
+    const csvData = filteredTasks.map((task) => {
+      const dataRecord = (task.data ?? {}) as Record<string, unknown>;
+      const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
+      const assignedUsers = normalizeArchivedUsers(task.assigned_users);
+      const assignedVehicles = normalizeArchivedVehicles(task.assigned_vehicles);
+
+      return [
+        archivedAt?.isValid() ? archivedAt.format('DD/MM/YYYY HH:mm') : '',
+        typeof dataRecord.site === 'string' ? dataRecord.site : '',
+        typeof dataRecord.client === 'string' ? dataRecord.client : '',
+        typeof dataRecord.address === 'string' ? dataRecord.address : '',
+        typeof dataRecord.description === 'string' ? dataRecord.description : '',
+        task.responsible_name ?? '',
+        assignedUsers.map((user) => user.full_name).join('; '),
+        assignedVehicles.map((vehicle) => vehicle.name).join('; '),
+        task.state ?? '',
+        task.screen_group ?? ''
+      ];
+    });
 
     const csv = [headers, ...csvData].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -219,7 +300,13 @@ export default function ArchivePage() {
   };
 
   // Obtener grupos únicos
-  const uniqueGroups = Array.from(new Set(tasks.map((task: any) => task.screen_group).filter(Boolean)));
+  const uniqueGroups = Array.from(
+    new Set(
+      tasks
+        .map((task) => task.screen_group)
+        .filter((group): group is string => typeof group === "string" && group.trim().length > 0)
+    )
+  );
 
   if (isLoading) {
     return <div className="text-center py-8">Cargando historial...</div>;
@@ -351,49 +438,64 @@ export default function ArchivePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentTasks.map((task: any) => (
-                  <TableRow key={task.id}>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {dayjs(task.archived_at).format('DD/MM/YYYY HH:mm')}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {task.start_date && task.end_date ? (
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{dayjs(task.start_date).format('DD/MM')} - {dayjs(task.end_date).format('DD/MM/YY')}</span>
+                {currentTasks.map((task) => {
+                  const dataRecord = (task.data ?? {}) as Record<string, unknown>;
+                  const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
+                  const startDate = task.start_date ? dayjs(task.start_date) : null;
+                  const endDate = task.end_date ? dayjs(task.end_date) : null;
+                  const assignedUsers = normalizeArchivedUsers(task.assigned_users);
+                  const assignedVehicles = normalizeArchivedVehicles(task.assigned_vehicles);
+                  const siteLabel = typeof dataRecord.site === 'string' ? dataRecord.site : 'N/A';
+                  const descriptionLabel = typeof dataRecord.description === 'string' ? dataRecord.description : 'Sin descripción';
+
+                  return (
+                    <TableRow key={task.id}>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {archivedAt?.isValid() ? archivedAt.format('DD/MM/YYYY HH:mm') : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {startDate?.isValid() && endDate?.isValid() ? (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{startDate.format('DD/MM')} - {endDate.format('DD/MM/YY')}</span>
+                          </div>
+                        ) : 'N/A'}
+                      </TableCell>
+                      <TableCell className="font-medium">{siteLabel}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
+                        {descriptionLabel}
+                      </TableCell>
+                      <TableCell>{task.responsible_name ?? 'N/A'}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {assignedUsers.length > 0 ? (
+                            assignedUsers.map((user) => (
+                              <StatusBadge key={user.id} status={user.status ?? 'activo'} size="sm" showDot />
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
                         </div>
-                      ) : 'N/A'}
-                    </TableCell>
-                    <TableCell className="font-medium">{task.data?.site || 'N/A'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                      {task.data?.description || 'Sin descripción'}
-                    </TableCell>
-                    <TableCell>{task.responsible_name || 'N/A'}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {task.assigned_users?.map((user: any) => (
-                          <StatusBadge key={user.id} status={user.status} size="sm" showDot />
-                        ))}
-                        {(!task.assigned_users || task.assigned_users.length === 0) && (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {task.assigned_vehicles?.map((vehicle: any) => (
-                          <VehicleBadge key={vehicle.id} name={vehicle.name} type={vehicle.type} size="sm" />
-                        ))}
-                        {(!task.assigned_vehicles || task.assigned_vehicles.length === 0) && (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <TaskStateBadge state={task.state} size="sm" />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {assignedVehicles.length > 0 ? (
+                            assignedVehicles.map((vehicle) => (
+                              <VehicleBadge key={vehicle.id} name={vehicle.name} type={vehicle.type ?? undefined} size="sm" />
+                            ))
+                          ) : task.vehicle_type ? (
+                            <VehicleBadge name={task.vehicle_type} type={task.vehicle_type} size="sm" />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <TaskStateBadge state={task.state ?? 'terminado'} size="sm" />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </ScrollArea>

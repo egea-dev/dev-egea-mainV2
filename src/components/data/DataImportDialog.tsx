@@ -12,6 +12,9 @@ import { read, utils } from "xlsx"
 import { mapRowToTemplateData } from "@/lib/template-import"
 import { format } from "date-fns"
 
+type RawCell = string | number | boolean | Date | null | undefined
+type NormalizedPayload = Record<string, unknown>
+
 interface DataImportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -22,7 +25,7 @@ interface DataImportDialogProps {
 
 interface WorkbookSheet {
   name: string
-  matrix: any[][]
+  matrix: RawCell[][]
 }
 
 interface FieldMapping {
@@ -34,7 +37,7 @@ const DEFAULT_HEADER_ROW = 1
 const DEFAULT_DATA_START_ROW = 2
 const DEFAULT_DATA_START_COLUMN = 1
 
-const ensureColumnLabel = (value: any, index: number) => {
+const ensureColumnLabel = (value: unknown, index: number) => {
   const raw = value !== undefined && value !== null ? String(value).trim() : ""
   if (raw) return raw
   return `Columna ${index + 1}`
@@ -52,7 +55,7 @@ const isLikelyDateString = (value: string) => {
   if (!trimmed) return false
   if (PURE_DIGITS_REGEX.test(trimmed)) return false
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return true
-  if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}$/.test(trimmed)) return true
+  if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/.test(trimmed)) return true
   if (/\bGMT\b/i.test(trimmed)) return true
   if (/[a-z]{3,}/i.test(trimmed) && /\d{4}/.test(trimmed)) return true
   if (/T\d{2}:\d{2}/.test(trimmed)) return true
@@ -98,11 +101,18 @@ const parseToSimpleDate = (value: unknown): string | null => {
   return null
 }
 
+const getStringField = (record: Record<string, unknown>, key: string): string | null => {
+  const value = record[key]
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  return trimmed.length ? trimmed : null
+}
+
 const normalizeImportedPayload = (
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   templateFields: Array<{ name: string; label: string; type: string }>
-) => {
-  const normalized: Record<string, any> = {}
+): NormalizedPayload => {
+  const normalized: NormalizedPayload = {}
   const templateDateFields = new Set<string>()
 
   templateFields.forEach((field) => {
@@ -148,7 +158,7 @@ const normalizeImportedPayload = (
   return normalized
 }
 
-const getFirstValidDate = (payload: Record<string, any>, keys: string[]) => {
+const getFirstValidDate = (payload: Record<string, unknown>, keys: string[]) => {
   for (const key of keys) {
     const formatted = parseToSimpleDate(payload[key])
     if (formatted) {
@@ -202,14 +212,14 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
     setLoading(true)
     try {
       const buffer = await file.arrayBuffer()
-      const workbook = read(buffer, { type: "array", cellDates: true })
-      const sheets = workbook.SheetNames.map((name) => ({
+  const workbook = read(buffer, { type: "array", cellDates: true })
+  const sheets = workbook.SheetNames.map((name) => ({
         name,
-        matrix: utils.sheet_to_json<any[]>(workbook.Sheets[name], {
+        matrix: utils.sheet_to_json(workbook.Sheets[name], {
           header: 1,
           defval: "",
           blankrows: false
-        })
+        }) as RawCell[][]
       }))
 
       if (!sheets.length) {
@@ -227,9 +237,10 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
           columnKey: null
         }))
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error parsing workbook:", error)
-      toast.error(`No se pudo procesar el archivo: ${error?.message ?? "desconocido"}`)
+      const message = error instanceof Error ? error.message : "desconocido"
+      toast.error(`No se pudo procesar el archivo: ${message}`)
     } finally {
       setLoading(false)
     }
@@ -245,7 +256,7 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
     const headerIndex = Math.max(headerRow - 1, 0)
     const startColumnIndex = Math.max(dataStartColumn - 1, 0)
 
-    const headerValues = matrix[headerIndex] ?? []
+    const headerValues = (matrix[headerIndex] ?? []) as RawCell[]
     const totalColumns = Math.max(headerValues.length, ...matrix.slice(headerIndex + 1).map((row) => row.length))
 
     return Array.from({ length: Math.max(totalColumns - startColumnIndex, 0) }, (_, offset) => {
@@ -355,7 +366,7 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
 
       const rows = matrix.slice(startRowIndex)
       for (const row of rows) {
-        const rawRecord: Record<string, any> = {}
+        const rawRecord: Record<string, RawCell> = {}
         columnDefinitions.forEach((column) => {
           const value = row?.[column.columnIndex] ?? ""
           rawRecord[column.key] = value
@@ -363,7 +374,7 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
           rawRecord[headerLabel] = value
         })
 
-        const mappedPayload: Record<string, any> = {}
+        const mappedPayload: Record<string, unknown> = {}
         activeMappings.forEach((mapping) => {
           const column = columnDefinitions.find((col) => col.key === mapping.columnKey)
           if (!column) return
@@ -373,7 +384,7 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
           mappedPayload[mapping.fieldName] = value
         })
 
-        const basePayload = templateFields.length
+        const basePayload: Record<string, unknown> = templateFields.length
           ? mapRowToTemplateData(mappedPayload, templateFields)
           : mappedPayload
 
@@ -390,10 +401,10 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
         }
 
         const location =
-          payload.location ||
-          payload.direccion ||
-          payload.address ||
-          payload.site ||
+          getStringField(payload, "location") ??
+          getStringField(payload, "direccion") ??
+          getStringField(payload, "address") ??
+          getStringField(payload, "site") ??
           null
 
         const startDate = getFirstValidDate(payload, ["start_date", "fecha_inicio", "fecha", "date"])
@@ -435,9 +446,10 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
       toast.success("Datos importados correctamente")
       resetState()
       onImported()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error importing data:", error)
-      toast.error(`No se pudo importar: ${error?.message ?? "error desconocido"}`)
+      const message = error instanceof Error ? error.message : "error desconocido"
+      toast.error(`No se pudo importar: ${message}`)
     } finally {
       setImporting(false)
     }

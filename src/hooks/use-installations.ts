@@ -32,6 +32,12 @@ interface CalendarEvent {
   }
 }
 
+type CalendarMoveEvent = {
+  id: string
+  start: Date
+  extendedProps?: Record<string, unknown>
+}
+
 export function useInstallations() {
   const [rows, setRows] = useState<InstallationData[]>([])
   const [operators, setOperators] = useState<Operator[]>([])
@@ -88,7 +94,7 @@ export function useInstallations() {
   }
 
   // DnD con UI optimista + persistencia en BD
-  const moveEvent = async (event: any) => {
+  const moveEvent = async (event: CalendarMoveEvent) => {
     const id = event.id
     const prev = rows
     const nextDate = event.start.toISOString().split('T')[0]

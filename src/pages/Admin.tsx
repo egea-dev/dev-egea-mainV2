@@ -23,22 +23,26 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CalendarCheck, Users, Car, ClipboardList, MoreHorizontal, Archive, Eye, Pencil, Filter, Clock, LogOut, User, AlertTriangle, CheckCircle, RotateCcw } from "lucide-react";
+import { CalendarCheck, Users, Car, ClipboardList, MoreHorizontal, Archive, Eye, Pencil, Filter, Clock, LogOut, User, AlertTriangle, CheckCircle, RotateCcw, AlarmClock, MapPin, Database } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { subDays, format, parseISO, isSameDay, isBefore } from "date-fns";
 import { es } from 'date-fns/locale';
 import { toast } from "sonner";
 import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
+import type { TaskActionConfig } from "@/components/tasks/TaskActionButtons";
 import { useNavigate } from "react-router-dom";
 import { StatusBadge, VehicleBadge, TaskStateBadge } from "@/components/badges";
 import { useDashboardTasks, useDashboardStats } from "@/hooks/use-detailed-tasks";
-import { useUsers, useVehicles } from "@/hooks/use-supabase";
+import { useScreens, useVehicles } from "@/hooks/use-supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { DetailedTask } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { buildMapsSearchUrl } from "@/utils/maps";
+import { normalizeTaskLocation } from "@/utils/task";
+import type { Profile, Task, Vehicle } from "@/types";
 
 const SCREEN_FIELD_MAP: Record<string, { site: string[]; description: string[] }> = {
   Instalaciones: {
@@ -111,8 +115,178 @@ const sanitizeString = (value: string | null | undefined) =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
+const mapDetailedTaskToTask = (task: DetailedTask): Task => {
+  const numericOrder =
+    typeof task.order === "number"
+      ? task.order
+      : Number.isFinite(Number(task.order))
+      ? Number(task.order)
+      : 0;
+
+  const normalizedState = (() => {
+    const allowed: Task["state"][] = ["urgente", "pendiente", "a la espera", "en fabricacion", "terminado"];
+    const candidate = typeof task.state === "string" ? task.state.toLowerCase() : null;
+    return candidate && (allowed as string[]).includes(candidate) ? (candidate as Task["state"]) : "pendiente";
+  })();
+
+  const normalizedStatus = (() => {
+    const allowed: Task["status"][] = ["pendiente", "acabado", "en progreso"];
+    const raw = typeof task.status === "string" ? task.status.toLowerCase() : null;
+    if (raw && (allowed as string[]).includes(raw)) {
+      return raw as Task["status"];
+    }
+    if (raw === "terminado" || raw === "completado") return "acabado";
+    if (raw === "progreso" || raw === "en_progreso") return "en progreso";
+    return "pendiente";
+  })();
+
+  const pickString = (value: unknown): string | undefined => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : undefined;
+  };
+
+  const pickMeaningfulString = (value: unknown): string | undefined => {
+    const text = pickString(value);
+    if (!text) return undefined;
+    const lowered = text.toLowerCase();
+    return lowered === "n/a" ? undefined : text;
+  };
+
+  const normalizeProfileRole = (value: unknown, fallback: Profile["role"] = "operario"): Profile["role"] => {
+    const roleText = pickString(value)?.toLowerCase();
+    if (!roleText) return fallback;
+    if (roleText.includes("admin")) return "admin";
+    if (roleText.includes("manager") || roleText.includes("gestor")) return "manager";
+    if (roleText.includes("respons")) return "responsable";
+    return fallback;
+  };
+
+  const normalizeProfileStatus = (value: unknown): Profile["status"] | undefined => {
+    const statusText = pickString(value)?.toLowerCase();
+    if (!statusText) return undefined;
+    if (statusText.includes("vac")) return "vacaciones";
+    if (statusText.includes("baja")) return "baja";
+    if (statusText.includes("activo")) return "activo";
+    return undefined;
+  };
+
+  const dataRecord = (task.data ?? {}) as Record<string, unknown>;
+  const taskRecord = task as unknown as Record<string, unknown>;
+
+  const resolveField = (candidates: string[], direct?: string | null): string | undefined => {
+    const directValue = pickMeaningfulString(direct);
+    if (directValue) return directValue;
+
+    for (const candidate of candidates) {
+      const normalized = candidate.trim();
+      const variants = Array.from(
+        new Set([
+          normalized,
+          normalized.toLowerCase(),
+          normalized.toUpperCase(),
+          normalized.replace(/\s+/g, "_"),
+          normalized.replace(/\s+/g, "").toLowerCase(),
+        ])
+      );
+
+      for (const key of variants) {
+        const fromTask = pickMeaningfulString(taskRecord[key]);
+        if (fromTask) return fromTask;
+
+        const fromData = pickMeaningfulString(dataRecord[key]);
+        if (fromData) return fromData;
+      }
+    }
+
+    return undefined;
+  };
+
+  const parseAssignedProfiles = (value: unknown): Profile[] => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const record = item as Record<string, unknown>;
+        const id = pickString(record.id);
+        const fullName = pickString(record.full_name);
+        if (!id || !fullName) return null;
+        return {
+          id,
+          full_name: fullName,
+          email: pickString(record.email) ?? null,
+          phone: pickString(record.phone) ?? null,
+          whatsapp: pickString(record.whatsapp) ?? null,
+          role: normalizeProfileRole(record.role),
+          status: normalizeProfileStatus(record.status),
+        } as Profile;
+      })
+      .filter((profile): profile is Profile => profile !== null);
+  };
+
+  const parseAssignedVehicles = (value: unknown): Vehicle[] => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const record = item as Record<string, unknown>;
+        const id = pickString(record.id);
+        const name = pickString(record.name);
+        if (!id || !name) return null;
+        return {
+          id,
+          name,
+          type: pickString(record.type) ?? "otro",
+          license_plate: pickString(record.license_plate) ?? null,
+        } as Vehicle;
+      })
+      .filter((vehicle): vehicle is Vehicle => vehicle !== null);
+  };
+
+  const assignedUsers = parseAssignedProfiles(task.assigned_profiles);
+  const assignedVehicles = parseAssignedVehicles(task.assigned_vehicles);
+
+  const responsible: Profile | null =
+    task.responsible_profile_id && typeof task.responsible_name === "string"
+      ? {
+          id: task.responsible_profile_id,
+          full_name: task.responsible_name,
+          email: pickString(task.responsible_email) ?? null,
+          phone: pickString(task.responsible_phone) ?? null,
+          whatsapp: null,
+          role: normalizeProfileRole(task.responsible_role, "responsable"),
+          status: normalizeProfileStatus(task.responsible_status) ?? "activo",
+        }
+      : null;
+
+  const resolvedSite = resolveField(DEFAULT_SITE_FIELDS, pickString(task.site));
+  const resolvedDescription = resolveField(DEFAULT_DESCRIPTION_FIELDS, pickString(task.description));
+
+  return {
+    id: task.id,
+    created_at: task.created_at ?? new Date().toISOString(),
+    start_date: task.start_date ?? task.created_at ?? new Date().toISOString(),
+    end_date: task.end_date ?? task.start_date ?? task.created_at ?? new Date().toISOString(),
+    order: numericOrder,
+    state: normalizedState,
+    status: normalizedStatus,
+    location: task.location ?? null,
+    data: (task.data ?? {}) as Task["data"],
+    responsible_profile_id: task.responsible_profile_id ?? null,
+    site: resolvedSite,
+    description: resolvedDescription,
+    responsible,
+    assigned_users: assignedUsers,
+    assigned_vehicles: assignedVehicles,
+    task_profiles: [],
+    task_vehicles: [],
+  } as Task;
+};
+
+
 const extractFieldValue = (task: DetailedTask, candidates: string[]) => {
-  const data = (task.data ?? {}) as Record<string, any>;
+  const data = (task.data ?? {}) as Record<string, unknown>;
+  const taskRecord = task as unknown as Record<string, unknown>;
   for (const candidate of candidates) {
     const normalized = candidate.trim();
     const variants = Array.from(new Set([
@@ -124,7 +298,7 @@ const extractFieldValue = (task: DetailedTask, candidates: string[]) => {
     ]));
 
     for (const key of variants) {
-      const valueFromTask = (task as unknown as Record<string, any>)[key];
+      const valueFromTask = taskRecord[key];
       if (valueFromTask !== undefined && valueFromTask !== null && String(valueFromTask).trim() !== '') {
         return String(valueFromTask).trim();
       }
@@ -154,6 +328,55 @@ interface SimpleVehicle {
   type: string;
 }
 
+type DashboardAssignedProfile = {
+  id: string;
+  full_name: string;
+  email?: string | null;
+  role?: string | null;
+  status?: string | null;
+};
+
+type DashboardAssignedVehicle = {
+  id: string;
+  name: string;
+  type: string;
+};
+
+const normalizeAssignedProfiles = (value: unknown): DashboardAssignedProfile[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      const id = typeof record.id === 'string' ? record.id : null;
+      const fullName = typeof record.full_name === 'string' ? record.full_name : null;
+      if (!id || !fullName) return null;
+      return {
+        id,
+        full_name: fullName,
+        email: typeof record.email === 'string' ? record.email : null,
+        role: typeof record.role === 'string' ? record.role : null,
+        status: typeof record.status === 'string' ? record.status : null,
+      };
+    })
+    .filter((profile): profile is DashboardAssignedProfile => profile !== null);
+};
+
+const normalizeAssignedVehicles = (value: unknown): DashboardAssignedVehicle[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const record = item as Record<string, unknown>;
+      const id = typeof record.id === 'string' ? record.id : null;
+      const name = typeof record.name === 'string' ? record.name : null;
+      const type = typeof record.type === 'string' ? record.type : null;
+      if (!id || !name || !type) return null;
+      return { id, name, type };
+    })
+    .filter((vehicle): vehicle is DashboardAssignedVehicle => vehicle !== null);
+};
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -163,12 +386,13 @@ export default function AdminPage() {
   const [selectedTask, setSelectedTask] = useState<DetailedTask | null>(null);
 
   // Usar hooks personalizados para datos del dashboard
-  const { confeccionTasks, tapiceriaTasks, pendingTasks, loading: tasksLoading, templateFieldsByScreen, refresh: refreshDashboardTasks } = useDashboardTasks();
+  const { confeccionTasks, tapiceriaTasks, pendingTasks, loading: tasksLoading, templateFieldsByScreen, sessionInfoByTask, refresh: refreshDashboardTasks } = useDashboardTasks();
   const { stats, loading: statsLoading } = useDashboardStats();
 
-  const { data: users = [] } = useUsers();
+  const { data: screens = [] } = useScreens();
   const { data: vehicles = [] } = useVehicles();
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [isRegisteringArrival, setIsRegisteringArrival] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'all' | 'instalaciones' | 'confeccion' | 'tapiceria'>('instalaciones');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<SimpleProfile | null>(null);
@@ -302,6 +526,8 @@ export default function AdminPage() {
   }, []);
 
   const getTaskSiteLabel = useCallback((task: DetailedTask) => {
+    const normalized = normalizeTaskLocation(mapDetailedTaskToTask(task));
+    if (normalized) return normalized;
     const candidates = getCandidateFields(task, 'site');
     const value = extractFieldValue(task, candidates);
     return value || 'Sin sitio definido';
@@ -369,6 +595,16 @@ export default function AdminPage() {
     return value || 'Sin descripción';
   }, [getCandidateFields]);
 
+  const formatSessionTimestamp = useCallback((value?: string | null) => {
+    if (!value) return null;
+    try {
+      return format(parseISO(value), "dd/MM HH:mm");
+    } catch (error) {
+      console.warn('Invalid session timestamp', error);
+      return null;
+    }
+  }, []);
+
   const archiveTask = useCallback(async (taskId: string, options?: { skipRefresh?: boolean }) => {
     try {
       const { data, error } = await supabase.rpc('archive_task_by_id', {
@@ -397,7 +633,7 @@ export default function AdminPage() {
 
   const updateTaskState = useCallback(async (taskId: string, newState: 'pendiente' | 'urgente' | 'terminado') => {
     try {
-      const updates: Record<string, any> = { state: newState };
+      const updates: { state: string; status?: string } = { state: newState };
       if (newState === 'terminado') {
         updates.status = 'acabado';
       }
@@ -412,8 +648,7 @@ export default function AdminPage() {
       }
 
       if (newState === 'terminado') {
-        await archiveTask(taskId, { skipRefresh: true });
-        toast.success('Tarea marcada como terminada y archivada');
+        toast.success('Tarea marcada como terminada. Recuerda archivarla tras la validación.');
       } else if (newState === 'urgente') {
         toast.success('Tarea marcada como urgente');
       } else {
@@ -425,7 +660,7 @@ export default function AdminPage() {
       console.error('Error updating task state:', err);
       toast.error('No se pudo actualizar el estado de la tarea');
     }
-  }, [archiveTask, refreshAllData]);
+  }, [refreshAllData]);
 
   useEffect(() => {
     refreshCalendarData();
@@ -453,36 +688,118 @@ export default function AdminPage() {
   };
 
   const handleViewDetails = (task: DetailedTask) => {
-    setSelectedTask(task);
+    setSelectedTask({ ...task });
     setDetailsDialogOpen(true);
   };
+
+  const handleOpenTaskLocation = useCallback((task: DetailedTask) => {
+    const mapped = mapDetailedTaskToTask(task);
+    const locationLabel = normalizeTaskLocation(mapped);
+    if (!locationLabel) {
+      toast.error('Esta tarea no tiene una ubicación registrada');
+      return;
+    }
+    const url = buildMapsSearchUrl(locationLabel);
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener');
+    }
+  }, []);
+
+  const handleRegisterArrival = useCallback(
+    async (task: DetailedTask) => {
+      if (!currentUser?.id) {
+        toast.error('Necesitas una sesión activa para registrar la llegada');
+        return;
+      }
+      setIsRegisteringArrival(true);
+      try {
+        const mapped = mapDetailedTaskToTask(task);
+        const fallback = normalizeTaskLocation(mapped);
+        const locationPayload = fallback
+          ? {
+              label: fallback,
+              source: 'task',
+              collected_at: new Date().toISOString(),
+            }
+          : null;
+
+        const { error } = await supabase.rpc('start_work_session', {
+          p_profile_id: currentUser.id,
+          p_task_id: task.id,
+          p_start_location: locationPayload,
+          p_metadata: { source: 'admin-dashboard' },
+        });
+
+        if (error) throw error;
+        toast.success('Llegada registrada correctamente');
+        refreshDashboardTasks();
+      } catch (error) {
+        console.error('Error registrando llegada desde Admin', error);
+        toast.error('No se pudo registrar la llegada');
+      } finally {
+        setIsRegisteringArrival(false);
+      }
+    },
+    [currentUser?.id, refreshDashboardTasks]
+  );
 
   const handleEditTask = (taskId: string) => {
     navigate('/admin/installations', { state: { editTaskId: taskId } });
   };
 
   // Filtrar tareas según la categoría seleccionada y fecha
-  const filteredTasks = pendingTasks.filter(task => {
-    // Filtro por categoría
-    let categoryMatch = false;
-    if (taskFilter === 'all') categoryMatch = true;
-    else if (taskFilter === 'confeccion') categoryMatch = task.screen_group === 'Confección';
-    else if (taskFilter === 'tapiceria') categoryMatch = task.screen_group === 'Tapicería';
-    else if (taskFilter === 'instalaciones') categoryMatch = task.screen_group === 'Instalaciones';
+  const filteredTasks = useMemo(() => {
+    return pendingTasks.filter(task => {
+      let categoryMatch = false;
+      if (taskFilter === 'all') categoryMatch = true;
+      else if (taskFilter === 'confeccion') categoryMatch = task.screen_group === 'Confección';
+      else if (taskFilter === 'tapiceria') categoryMatch = task.screen_group === 'Tapicería';
+      else if (taskFilter === 'instalaciones') categoryMatch = task.screen_group === 'Instalaciones';
 
-    // Filtro por fecha si hay una fecha seleccionada
-    let dateMatch = true;
-    if (selectedDate) {
-      if (!task.start_date) {
-        dateMatch = true;
-      } else {
-        const taskDate = parseISO(task.start_date);
-        dateMatch = isSameDay(taskDate, selectedDate) || isBefore(taskDate, selectedDate);
+      let dateMatch = true;
+      if (selectedDate) {
+        if (!task.start_date) {
+          dateMatch = true;
+        } else {
+          const taskDate = parseISO(task.start_date);
+          dateMatch = isSameDay(taskDate, selectedDate) || isBefore(taskDate, selectedDate);
+        }
       }
-    }
 
-    return categoryMatch && dateMatch;
-  });
+      return categoryMatch && dateMatch;
+    });
+  }, [pendingTasks, taskFilter, selectedDate]);
+
+  const sortedTasks = useMemo(() => {
+    return filteredTasks
+      .map((task, index) => ({ task, index }))
+      .sort((a, b) => {
+        const aTerminated = (a.task.state ?? '').toLowerCase() === 'terminado';
+        const bTerminated = (b.task.state ?? '').toLowerCase() === 'terminado';
+        if (aTerminated === bTerminated) {
+          return a.index - b.index;
+        }
+        return aTerminated ? -1 : 1;
+      })
+      .map((entry) => entry.task);
+  }, [filteredTasks]);
+
+  const dataShortcutScreens = useMemo(() => {
+    return screens
+      .filter((screen) => screen.dashboard_section === "data_shortcuts")
+      .sort((a, b) => {
+        const orderA = typeof a.dashboard_order === "number" ? a.dashboard_order : 0;
+        const orderB = typeof b.dashboard_order === "number" ? b.dashboard_order : 0;
+        return orderA - orderB;
+      });
+  }, [screens]);
+
+  const handleOpenDataShortcut = useCallback(
+    (screenId: string) => {
+      navigate(`/admin/data?screen=${screenId}&from=dashboard`);
+    },
+    [navigate]
+  );
 
   return (
     <div className="space-y-6">
@@ -516,13 +833,8 @@ export default function AdminPage() {
                   </AvatarFallback>
                 </Avatar>
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuItem onClick={() => navigate('/admin/settings')}>
-                <User className="mr-2 h-4 w-4" />
-                <span>Perfil</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar sesión</span>
@@ -633,48 +945,49 @@ export default function AdminPage() {
             </CardContent>
           </Card>
 
-          {/* Online Users Card */}
+          {/* Data Shortcuts Card */}
           <Card className="flex-1">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                Usuarios Online
+                <Database className="h-4 w-4 text-muted-foreground" />
+                Accesos Gestión de Datos
               </CardTitle>
               <CardDescription>
-                Operarios actualmente disponibles
+                Configura estos accesos en "Gestión de Tablas de Datos".
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                {users
-                  .filter(user => user.status === 'activo')
-                  .map((user) => (
-                    <div
-                      key={user.id}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+              {dataShortcutScreens.length > 0 ? (
+                <div className="space-y-2 max-h-[320px] overflow-y-auto">
+                  {dataShortcutScreens.map((screen) => (
+                    <Button
+                      key={screen.id}
+                      variant="outline"
+                      className="w-full justify-between"
+                      onClick={() => handleOpenDataShortcut(screen.id)}
                     >
-                      <div className="relative">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage src={user.avatar_url} alt={user.full_name} />
-                          <AvatarFallback className="text-xs">
-                            {user.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{user.full_name}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{user.role || 'Operario'}</p>
-                      </div>
-                    </div>
+                      <span className="truncate text-left">{screen.name}</span>
+                      {screen.screen_group ? (
+                        <Badge variant="secondary" className="ml-2 whitespace-nowrap">
+                          {screen.screen_group}
+                        </Badge>
+                      ) : null}
+                    </Button>
                   ))}
-                {users.filter(user => user.status === 'activo').length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No hay usuarios online</p>
-                  </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Database className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Añade accesos desde Gestión de Tablas de Datos.</p>
+                  <Button
+                    variant="link"
+                    className="mt-2"
+                    onClick={() => navigate("/admin/data")}
+                  >
+                    Abrir Gestión de Datos
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -687,50 +1000,79 @@ export default function AdminPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-sm">Nº Orden</TableHead>
-                      <TableHead className="text-sm">Obra</TableHead>
-                      <TableHead className="text-sm">Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tasksLoading ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell><div className="animate-pulse bg-muted h-4 w-8 rounded"></div></TableCell>
-                          <TableCell><div className="animate-pulse bg-muted h-4 w-16 rounded"></div></TableCell>
-                          <TableCell><div className="animate-pulse bg-muted h-4 w-20 rounded"></div></TableCell>
+              {tasksLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <div key={i} className="grid grid-cols-3 gap-4">
+                      <div className="animate-pulse bg-muted h-6 rounded" />
+                      <div className="animate-pulse bg-muted h-6 rounded" />
+                      <div className="animate-pulse bg-muted h-6 rounded" />
+                    </div>
+                  ))}
+                </div>
+              ) : confeccionTasks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No hay tareas de confección
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto">
+                    <Table className="min-w-full">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-sm">Nº Orden</TableHead>
+                          <TableHead className="text-sm">Obra</TableHead>
+                          <TableHead className="text-sm">Estado</TableHead>
                         </TableRow>
-                      ))
-                    ) : confeccionTasks.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                          No hay tareas de confección
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      confeccionTasks.map((task) => {
-                        const statusColor = getStateBadgeClasses(task.state);
-
-                        return (
-                          <TableRow key={task.id}>
-                            <TableCell className="text-sm font-medium">{getOrderNumberLabel(task)}</TableCell>
-                            <TableCell className="text-sm">{getConfeccionObraLabel(task)}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={statusColor}>
-                                {task.state}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                      </TableHeader>
+                      <TableBody>
+                        {confeccionTasks.slice(0, 2).map((task) => {
+                          const statusColor = getStateBadgeClasses(task.state);
+                          return (
+                            <TableRow key={task.id}>
+                              <TableCell className="text-sm font-medium">
+                                {getOrderNumberLabel(task)}
+                              </TableCell>
+                              <TableCell className="text-sm">{getConfeccionObraLabel(task)}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className={statusColor}>
+                                  {task.state}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {confeccionTasks.length > 2 && (
+                    <div className="overflow-x-auto">
+                      <div className="max-h-48 overflow-y-auto rounded-md border border-muted/40">
+                        <Table className="min-w-full">
+                          <TableBody>
+                            {confeccionTasks.slice(2).map((task) => {
+                              const statusColor = getStateBadgeClasses(task.state);
+                              return (
+                                <TableRow key={task.id}>
+                                  <TableCell className="text-sm font-medium">
+                                    {getOrderNumberLabel(task)}
+                                  </TableCell>
+                                  <TableCell className="text-sm">{getConfeccionObraLabel(task)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="secondary" className={statusColor}>
+                                      {task.state}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -838,10 +1180,10 @@ export default function AdminPage() {
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={selectedTaskIds.size === filteredTasks.length && filteredTasks.length > 0}
+                      checked={selectedTaskIds.size === sortedTasks.length && sortedTasks.length > 0}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedTaskIds(new Set(filteredTasks.map(t => t.id)));
+                          setSelectedTaskIds(new Set(sortedTasks.map(t => t.id)));
                         } else {
                           setSelectedTaskIds(new Set());
                         }
@@ -854,6 +1196,7 @@ export default function AdminPage() {
                   <TableHead className="text-sm min-w-[200px]">Descripción</TableHead>
                   <TableHead className="text-sm min-w-[120px]">Vehículos</TableHead>
                   <TableHead className="text-sm min-w-[100px]">Estado</TableHead>
+                  <TableHead className="text-sm min-w-[150px]">Sesión</TableHead>
                   <TableHead className="text-right min-w-[100px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -868,12 +1211,13 @@ export default function AdminPage() {
                       <TableCell><div className="animate-pulse bg-muted h-4 w-40 rounded"></div></TableCell>
                       <TableCell><div className="animate-pulse bg-muted h-6 w-20 rounded"></div></TableCell>
                       <TableCell><div className="animate-pulse bg-muted h-6 w-16 rounded"></div></TableCell>
+                      <TableCell><div className="animate-pulse bg-muted h-6 w-28 rounded"></div></TableCell>
                       <TableCell><div className="animate-pulse bg-muted h-8 w-8 rounded"></div></TableCell>
                     </TableRow>
                   ))
-                ) : filteredTasks.length === 0 ? (
+                ) : sortedTasks.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-12">
                       <div className="flex flex-col items-center gap-2">
                         <ClipboardList className="h-12 w-12 text-muted-foreground/50" />
                         <div>
@@ -889,7 +1233,20 @@ export default function AdminPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredTasks.map((task) => (
+                  sortedTasks.map((task) => {
+                    const sessionSummary = sessionInfoByTask[task.id];
+                    const arrivalLabel = formatSessionTimestamp(sessionSummary?.lastArrival);
+                    const departureLabel = formatSessionTimestamp(sessionSummary?.lastDeparture);
+                    const isTerminated = (task.state ?? '').toLowerCase() === 'terminado';
+                    const mappedTask = mapDetailedTaskToTask(task);
+                    const locationLabel = normalizeTaskLocation(mappedTask);
+                    const hasMaps = Boolean(locationLabel);
+                    const siteLabel = mappedTask.site
+                      ?? (typeof task.data?.site === 'string' ? task.data.site : null)
+                      ?? (typeof task.data?.client === 'string' ? task.data.client : null)
+                      ?? 'Sin sitio asignado';
+
+                    return (
                     <TableRow key={task.id} className="hover:bg-muted/50">
                       <TableCell>
                         <Checkbox
@@ -910,10 +1267,20 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {task.assigned_profiles && task.assigned_profiles.length > 0 ? (
-                            task.assigned_profiles.map((profile: any) => {
+                          {(() => {
+                            const assignedProfiles = normalizeAssignedProfiles(task.assigned_profiles);
+                            if (assignedProfiles.length === 0) {
+                              return (
+                                <span className="text-xs text-muted-foreground">Sin asignar</span>
+                              );
+                            }
+
+                            return assignedProfiles.map((profile) => {
                               const taskCount = pendingTasks.filter(
-                                t => t.assigned_profiles?.some((p: any) => p.id === profile.id)
+                                (pendingTask) =>
+                                  normalizeAssignedProfiles(pendingTask.assigned_profiles).some(
+                                    (assigned) => assigned.id === profile.id
+                                  )
                               ).length;
 
                               const bgColor = 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200';
@@ -929,20 +1296,30 @@ export default function AdminPage() {
                                   )}
                                 </div>
                               );
-                            })
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Sin asignar</span>
-                          )}
+                            });
+                          })()}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm font-medium">{getTaskSiteLabel(task)}</TableCell>
+                      <TableCell className="text-sm font-medium">
+                        <Badge
+                          title={siteLabel}
+                          variant="outline"
+                          className={hasMaps
+                            ? "flex w-fit items-center gap-1 border-emerald-400 bg-emerald-100 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                            : "flex w-fit items-center gap-1 border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                          }
+                        >
+                          <MapPin className={`h-3.5 w-3.5 ${hasMaps ? "" : "opacity-60"}`} />
+                          {hasMaps ? 'Maps ON' : 'Maps OFF'}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[220px] truncate" title={getTaskDescriptionLabel(task)}>
                         {getTaskDescriptionLabel(task)}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {task.assigned_vehicles && task.assigned_vehicles.length > 0 ? (
-                            task.assigned_vehicles.map((vehicle: any) => (
+                          {normalizeAssignedVehicles(task.assigned_vehicles).length > 0 ? (
+                            normalizeAssignedVehicles(task.assigned_vehicles).map((vehicle) => (
                               <VehicleBadge
                                 key={`${task.id}-${vehicle.id}`}
                                 name={vehicle.name}
@@ -963,7 +1340,40 @@ export default function AdminPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <TaskStateBadge state={task.state} />
+                        <div className="flex flex-col gap-1">
+                          <TaskStateBadge state={task.state} />
+                          {isTerminated && (
+                            <div className="flex items-center gap-1">
+                              <Badge className="flex items-center gap-1 bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-200">
+                                <CheckCircle className="h-3 w-3" />
+                                Verificado
+                              </Badge>
+                              <Badge variant="outline" className="flex w-fit items-center gap-1 text-xs">
+                                <AlarmClock className="h-3 w-3" />
+                                Pendiente
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {sessionSummary ? (
+                          sessionSummary.active ? (
+                            <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300">
+                              Sesión en curso{arrivalLabel ? ` desde ${arrivalLabel}` : ''}
+                            </Badge>
+                          ) : (
+                            <div className="flex flex-col text-xs text-muted-foreground">
+                              {arrivalLabel && <span>Última llegada: {arrivalLabel}</span>}
+                              {departureLabel && <span>Salida: {departureLabel}</span>}
+                              {!arrivalLabel && !departureLabel && (
+                                <span>Sin registros recientes</span>
+                              )}
+                            </div>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sin registros</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -973,7 +1383,12 @@ export default function AdminPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewDetails(task)}>
+                            <DropdownMenuItem
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                handleViewDetails(task);
+                              }}
+                            >
                               <Eye className="mr-2 h-4 w-4" />
                               Ver detalles
                             </DropdownMenuItem>
@@ -1003,7 +1418,8 @@ export default function AdminPage() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -1011,44 +1427,85 @@ export default function AdminPage() {
         </CardContent>
       </Card>
 
-      {selectedTask && (
-        <TaskDetailsDialog
-          task={{
-            id: selectedTask.id,
-            created_at: selectedTask.created_at,
-            start_date: selectedTask.start_date,
-            end_date: selectedTask.end_date,
-            order: 0,
-            state: selectedTask.state as 'urgente' | 'pendiente' | 'a la espera' | 'en fabricacion' | 'terminado',
-            location: selectedTask.location as 'en la isla' | 'fuera',
-            data: selectedTask.data,
-            responsible_profile_id: selectedTask.responsible_profile_id,
-            site: selectedTask.site,
-            description: selectedTask.description,
-            responsible: selectedTask.responsible_name ? {
-              id: selectedTask.responsible_profile_id || '',
-              full_name: selectedTask.responsible_name,
-              email: selectedTask.responsible_email,
-              role: selectedTask.responsible_role as 'admin' | 'responsable' | 'operario',
-              status: selectedTask.responsible_status as 'activo' | 'baja' | 'vacaciones'
-            } : null,
-            assigned_users: selectedTask.assigned_name ? [{
-              id: selectedTask.responsible_profile_id || '',
-              full_name: selectedTask.assigned_name,
-              email: selectedTask.assigned_email,
-              role: selectedTask.assigned_role as 'admin' | 'responsable' | 'operario',
-              status: selectedTask.assigned_status as 'activo' | 'baja' | 'vacaciones'
-            }] : [],
-            assigned_vehicles: selectedTask.vehicle_type ? [{
-              id: selectedTask.id,
-              name: selectedTask.vehicle_type,
-              type: selectedTask.vehicle_type
-            }] : []
-          }}
-          open={detailsDialogOpen}
-          onOpenChange={setDetailsDialogOpen}
-        />
-      )}
+      {selectedTask && (() => {
+        const dialogTask = mapDetailedTaskToTask(selectedTask);
+        const locationLabel = normalizeTaskLocation(dialogTask);
+        const canRegisterArrival =
+          Boolean(currentUser?.id) && selectedTask.responsible_profile_id === currentUser?.id;
+        const isTerminated = (selectedTask.state ?? '').toLowerCase() === 'terminado';
+        const sessionSummary = sessionInfoByTask[selectedTask.id];
+        const arrivalLabel = formatSessionTimestamp(sessionSummary?.lastArrival);
+        const departureLabel = formatSessionTimestamp(sessionSummary?.lastDeparture);
+
+        const actions: TaskActionConfig[] = [
+          ...(canRegisterArrival && !isTerminated
+            ? [
+                {
+                  id: "register",
+                  label: "Registrar llegada",
+                  icon: <Clock className="h-4 w-4" />,
+                  variant: "primary",
+                  onClick: () => handleRegisterArrival(selectedTask),
+                  loading: isRegisteringArrival,
+                } satisfies TaskActionConfig,
+              ]
+            : []),
+          {
+            id: "maps",
+            label: "Abrir en Maps",
+            icon: <MapPin className="h-4 w-4" />,
+            variant: "outline-success",
+            onClick: () => handleOpenTaskLocation(selectedTask),
+            disabled: !locationLabel,
+          },
+          ...(isTerminated
+            ? [
+                {
+                  id: "archive",
+                  label: "Archivar tarea",
+                  icon: <Archive className="h-4 w-4" />,
+                  variant: "outline-success",
+                  onClick: async () => {
+                    await handleArchiveTask(selectedTask.id);
+                    setDetailsDialogOpen(false);
+                  },
+                } satisfies TaskActionConfig,
+              ]
+            : []),
+        ];
+
+        return (
+          <TaskDetailsDialog
+            task={dialogTask}
+            open={detailsDialogOpen}
+            onOpenChange={(open) => {
+              setDetailsDialogOpen(open);
+              if (!open) {
+                setSelectedTask(null);
+              }
+            }}
+            description="Visualiza la información clave de la tarea y accede a acciones rápidas."
+            actions={actions}
+          >
+            {sessionSummary && (
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-1">Sesión reciente</h4>
+                {sessionSummary.active ? (
+                  <p className="text-emerald-600 dark:text-emerald-300">
+                    Sesión en curso{arrivalLabel ? ` desde ${arrivalLabel}` : ''}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-1 text-muted-foreground">
+                    {arrivalLabel && <span>Última llegada: {arrivalLabel}</span>}
+                    {departureLabel && <span>Salida registrada: {departureLabel}</span>}
+                    {!arrivalLabel && !departureLabel && <span>Sin sesiones registradas.</span>}
+                  </div>
+                )}
+              </div>
+            )}
+          </TaskDetailsDialog>
+        );
+      })()}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client"
 import { toast } from "sonner"
 import { parseTemplatesFromWorkbook, ImportedTemplate, mapRowToTemplateData } from "@/lib/template-import"
+import { format } from "date-fns"
 
 type TemplateImportDialogProps = {
   open: boolean
@@ -21,9 +22,11 @@ type TemplatePreview = ImportedTemplate & {
 
 type ScreenOption = {
   id: string
-  name: string
+  name: string | null
   screen_group: string | null
 }
+
+type NormalizedRow = Record<string, unknown>
 
 export const TemplateImportDialog = ({ open, onOpenChange, onImported }: TemplateImportDialogProps) => {
   const [fileName, setFileName] = useState<string | null>(null)
@@ -68,7 +71,13 @@ export const TemplateImportDialog = ({ open, onOpenChange, onImported }: Templat
         return
       }
 
-      setScreens(data as ScreenOption[])
+      const parsed: ScreenOption[] = (data ?? []).map((screen) => ({
+        id: screen.id,
+        name: screen.name ?? null,
+        screen_group: screen.screen_group ?? null,
+      }))
+
+      setScreens(parsed)
     }
 
     fetchScreens()
@@ -97,9 +106,10 @@ export const TemplateImportDialog = ({ open, onOpenChange, onImported }: Templat
           selected: true
         }))
       )
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error parsing workbook:', error)
-      toast.error(`Error al procesar el archivo: ${error?.message ?? 'desconocido'}`)
+      const message = error instanceof Error ? error.message : 'desconocido'
+      toast.error(`Error al procesar el archivo: ${message}`)
       setPreviews([])
     } finally {
       setLoading(false)
@@ -124,13 +134,27 @@ export const TemplateImportDialog = ({ open, onOpenChange, onImported }: Templat
     )
   }
 
-  const getDateValue = (data: Record<string, any>, keys: string[]) => {
+  const getStringValue = (data: NormalizedRow, keys: string[]): string | null => {
+    for (const key of keys) {
+      const value = data[key]
+      if (typeof value === 'string') {
+        const trimmed = value.trim()
+        if (trimmed) return trimmed
+      }
+    }
+    return null
+  }
+
+  const getDateValue = (data: NormalizedRow, keys: string[]) => {
     for (const key of keys) {
       const raw = data[key]
-      if (!raw) continue
-      const date = new Date(raw)
-      if (!Number.isNaN(date.getTime())) {
-        return date.toISOString().split('T')[0]
+      if (!raw && raw !== 0) continue
+      if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+        return format(raw, 'yyyy-MM-dd')
+      }
+      const candidate = typeof raw === 'number' ? new Date(raw) : new Date(String(raw))
+      if (!Number.isNaN(candidate.getTime())) {
+        return format(candidate, 'yyyy-MM-dd')
       }
     }
     return null
@@ -173,15 +197,9 @@ export const TemplateImportDialog = ({ open, onOpenChange, onImported }: Templat
       if (createTasks && selectedScreenId) {
         for (const template of selected) {
           for (const row of template.rows) {
-            const dataPayload = mapRowToTemplateData(row, template.fields)
+            const dataPayload = mapRowToTemplateData(row, template.fields) as NormalizedRow
 
-            const location =
-              dataPayload.location ||
-              dataPayload.direccion ||
-              dataPayload.address ||
-              dataPayload.site ||
-              null
-
+            const location = getStringValue(dataPayload, ['location', 'direccion', 'address', 'site'])
             const startDate = getDateValue(dataPayload, ['start_date', 'fecha_inicio', 'fecha', 'date'])
             const endDate = getDateValue(dataPayload, ['end_date', 'fecha_fin', 'fecha_entrega'])
 
@@ -216,9 +234,10 @@ export const TemplateImportDialog = ({ open, onOpenChange, onImported }: Templat
       toast.success(successMessage || 'Operación completada')
       resetState()
       onImported()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error importing templates:', error)
-      toast.error(`No se pudo completar la importación: ${error?.message ?? 'error desconocido'}`)
+      const message = error instanceof Error ? error.message : 'error desconocido'
+      toast.error(`No se pudo completar la importación: ${message}`)
     } finally {
       setImporting(false)
     }
@@ -268,12 +287,16 @@ export const TemplateImportDialog = ({ open, onOpenChange, onImported }: Templat
                   <SelectValue placeholder="Selecciona una pantalla" />
                 </SelectTrigger>
                 <SelectContent>
-                  {screens.map((screen) => (
-                    <SelectItem key={screen.id} value={screen.id}>
-                      {screen.name}
-                      {screen.screen_group ? ` · ${screen.screen_group}` : ''}
-                    </SelectItem>
-                  ))}
+                  {screens.map((screen) => {
+                    const label = screen.name ?? '(Sin nombre)';
+                    const groupLabel = screen.screen_group ? ` · ${screen.screen_group}` : '';
+                    return (
+                      <SelectItem key={screen.id} value={screen.id}>
+                        {label}
+                        {groupLabel}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">

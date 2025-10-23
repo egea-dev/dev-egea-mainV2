@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Profile, Vehicle, Task } from '@/types';
+import type { Profile, Task, Vehicle } from '@/types';
+import type { JsonObject } from '@/integrations/supabase/types';
 import dayjs from 'dayjs';
 import { toast } from 'sonner';
 
@@ -48,25 +49,44 @@ export const useUpdateProfile = () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
-    onError: (error) => toast.error(`Error al actualizar: ${error.message}`)
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al actualizar';
+      toast.error(`Error al actualizar: ${message}`);
+    }
   });
+};
+
+type ProfileAvailability = {
+  start_date: string;
+  end_date: string;
+  reason?: string | null;
+};
+
+type ProfileRow = Profile & {
+  user_availability?: ProfileAvailability[] | null;
 };
 
 export const useUsers = () => {
   return useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('*, user_availability(*)').order('full_name');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, user_availability(*)')
+        .order('full_name');
       if (error) {
         console.error('Error fetching users:', error);
         return [];
       }
       const today = dayjs();
-      return (data as Profile[]).map(p => {
-        const availability = p.user_availability || [];
-        const onLeave = availability.find(a => today.isAfter(dayjs(a.start_date).subtract(1, 'day')) && today.isBefore(dayjs(a.end_date).add(1, 'day')));
-        const status = onLeave ? onLeave.reason : 'activo';
-        return { ...p, status } as Profile;
+      return (data ?? []).map((profileRow) => {
+        const row = profileRow as ProfileRow;
+        const availability = Array.isArray(row.user_availability) ? row.user_availability : [];
+        const onLeave = availability.find((entry) =>
+          today.isAfter(dayjs(entry.start_date).subtract(1, 'day')) && today.isBefore(dayjs(entry.end_date).add(1, 'day'))
+        );
+        const status = onLeave?.reason ?? 'activo';
+        return { ...row, status } as Profile;
       });
     },
   });
@@ -81,7 +101,7 @@ export const useVehicles = () => {
         console.error('Error fetching vehicles:', error);
         return [];
       }
-      return data as Vehicle[];
+      return (data ?? []) as Vehicle[];
     },
   });
 };
@@ -106,19 +126,39 @@ export const useTasksByDate = (date: Date) => {
                 .order('order');
 
             if (error) throw error;
-            
-            type RawTask = Partial<Task> & {
-                assigned_users?: Array<{ profiles: Profile }>;
-                assigned_vehicles?: Array<{ vehicles: Vehicle }>;
+
+            type TaskProfileRow = { profiles: Profile | null };
+            type TaskVehicleRow = { vehicles: Vehicle | null };
+            type ScreenTaskRow = Task & {
+              data?: Record<string, unknown> | null;
+              assigned_users?: TaskProfileRow[] | null;
+              assigned_vehicles?: TaskVehicleRow[] | null;
             };
 
-            const formattedTasks = (data as any[] || []).map((task: any) => ({
+            const rows = (data ?? []) as ScreenTaskRow[];
+            const formattedTasks = rows.map((task) => {
+              const assignedUsers = Array.isArray(task.assigned_users)
+                ? task.assigned_users
+                    .map((tp) => tp.profiles)
+                    .filter((profile): profile is Profile => Boolean(profile))
+                : [];
+
+              const assignedVehicles = Array.isArray(task.assigned_vehicles)
+                ? task.assigned_vehicles
+                    .map((tv) => tv.vehicles)
+                    .filter((vehicle): vehicle is Vehicle => Boolean(vehicle))
+                : [];
+
+              const normalized: Task = {
                 ...task,
-                site: task.data?.site || 'N/A',
-                description: task.data?.description || 'N/A',
-                assigned_users: (task.assigned_users || []).map((tp) => tp.profiles).filter(Boolean),
-                assigned_vehicles: (task.assigned_vehicles || []).map((tv) => tv.vehicles).filter(Boolean),
-            }));
+                site: typeof task.data?.site === 'string' ? task.data.site : 'N/A',
+                description: typeof task.data?.description === 'string' ? task.data.description : 'N/A',
+                assigned_users: assignedUsers,
+                assigned_vehicles: assignedVehicles,
+              };
+
+              return normalized;
+            });
 
             // Ordenar: primero urgentes, luego por fecha de finalización más próxima
             formattedTasks.sort((a, b) => {
@@ -132,7 +172,7 @@ export const useTasksByDate = (date: Date) => {
                 return dateA.getTime() - dateB.getTime();
             });
 
-            return formattedTasks as Task[];
+            return formattedTasks;
         },
         enabled: !!date,
     });
@@ -173,7 +213,10 @@ export const useUpsertTask = () => {
       }
       queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
     },
-    onError: (error) => toast.error(`Error al guardar la tarea: ${error.message}`)
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error desconocido al guardar la tarea';
+      toast.error(`Error al guardar la tarea: ${message}`);
+    }
   });
 };
 
@@ -182,11 +225,11 @@ export const useUpdateTaskOrder = (date: Date | undefined) => {
     const dateString = dayjs(date).format('YYYY-MM-DD');
     return useMutation({
         mutationFn: async (orderedTasks: Task[]) => {
-            const updates = orderedTasks.map((task, index) => 
+            const updates = orderedTasks.map((task, index) =>
                 supabase.from('screen_data').update({ order: index }).eq('id', task.id)
             );
             const results = await Promise.all(updates);
-            results.forEach(res => { if(res.error) throw res.error });
+            results.forEach((res) => { if(res.error) throw res.error; });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks', dateString] });
@@ -215,7 +258,10 @@ export const useAssignToTask = (date: Date | undefined) => {
             queryClient.invalidateQueries({ queryKey: ['tasks', dateString] });
             toast.success(`${type === 'user' ? 'Operario' : 'Vehículo'} asignado.`);
         },
-        onError: (error: Error, variables) => toast.error(`Error al asignar ${variables.type === 'user' ? 'operario' : 'vehículo'}: ${error.message}`)
+        onError: (error: unknown, variables) => {
+            const message = error instanceof Error ? error.message : 'Error desconocido';
+            toast.error(`Error al asignar ${variables.type === 'user' ? 'operario' : 'vehículo'}: ${message}`);
+        }
     });
 };
 
@@ -231,7 +277,10 @@ export const useUpdateTaskState = () => {
             queryClient.invalidateQueries({ queryKey: ['tasks'], exact: false });
             queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
         },
-        onError: (error) => toast.error(`Error al actualizar estado: ${error.message}`)
+        onError: (error: unknown) => {
+            const message = error instanceof Error ? error.message : 'Error al actualizar estado';
+            toast.error(`Error al actualizar estado: ${message}`);
+        }
     });
 };
 
@@ -248,7 +297,10 @@ export const useArchiveTask = () => {
             queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
             queryClient.invalidateQueries({ queryKey: ['archived_tasks'] });
         },
-        onError: (error) => toast.error(`Error al archivar la tarea: ${error.message}`)
+        onError: (error: unknown) => {
+            const message = error instanceof Error ? error.message : 'Error al archivar la tarea';
+            toast.error(`Error al archivar la tarea: ${message}`);
+        }
     });
 };
 
@@ -265,7 +317,10 @@ export const useCreateSharedPlan = () => {
             navigator.clipboard.writeText(url);
             toast.success("Enlace para compartir copiado al portapapeles.");
         },
-        onError: (error) => toast.error(`Error al crear el enlace: ${error.message}`)
+        onError: (error: unknown) => {
+            const message = error instanceof Error ? error.message : 'Error al crear el enlace';
+            toast.error(`Error al crear el enlace: ${message}`);
+        }
     });
 };
 
@@ -355,16 +410,30 @@ export const useDeleteScreenData = (screenId: string | null) => {
 };
 
 export const useCreateScreenData = (screenId: string | null) => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: async (newRowData: Record<string, string | number | null>) => {
-            const { error } = await supabase.from("screen_data").insert({ screen_id: screenId, data: newRowData, state: 'pendiente' });
-            if (error) throw error;
-        },
-        onSuccess: () => {
-            toast.success("Nuevo registro guardado.");
-            queryClient.invalidateQueries({ queryKey: ['screen_data', screenId] });
-        },
-        onError: () => toast.error("Error al guardar el nuevo registro.")
-    });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (newRowData: JsonObject) => {
+      if (!screenId) {
+        throw new Error('No se puede crear un registro sin pantalla asociada');
+      }
+
+      const { error } = await supabase
+        .from('screen_data')
+        .insert({
+          screen_id: screenId,
+          data: newRowData,
+          state: 'pendiente'
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Nuevo registro guardado.");
+      queryClient.invalidateQueries({ queryKey: ['screen_data', screenId] });
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Error al guardar el nuevo registro';
+      toast.error(`Error al guardar el nuevo registro: ${message}`);
+    }
+  });
 };
