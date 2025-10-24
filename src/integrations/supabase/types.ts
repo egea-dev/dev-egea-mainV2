@@ -19,7 +19,7 @@ export interface Profile {
   full_name: string;
   email: string | null;
   phone: string | null;
-  role: 'admin' | 'responsable' | 'operario';
+  role: 'admin' | 'manager' | 'responsable' | 'operario';
   status: 'activo' | 'vacaciones' | 'baja';
   avatar_url: string | null;
   created_at: string;
@@ -672,7 +672,7 @@ export type Database = {
 // TIPOS UTILITARIOS
 // =====================================================================
 
-export type UserRole = 'admin' | 'responsable' | 'operario';
+export type UserRole = 'admin' | 'manager' | 'responsable' | 'operario';
 export type UserStatus = 'activo' | 'vacaciones' | 'baja';
 export type TaskState = 'pendiente' | 'urgente' | 'en fabricacion' | 'a la espera' | 'terminado' | 'incidente' | 'arreglo';
 export type TaskStatus = 'pendiente' | 'acabado' | 'en progreso';

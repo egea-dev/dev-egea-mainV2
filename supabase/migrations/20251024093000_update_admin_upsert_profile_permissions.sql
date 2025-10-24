@@ -1,31 +1,12 @@
 -- =====================================================================
--- Actualizar función admin_upsert_profile (sin campo whatsapp)
+-- Actualizar función admin_upsert_profile para jerarquía de roles
 -- =====================================================================
--- Fecha: 2025-10-11
--- Motivo: Eliminar referencias a la columna whatsapp para evitar errores
---         cuando no existe en la tabla profiles.
+-- Fecha: 2025-10-24
+-- Motivo: Permitir que managers y responsables ajusten roles dentro de
+--         su jerarquía manteniendo la restricción de admins.
 -- =====================================================================
 
 BEGIN;
-
-DROP FUNCTION IF EXISTS public.admin_upsert_profile(
-  TEXT,
-  UUID,
-  TEXT,
-  TEXT,
-  TEXT,
-  TEXT,
-  TEXT
-);
-
-DROP FUNCTION IF EXISTS public.admin_upsert_profile(
-  TEXT,
-  UUID,
-  TEXT,
-  TEXT,
-  TEXT,
-  TEXT
-);
 
 CREATE OR REPLACE FUNCTION public.admin_upsert_profile(
   p_full_name TEXT,

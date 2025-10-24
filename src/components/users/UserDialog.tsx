@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Profile } from "@/types";
+import { getUserRoleLabel } from "@/lib/constants";
+import { useProfile } from "@/hooks/use-supabase";
 
 type UserDialogProps = {
   open: boolean;
@@ -24,6 +26,16 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
     role: 'operario'
   });
   const [loading, setLoading] = useState(false);
+  const { data: currentUserProfile } = useProfile();
+
+  const actorRole = currentUserProfile?.role;
+
+  const roleOptions: Profile["role"][] = ["operario", "responsable", "manager", "admin"];
+
+  const disableRoleSelect =
+    actorRole !== undefined &&
+    actorRole !== "admin" &&
+    user?.role === "admin";
 
   useEffect(() => {
     if (user) {
@@ -121,12 +133,22 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
           )}
           <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
-            <Select value={profile.role} onValueChange={(value) => handleSelectChange('role', value as 'admin' | 'responsable' | 'operario')}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={profile.role}
+              onValueChange={(value) => handleSelectChange('role', value as Profile['role'])}
+            >
+              <SelectTrigger disabled={disableRoleSelect}>
+                <SelectValue placeholder="Seleccionar rol" />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="operario">Operario</SelectItem>
-                <SelectItem value="responsable">Responsable</SelectItem>
-                <SelectItem value="admin">Administrador</SelectItem>
+                {roleOptions.map((roleOption) => (
+                  <SelectItem
+                    key={roleOption}
+                    value={roleOption}
+                  >
+                    {getUserRoleLabel(roleOption)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

@@ -145,6 +145,7 @@ export const VEHICLE_TYPE_LABELS: Record<string, string> = {
 // =====================================================================
 export const USER_ROLES = {
   ADMIN: 'admin',
+  MANAGER: 'manager',
   RESPONSABLE: 'responsable',
   OPERARIO: 'operario',
 } as const;
@@ -153,6 +154,7 @@ export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   [USER_ROLES.ADMIN]: 'Administrador',
+  [USER_ROLES.MANAGER]: 'Manager',
   [USER_ROLES.RESPONSABLE]: 'Responsable',
   [USER_ROLES.OPERARIO]: 'Operario',
 };

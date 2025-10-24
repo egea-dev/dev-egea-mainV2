@@ -5,7 +5,7 @@ const GOOGLE_MAPS_HOSTS = [
   'goo.gl',
 ];
 
-const isHttpUrl = (value: string): boolean => {
+export const isHttpUrl = (value: string): boolean => {
   if (!value) return false;
   try {
     const url = new URL(value);
@@ -15,7 +15,7 @@ const isHttpUrl = (value: string): boolean => {
   }
 };
 
-const isGoogleMapsUrl = (value: string): boolean => {
+export const isGoogleMapsUrl = (value: string): boolean => {
   if (!isHttpUrl(value)) return false;
   try {
     const url = new URL(value);
@@ -25,7 +25,7 @@ const isGoogleMapsUrl = (value: string): boolean => {
   }
 };
 
-const extractCoordinates = (value: string): string | null => {
+export const extractCoordinates = (value: string): string | null => {
   if (!value) return null;
 
   const coordinatePattern = /(-?\d{1,3}\.\d+),\s*(-?\d{1,3}\.\d+)/;
