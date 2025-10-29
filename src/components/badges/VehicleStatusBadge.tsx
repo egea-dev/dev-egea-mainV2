@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Car, AlertTriangle, Wrench } from 'lucide-react';
@@ -10,9 +10,9 @@ type VehicleStatusBadgeProps = {
   className?: string;
 };
 
-export const VehicleStatusBadge = ({ 
-  status, 
-  size = 'sm', 
+export const VehicleStatusBadge = ({
+  status,
+  size = 'sm',
   showIcon = true,
   className = ''
 }: VehicleStatusBadgeProps) => {

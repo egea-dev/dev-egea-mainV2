@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Plus, Car, Edit, Trash2, Users } from "lucide-react";
 import { VehicleDialog } from "./VehicleDialog";
-import { Vehicle } from "@/types";
+import type { Vehicle } from "@/types";
 import { VehicleBadge, VehicleStatusBadge } from "@/components/badges";
 
 type VehicleListProps = {
@@ -22,85 +22,106 @@ export const VehicleList = ({ vehicles, onVehiclesUpdate }: VehicleListProps) =>
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este vehículo?')) return;
-    
-    const { error } = await supabase.from('vehicles').delete().eq('id', id);
+    if (!confirm("Estas seguro de que quieres eliminar este vehiculo?")) return;
+
+    const { error } = await supabase.from("vehicles").delete().eq("id", id);
     if (error) {
-      toast.error('Error al eliminar el vehículo.');
+      toast.error("Error al eliminar el vehiculo.");
     } else {
-      toast.success('Vehículo eliminado.');
+      toast.success("Vehiculo eliminado.");
       onVehiclesUpdate();
     }
   };
 
   return (
     <>
-      <div className="space-y-4">
-        {/* Botón de añadir */}
-        <Button onClick={() => handleOpenDialog()} className="w-full">
-          <Plus className="mr-2 h-4 w-4" />Añadir Vehículo
-        </Button>
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-orange-100 p-2 text-orange-600">
+              <Car className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Gestionar vehiculos
+              </p>
+              <p className="text-lg font-semibold text-slate-900">Flota disponible</p>
+            </div>
+          </div>
+          <Button
+            onClick={() => handleOpenDialog()}
+            className="rounded-full bg-[#ff6b4a] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#ff5f3a]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Anadir vehiculo
+          </Button>
+        </div>
 
-        {/* Lista de vehículos */}
         <div className="space-y-3">
           {vehicles.map((vehicle) => (
-            <div key={vehicle.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Car className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-sm truncate">{vehicle.name}</p>
-                    <VehicleStatusBadge
-                      status={vehicle.status || 'normal'}
-                      size="sm"
-                      showIcon={true}
-                    />
+            <div
+              key={vehicle.id}
+              className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-slate-100 p-2 ring-1 ring-slate-200">
+                    <Car className="h-5 w-5 text-slate-500" />
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <VehicleBadge
-                      name={vehicle.name}
-                      type={vehicle.type}
-                      size="sm"
-                      showIcon={false}
-                      variant="solid"
-                    />
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Users className="h-3 w-3" />
-                      <span>Capacidad: {vehicle.capacity}</span>
+                  <div className="min-w-0 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{vehicle.name}</p>
+                      <VehicleStatusBadge
+                        status={vehicle.status || "normal"}
+                        size="sm"
+                        showIcon={true}
+                      />
                     </div>
-                    {vehicle.km !== undefined && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <span className="font-medium">KM: {vehicle.km.toLocaleString()}</span>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <VehicleBadge
+                        name={vehicle.name}
+                        type={vehicle.type}
+                        size="sm"
+                        showIcon={false}
+                        variant="solid"
+                      />
+                      <div className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        <span>Capacidad: {vehicle.capacity ?? "N/D"}</span>
                       </div>
+                      {vehicle.km !== undefined && (
+                        <div className="flex items-center gap-1">
+                          <span>KM: {vehicle.km.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                    {vehicle.license_plate && (
+                      <p className="text-xs text-muted-foreground">
+                        Matricula: {vehicle.license_plate}
+                      </p>
                     )}
                   </div>
-                  {vehicle.license_plate && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Matrícula: {vehicle.license_plate}
-                    </p>
-                  )}
                 </div>
-              </div>
-              
-              <div className="flex gap-1 flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => handleOpenDialog(vehicle)}
-                  title="Editar vehículo"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => handleDelete(vehicle.id)}
-                  title="Eliminar vehículo"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    onClick={() => handleOpenDialog(vehicle)}
+                    title="Editar vehiculo"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50"
+                    onClick={() => handleDelete(vehicle.id)}
+                    title="Eliminar vehiculo"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           ))}

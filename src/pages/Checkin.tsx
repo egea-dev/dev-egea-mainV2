@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,7 +30,7 @@ export default function CheckinPage() {
     setLoading(true);
     const updateData: Partial<Task> = { status: 'acabado' };
     
-    // LÓGICA DE MOVIMIENTO AUTOMÁTICO
+    // L├ôGICA DE MOVIMIENTO AUTOM├üTICO
     if (task.screens.next_screen_id) {
       updateData.screen_id = task.screens.next_screen_id;
     }
@@ -40,7 +40,7 @@ export default function CheckinPage() {
     if (error) {
       toast.error("Error al marcar la tarea como completada.");
     } else {
-      toast.success("¡Tarea completada! Gracias.");
+      toast.success("┬íTarea completada! Gracias.");
       setIsCompleted(true);
     }
     setLoading(false);
@@ -50,7 +50,7 @@ export default function CheckinPage() {
 
   if (!task) return (
     <div className="flex min-h-screen items-center justify-center">
-      <Card className="w-full max-w-lg text-center"><CardHeader><CardTitle className="text-2xl text-destructive">Error</CardTitle></CardHeader><CardContent><p>La tarea no pudo ser encontrada o el enlace no es válido.</p></CardContent></Card>
+      <Card className="w-full max-w-lg text-center"><CardHeader><CardTitle className="text-2xl text-destructive">Error</CardTitle></CardHeader><CardContent><p>La tarea no pudo ser encontrada o el enlace no es v├ílido.</p></CardContent></Card>
     </div>
   );
 

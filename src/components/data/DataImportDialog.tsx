@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
+import { upsertTask } from "@/lib/upsert-task"
 import { supabase } from "@/integrations/supabase/client"
 import { read, utils } from "xlsx"
 import { mapRowToTemplateData } from "@/lib/template-import"
@@ -347,23 +348,6 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
         }
       }
 
-      let nextOrder = 0
-
-      if (!clearBeforeImport) {
-        const { data: existingOrder, error: orderLookupError } = await supabase
-          .from("screen_data")
-          .select("order")
-          .eq("screen_id", screenId)
-          .order("order", { ascending: false, nullsLast: true })
-          .limit(1)
-
-        if (orderLookupError) {
-          throw orderLookupError
-        }
-
-        nextOrder = existingOrder?.[0]?.order ?? 0
-      }
-
       const rows = matrix.slice(startRowIndex)
       for (const row of rows) {
         const rawRecord: Record<string, RawCell> = {}
@@ -410,37 +394,21 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
         const startDate = getFirstValidDate(payload, ["start_date", "fecha_inicio", "fecha", "date"])
         const endDate = getFirstValidDate(payload, ["end_date", "fecha_fin", "fecha_entrega"])
 
-        const { data: taskResult, error } = await supabase.rpc("upsert_task", {
-          p_screen_id: screenId,
-          p_data: payload,
-          p_state: "pendiente",
-          p_status: "pendiente",
-          p_start_date: startDate,
-          p_end_date: endDate,
-          p_location: location,
-          p_responsible_profile_id: null,
-          p_assigned_to: null,
-          p_assigned_profiles: [],
-          p_assigned_vehicles: []
+        await upsertTask(supabase, {
+          screenId,
+          data: payload,
+          state: "pendiente",
+          status: "pendiente",
+          startDate: startDate ?? null,
+          endDate: endDate ?? null,
+          location,
+          locationMetadata: location ? { manual_label: location } : {},
+          workSiteId: null,
+          responsibleProfileId: null,
+          assignedTo: null,
+          assignedProfiles: [],
+          assignedVehicles: []
         })
-
-        if (error) {
-          throw error
-        }
-
-        const createdTask = Array.isArray(taskResult) ? taskResult[0] : null
-
-        if (createdTask?.action === "created") {
-          nextOrder += 1
-          const { error: orderUpdateError } = await supabase
-            .from("screen_data")
-            .update({ order: nextOrder })
-            .eq("id", createdTask.task_id)
-
-          if (orderUpdateError) {
-            throw orderUpdateError
-          }
-        }
       }
 
       toast.success("Datos importados correctamente")

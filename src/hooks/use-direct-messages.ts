@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { RealtimeChannel } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
 export interface DirectMessage {
@@ -40,12 +39,12 @@ type ConversationSummaryRow = {
 const CONVERSATIONS_PAGE_SIZE = 20;
 const ENABLE_REALTIME = false;
 
-export const useDirectMessages = () => {
+export const useDirectMessages = (options: { enabled?: boolean } = {}) => {
+  const { enabled = true } = options;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<DirectMessage[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [channel, setChannel] = useState<RealtimeChannel | null>(null);
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [realtimeAvailable, setRealtimeAvailable] = useState(ENABLE_REALTIME);
@@ -56,6 +55,7 @@ export const useDirectMessages = () => {
     total: 0,
   });
   const fetchingConversationsRef = useRef(false);
+  const realtimeFallbackRef = useRef(false);
 
   const loading = loadingConversations || loadingMessages;
 
@@ -65,6 +65,8 @@ export const useDirectMessages = () => {
   );
 
   const hydrateCurrentUser = useCallback(async () => {
+    if (!enabled) return;
+
     try {
       const {
         data: { user },
@@ -88,11 +90,12 @@ export const useDirectMessages = () => {
     } catch (error) {
       console.error('Error getting current user:', error);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     hydrateCurrentUser();
-  }, [hydrateCurrentUser]);
+  }, [hydrateCurrentUser, enabled]);
 
   const mergeConversations = useCallback((existing: Conversation[], incoming: Conversation[]) => {
     const map = new Map<string, Conversation>();
@@ -119,7 +122,7 @@ export const useDirectMessages = () => {
 
   const loadConversations = useCallback(
     async ({ reset = false }: { reset?: boolean } = {}) => {
-      if (!currentUserId) return;
+      if (!enabled || !currentUserId) return;
 
       const pagination = paginationRef.current;
 
@@ -172,14 +175,14 @@ export const useDirectMessages = () => {
         fetchingConversationsRef.current = false;
         setLoadingConversations(false);
       }
-    },
-    [currentUserId, mergeConversations]
+  },
+  [currentUserId, enabled, mergeConversations]
   );
 
   useEffect(() => {
-    if (!currentUserId) return;
+    if (!enabled || !currentUserId) return;
     loadConversations({ reset: true });
-  }, [currentUserId, loadConversations]);
+  }, [currentUserId, enabled, loadConversations]);
 
   const markMessagesAsRead = useCallback(
     async (senderId: string) => {
@@ -237,7 +240,8 @@ export const useDirectMessages = () => {
     async (
       recipientId: string,
       content: string,
-      messageType: 'text' | 'image' | 'file' | 'system' = 'text'
+      messageType: 'text' | 'image' | 'file' | 'system' = 'text',
+      metadata?: Record<string, unknown>
     ) => {
       if (!currentUserId || !content.trim()) return;
 
@@ -246,6 +250,7 @@ export const useDirectMessages = () => {
           p_recipient_id: recipientId,
           p_content: content.trim(),
           p_message_type: messageType,
+          ...(metadata ? { p_metadata: metadata } : {}),
         });
 
         if (error) throw error;
@@ -302,28 +307,19 @@ export const useDirectMessages = () => {
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') return;
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          setRealtimeAvailable(false);
-          toast.warning('Realtime no disponible; se usar���� una recarga peri��dica.');
-          supabase.removeChannel(newChannel);
+          if (!realtimeFallbackRef.current) {
+            realtimeFallbackRef.current = true;
+            setRealtimeAvailable(false);
+            toast.warning('Realtime no disponible; se usara una recarga periodica.');
+          }
         }
       });
 
-    setChannel(newChannel);
-
     return () => {
-      if (newChannel) {
-        supabase.removeChannel(newChannel);
-      }
+      supabase.removeChannel(newChannel);
     };
   }, [currentUserId, loadConversations, fetchConversation, selectedUserId, realtimeAvailable]);
 
-  useEffect(() => {
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, [channel]);
 
   useEffect(() => {
     if (realtimeAvailable) return;

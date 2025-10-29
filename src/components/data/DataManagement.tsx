@@ -497,7 +497,7 @@ export const DataManagement = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {screens.map((screen) => (
-            <Card key={screen.id} className="hover:shadow-lg transition-shadow">
+            <Card key={screen.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">{screen.name}</CardTitle>
@@ -613,7 +613,7 @@ export const DataManagement = () => {
 
   return (
     <div className="p-4 sm:p-8 space-y-6">
-    <Card className="shadow-sm">
+    <Card>
       <CardHeader className="space-y-6">
         <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">

@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { useProfile, useUpdateProfile, useUsers } from "@/hooks/use-supabase";
 import { useSystemConfig, useUpdateSystemConfig, useCreateSystemConfig, useDeleteSystemConfig } from "@/hooks/use-system-config";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Building2, Mail, Phone, Palette, Settings, Trash2, Plus, Upload, Users, UserPlus, UserX, Shield, User } from "lucide-react";
 import {
   Table,
@@ -81,6 +81,13 @@ export default function SettingsPage() {
   // Estados para avatar
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Datos básicos del perfil
+  const [phone, setPhone] = useState('');
+
+  const AVATAR_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+  const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
   
   // Estados para permisos
   const [rolePermissions, setRolePermissions] = useState<Record<string, Record<string, { can_view: boolean; can_edit: boolean }>>>({});
@@ -97,6 +104,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (profile) {
       setFullName(profile.full_name || '');
+      setPhone(profile.phone ?? '');
     }
   }, [profile]);
 
@@ -158,7 +166,11 @@ export default function SettingsPage() {
 
   const handleUpdateProfile = () => {
     if (profile) {
-      updateProfileMutation.mutate({ ...profile, full_name: fullName });
+      updateProfileMutation.mutate({
+        ...profile,
+        full_name: fullName,
+        phone,
+      });
     }
   };
 
@@ -168,6 +180,88 @@ export default function SettingsPage() {
   };
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager';
+
+  const handleAvatarInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const fileInput = event.target;
+    const file = fileInput.files?.[0] ?? null;
+    if (!file) return;
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setAvatarPreview(reader.result as string);
+    reader.readAsDataURL(file);
+    fileInput.value = '';
+  };
+
+  const triggerAvatarPicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const extractStoragePath = (url: string): string | null => {
+    const segments = url.split('/storage/v1/object/public/avatars/')[1];
+    const fallback = url.split('/avatars/')[1];
+    const rawPath = (segments || fallback)?.split('?')[0];
+    return rawPath ?? null;
+  };
+
+  const handleUploadAvatar = async () => {
+    if (!avatarFile || !profile) return;
+
+    try {
+      if (avatarFile.size > MAX_AVATAR_SIZE) {
+        toast.error('El archivo es demasiado grande. Máximo 2MB');
+        return;
+      }
+
+      if (!AVATAR_ALLOWED_TYPES.includes(avatarFile.type)) {
+        toast.error('Formato no válido. Usa JPG, PNG o WEBP');
+        return;
+      }
+
+      const fileExt = avatarFile.name.split('.').pop() || 'png';
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('No se encontró la sesión. Inicia sesión nuevamente.');
+        return;
+      }
+
+      if (profile.avatar_url) {
+        const oldPath = extractStoragePath(profile.avatar_url);
+        if (oldPath) {
+          try {
+            await supabase.storage.from('avatars').remove([oldPath]);
+          } catch (error) {
+            console.error('No se pudo eliminar el avatar anterior:', error);
+          }
+        }
+      }
+
+      const storagePath = `${user.id}/${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(storagePath, avatarFile, { cacheControl: '3600', upsert: true });
+
+      if (uploadError) {
+        throw new Error(uploadError.message ?? 'Error al subir avatar');
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(storagePath);
+
+      await updateProfileMutation.mutateAsync({
+        ...profile,
+        avatar_url: publicUrl,
+      });
+
+      setAvatarPreview(publicUrl);
+      setAvatarFile(null);
+      toast.success('Avatar actualizado correctamente');
+    } catch (error) {
+      console.error('Error al subir avatar:', error);
+      const message = error instanceof Error ? error.message : 'Error al subir avatar. Verifica el bucket "avatars".';
+      toast.error(message);
+    }
+  };
 
   if (loadingProfile) {
     return <div className="p-6 text-center text-muted-foreground">Cargando perfil...</div>;
@@ -182,6 +276,13 @@ export default function SettingsPage() {
             <CardDescription>Actualiza tu información básica y tu foto de perfil.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={AVATAR_ALLOWED_TYPES.join(',')}
+              className="hidden"
+              onChange={handleAvatarInputChange}
+            />
             <div className="space-y-2">
               <Label>Avatar</Label>
               <div className="flex items-center gap-4">
@@ -197,82 +298,14 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/png,image/jpeg,image/webp';
-                      input.onchange = (event: Event) => {
-                        const file = (event.target as HTMLInputElement)?.files?.[0];
-                        if (file) {
-                          setAvatarFile(file);
-                          const reader = new FileReader();
-                          reader.onloadend = () => setAvatarPreview(reader.result as string);
-                          reader.readAsDataURL(file);
-                        }
-                      };
-                      input.click();
-                    }}
-                  >
+                  <Button variant="outline" size="sm" onClick={triggerAvatarPicker}>
                     Elegir imagen
                   </Button>
                   <Button
                     variant="default"
                     size="sm"
                     disabled={!avatarFile || updateProfileMutation.isPending}
-                    onClick={async () => {
-                      if (!avatarFile || !profile) return;
-                      try {
-                        if (avatarFile.size > 2 * 1024 * 1024) {
-                          toast.error('El archivo es demasiado grande. Máximo 2MB');
-                          return;
-                        }
-                        const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
-                        if (!validTypes.includes(avatarFile.type)) {
-                          toast.error('Formato no válido. Usa JPG, PNG o WEBP');
-                          return;
-                        }
-                        const fileExt = avatarFile.name.split('.').pop() || 'png';
-                        const { data: { user } } = await supabase.auth.getUser();
-                        if (!user) {
-                          toast.error('No se encontró la sesión. Inicia sesión nuevamente.');
-                          return;
-                        }
-                        if (profile.avatar_url) {
-                          try {
-                            const segments = profile.avatar_url.split('/storage/v1/object/public/avatars/')[1];
-                            const fallback = profile.avatar_url.split('/avatars/')[1];
-                            const oldFilePath = (segments || fallback)?.split('?')[0];
-                            if (oldFilePath) {
-                              await supabase.storage.from('avatars').remove([oldFilePath]);
-                            }
-                          } catch (err) {
-                            console.log('No se pudo eliminar el avatar anterior:', err);
-                          }
-                        }
-                        const storagePath = `${user.id}.${fileExt}`;
-                        const { error: uploadError } = await supabase.storage
-                          .from('avatars')
-                          .upload(storagePath, avatarFile, { cacheControl: '3600', upsert: true });
-                        if (uploadError) throw uploadError;
-                        const { data: publicUrlData } = await supabase.storage
-                          .from('avatars')
-                          .getPublicUrl(storagePath);
-                        await updateProfileMutation.mutateAsync({
-                          ...profile,
-                          avatar_url: publicUrlData.publicUrl,
-                        });
-                        setAvatarFile(null);
-                        setAvatarPreview('');
-                        toast.success('Avatar actualizado correctamente');
-                      } catch (error: unknown) {
-                        console.error(error);
-                        const message = error instanceof Error ? error.message : 'Error al subir avatar. Verifica el bucket "avatars".';
-                        toast.error(message);
-                      }
-                    }}
+                    onClick={handleUploadAvatar}
                   >
                     {updateProfileMutation.isPending ? 'Subiendo...' : 'Subir Avatar'}
                   </Button>
@@ -291,14 +324,23 @@ export default function SettingsPage() {
                 onChange={(event) => setFullName(event.target.value)}
                 placeholder="Tu nombre"
               />
-              <Button
-                onClick={handleUpdateProfile}
-                disabled={updateProfileMutation.isPending}
-                className="self-start"
-              >
-                {updateProfileMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
-              </Button>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Teléfono</Label>
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="+34 600 000 000"
+              />
+            </div>
+            <Button
+              onClick={handleUpdateProfile}
+              disabled={updateProfileMutation.isPending}
+              className="self-start"
+            >
+              {updateProfileMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
 
             <div className="space-y-1">
               <Label>Correo</Label>
@@ -358,6 +400,13 @@ export default function SettingsPage() {
               <CardDescription>Actualiza la información de tu cuenta personal</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={AVATAR_ALLOWED_TYPES.join(',')}
+                className="hidden"
+                onChange={handleAvatarInputChange}
+              />
               {/* Avatar Upload */}
               <div className="space-y-2">
                 <Label>Avatar</Label>
@@ -374,98 +423,12 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setAvatarFile(file);
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setAvatarPreview(reader.result as string);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
+                    <Button size="sm" variant="outline" onClick={triggerAvatarPicker}>
+                      Elegir imagen
+                    </Button>
                     <Button
                       size="sm"
-                      variant="outline"
-                      onClick={async () => {
-                        if (!avatarFile || !profile) return;
-                        
-                        try {
-                          // Validar tamaño del archivo (máx 2MB)
-                          if (avatarFile.size > 2 * 1024 * 1024) {
-                            toast.error('El archivo es demasiado grande. Máximo 2MB');
-                            return;
-                          }
-
-                          // Validar tipo de archivo
-                          const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-                          if (!validTypes.includes(avatarFile.type)) {
-                            toast.error('Formato no válido. Use JPG, PNG o WEBP');
-                            return;
-                          }
-
-                          const fileExt = avatarFile.name.split('.').pop() || 'png';
-                          const { data: { user } } = await supabase.auth.getUser();
-                          if (!user) {
-                            toast.error('No se encontro una sesion activa. Vuelve a iniciar sesion.');
-                            return;
-                          }
-                          const storagePath = `${user.id}/${Date.now()}.${fileExt}`;
-                          
-                          // Eliminar avatar anterior si existe
-                          if (profile.avatar_url) {
-                            try {
-                              const segments = profile.avatar_url.split('/storage/v1/object/public/avatars/')[1];
-                              const fallback = profile.avatar_url.split('/avatars/')[1];
-                              const oldFilePath = (segments || fallback)?.split('?')[0];
-                              if (oldFilePath) {
-                                await supabase.storage
-                                  .from('avatars')
-                                  .remove([oldFilePath]);
-                              }
-                            } catch (err) {
-                              console.log('No se pudo eliminar el avatar anterior:', err);
-                            }
-                          }
-                          
-                          // Subir nuevo avatar
-                          const { error: uploadError } = await supabase.storage
-                            .from('avatars')
-                            .upload(storagePath, avatarFile, {
-                              cacheControl: '3600',
-                              upsert: true
-                            });
-                          
-                          if (uploadError) {
-                            console.error('Upload error:', uploadError);
-                            throw new Error(uploadError.message || 'Error al subir el archivo');
-                          }
-                          
-                          // Obtener URL pública
-                          const { data: { publicUrl } } = supabase.storage
-                            .from('avatars')
-                            .getPublicUrl(storagePath);
-                          
-                          // Actualizar perfil con nueva URL
-                          await updateProfileMutation.mutateAsync({
-                            ...profile,
-                            avatar_url: publicUrl
-                          });
-                          
-                          setAvatarFile(null);
-                          setAvatarPreview('');
-                          toast.success('Avatar actualizado correctamente');
-                        } catch (error: unknown) {
-                          console.error('Error completo:', error);
-                          const message = error instanceof Error ? error.message : 'Error al subir avatar. Verifica que el bucket "avatars" exista en Supabase Storage.';
-                          toast.error(message);
-                        }
-                      }}
+                      onClick={handleUploadAvatar}
                       disabled={!avatarFile || updateProfileMutation.isPending}
                     >
                       {updateProfileMutation.isPending ? 'Subiendo...' : 'Subir Avatar'}
@@ -480,6 +443,15 @@ export default function SettingsPage() {
                   id="fullName"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Teléfono</Label>
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="+34 600 000 000"
                 />
               </div>
               <div className="space-y-2">

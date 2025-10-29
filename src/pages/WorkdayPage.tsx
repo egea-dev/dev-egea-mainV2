@@ -673,7 +673,7 @@ export default function WorkdayPage() {
             </ul>
           </div>
         )}
-        <div className="rounded-2xl border bg-card/60 shadow-sm">
+        <div className="rounded-2xl border bg-card/60">
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6">
             <div className="flex flex-col gap-3">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -707,7 +707,7 @@ export default function WorkdayPage() {
                 selected={selectedDate}
                 onSelect={(value) => value && setSelectedDate(value)}
                 numberOfMonths={1}
-                className="w-full rounded-md border shadow-sm"
+                className="w-full rounded-md border"
                 modifiers={{
                   hasTasks: calendarTaskDays,
                   pending: calendarPendingDays,

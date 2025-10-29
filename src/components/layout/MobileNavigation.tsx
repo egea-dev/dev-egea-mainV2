@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type NavItem = {
   path: string;
@@ -158,33 +159,36 @@ export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProp
           </div>
         </div>
 
-        {currentUser && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleNavigation("/admin/communications")}
-              className="relative h-10 w-10"
-            >
-              <MessageCircle className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                  {unreadCount}
-                </Badge>
-              )}
-            </Button>
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={currentUser.avatar_url || ''} />
-              <AvatarFallback className="text-sm">
-                {currentUser.full_name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          {currentUser && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleNavigation("/admin/communications")}
+                className="relative h-10 w-10"
+              >
+                <MessageCircle className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </Button>
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={currentUser.avatar_url || ''} />
+                <AvatarFallback className="text-sm">
+                  {currentUser.full_name
+                    .split(' ')
+                    .map((n) => n[0])
+                    .join('')
+                    .toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Bottom navigation */}

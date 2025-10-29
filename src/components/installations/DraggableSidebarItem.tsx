@@ -3,15 +3,17 @@ import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { Profile } from '@/types';
 
-type DraggableItem = (Profile & { type?: 'vehicle' | 'user'; tasksCount?: number }) | { id: string; name: string; type: 'vehicle' | 'user'; status?: string };
-
+type DraggableItem =
+  | (Profile & { type?: 'vehicle' | 'user'; tasksCount?: number })
+  | { id: string; name: string; type: 'vehicle' | 'user'; status?: string };
 
 type DraggableSidebarItemProps = {
   item: DraggableItem;
   children: React.ReactNode;
+  className?: string;
 };
 
-export const DraggableSidebarItem = ({ item, children }: DraggableSidebarItemProps) => {
+export const DraggableSidebarItem = ({ item, children, className }: DraggableSidebarItemProps) => {
   const isUser = 'full_name' in item;
   const itemType = isUser ? 'user' : item.type;
   
@@ -43,7 +45,8 @@ export const DraggableSidebarItem = ({ item, children }: DraggableSidebarItemPro
         'p-1 rounded-md transition-colors',
         !isDisabled && 'hover:bg-accent',
         isDragging && 'bg-accent opacity-50',
-        statusClasses
+        statusClasses,
+        className
       )}
     >
       {children}

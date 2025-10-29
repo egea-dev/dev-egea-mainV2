@@ -312,6 +312,7 @@ export type Database = {
           end_date: string | null
           id: string
           location: string | null
+          location_metadata: Json
           order: number | null
           responsible_profile_id: string | null
           screen_id: string
@@ -319,6 +320,7 @@ export type Database = {
           state: string
           status: string
           updated_at: string | null
+          work_site_id: string | null
         }
         Insert: {
           assigned_to?: string | null
@@ -328,6 +330,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           location?: string | null
+          location_metadata?: Json
           order?: number | null
           responsible_profile_id?: string | null
           screen_id: string
@@ -335,6 +338,7 @@ export type Database = {
           state?: string
           status?: string
           updated_at?: string | null
+          work_site_id?: string | null
         }
         Update: {
           assigned_to?: string | null
@@ -344,6 +348,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           location?: string | null
+          location_metadata?: Json
           order?: number | null
           responsible_profile_id?: string | null
           screen_id?: string
@@ -351,6 +356,7 @@ export type Database = {
           state?: string
           status?: string
           updated_at?: string | null
+          work_site_id?: string | null
         }
         Relationships: [
           {
@@ -386,6 +392,13 @@ export type Database = {
             columns: ["screen_id"]
             isOneToOne: false
             referencedRelation: "screens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "screen_data_work_site_id_fkey"
+            columns: ["work_site_id"]
+            isOneToOne: false
+            referencedRelation: "work_sites"
             referencedColumns: ["id"]
           },
         ]
@@ -779,6 +792,60 @@ export type Database = {
         }
         Relationships: []
       }
+      work_sites: {
+        Row: {
+          address: string | null
+          alias: string | null
+          city: string | null
+          created_at: string | null
+          id: string
+          imagotipo_enabled: boolean
+          is_active: boolean
+          latitude: number | null
+          longitude: number | null
+          maps_url: string | null
+          name: string
+          notes: string | null
+          postal_code: string | null
+          province: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          alias?: string | null
+          city?: string | null
+          created_at?: string | null
+          id?: string
+          imagotipo_enabled?: boolean
+          is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          maps_url?: string | null
+          name: string
+          notes?: string | null
+          postal_code?: string | null
+          province?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          alias?: string | null
+          city?: string | null
+          created_at?: string | null
+          id?: string
+          imagotipo_enabled?: boolean
+          is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          maps_url?: string | null
+          name?: string
+          notes?: string | null
+          postal_code?: string | null
+          province?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_availability: {
         Row: {
           created_at: string | null
@@ -941,6 +1008,7 @@ export type Database = {
           is_overdue: boolean | null
           is_urgent: boolean | null
           location: string | null
+          location_metadata: Json | null
           next_screen_id: string | null
           notes: string | null
           order: number | null
@@ -963,6 +1031,17 @@ export type Database = {
           state: string | null
           status: string | null
           updated_at: string | null
+          work_site_address: string | null
+          work_site_alias: string | null
+          work_site_city: string | null
+          work_site_id: string | null
+          work_site_imagotipo_enabled: boolean | null
+          work_site_latitude: number | null
+          work_site_longitude: number | null
+          work_site_maps_url: string | null
+          work_site_name: string | null
+          work_site_postal_code: string | null
+          work_site_province: string | null
           vehicle_type: string | null
         }
         Relationships: [
@@ -1161,10 +1240,12 @@ export type Database = {
           | {
               p_assigned_profiles?: string[]
               p_assigned_to?: string
+              p_work_site_id?: string
               p_assigned_vehicles?: string[]
               p_data?: Json
               p_end_date?: string
               p_location?: string
+              p_location_metadata?: Json
               p_responsible_profile_id?: string
               p_screen_id?: string
               p_start_date?: string

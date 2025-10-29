@@ -71,10 +71,30 @@ export interface ScreenData {
   start_date: string | null;
   end_date: string | null;
   location: string | null;
+  location_metadata: JsonObject;
   responsible_profile_id: string | null;
   assigned_to: string | null;
   checkin_token: string | null;
+  work_site_id: string | null;
   order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkSite {
+  id: string;
+  name: string;
+  alias: string | null;
+  address: string | null;
+  city: string | null;
+  province: string | null;
+  postal_code: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  maps_url: string | null;
+  notes: string | null;
+  imagotipo_enabled: boolean;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -227,6 +247,8 @@ export interface DetailedTask {
   start_date: string | null;
   end_date: string | null;
   location: string | null;
+  location_metadata: JsonObject;
+  work_site_id: string | null;
   responsible_profile_id: string | null;
   assigned_to: string | null;
   checkin_token: string | null;
@@ -240,6 +262,18 @@ export interface DetailedTask {
   header_color: string | null;
   screen_is_active: boolean | null;
   refresh_interval_sec: number | null;
+  
+  // Información del work site
+  work_site_name: string | null;
+  work_site_alias: string | null;
+  work_site_address: string | null;
+  work_site_city: string | null;
+  work_site_province: string | null;
+  work_site_postal_code: string | null;
+  work_site_latitude: number | null;
+  work_site_longitude: number | null;
+  work_site_maps_url: string | null;
+  work_site_imagotipo_enabled: boolean | null;
   
   // Información del responsable
   responsible_name: string | null;
@@ -333,6 +367,8 @@ export interface TaskFormData {
   start_date: string | null;
   end_date: string | null;
   location: string | null;
+  location_metadata: JsonObject;
+  work_site_id: string | null;
   responsible_profile_id: string | null;
   assigned_to: string | null;
   assigned_profiles: string[];
@@ -602,14 +638,16 @@ export type Database = {
           p_start_date?: string;
           p_end_date?: string;
           p_location?: string;
+          p_location_metadata?: JsonObject;
+          p_work_site_id?: string;
           p_responsible_profile_id?: string;
           p_assigned_to?: string;
           p_assigned_profiles?: string[];
           p_assigned_vehicles?: string[];
         };
         Returns: {
-          task_id: string;
-          action: string;
+          result_task_id: string;
+          result_action: string;
         };
       };
       archive_completed_tasks: {

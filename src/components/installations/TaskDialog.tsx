@@ -1,47 +1,50 @@
-import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+﻿import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import type { Task, Profile, Vehicle } from '@/types';
-import dayjs from 'dayjs';
-import { toast } from "sonner";
-import { format } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, ExternalLink } from "lucide-react";
-import { buildMapsSearchUrl, formatLocationLabel } from "@/utils/maps";
-import { cn } from "@/lib/utils";
+import dayjs from "dayjs";
+import { addDays, format, parseISO } from "date-fns";
+import { es as esLocale } from "date-fns/locale";
+
+import type { Profile, Vehicle, Task } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import type { Screen } from "@/integrations/supabase/client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { MultiSelectCombobox } from "./MultiSelectCombobox"; // Asumo que este componente ya existe y es reutilizable
+import { Switch } from "@/components/ui/switch";
+import { MultiSelectCombobox } from "./MultiSelectCombobox";
 
-// Tarea 3.3: Esquema de validación con Zod
+import { Calendar as CalendarIcon, MapPin, ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { buildMapsSearchUrl, formatLocationLabel } from "@/utils/maps";
+import { toast } from "sonner";
+import { upsertTask } from "@/lib/upsert-task";
+
+const FIELD_WRAPPER =
+  "rounded-2xl border border-border/70 bg-background px-4 py-3 space-y-2 text-foreground sm:px-5 sm:py-4 backdrop-blur-xl";
+
 const taskSchema = z.object({
   site: z.string().min(1, { message: "El sitio de trabajo es obligatorio." }),
-  location: z.string().min(1, { message: "La ubicación es obligatoria." }),
-  description: z.string().min(1, { message: "La descripción es obligatoria." }),
+  location: z.string().min(1, { message: "La ubicacion es obligatoria." }),
+  description: z.string().min(1, { message: "La descripcion es obligatoria." }),
   dueDate: z.date({ required_error: "La fecha es obligatoria." }),
   selectedUsers: z.array(z.object({ id: z.string(), name: z.string() })),
   selectedVehicles: z.array(z.object({ id: z.string(), name: z.string() })),
+  locationPreset: z.string().nullable().optional(),
+  repeatEnabled: z.boolean().optional(),
+  repeatDates: z.array(z.string()).optional(),
 });
 
 type TaskFormData = z.infer<typeof taskSchema>;
 
-type UpsertTaskResult = {
-  action: 'created' | 'updated';
-  task_id: string;
-};
-
-type DraggedItem =
-  | { type: 'user'; item: Profile }
-  | { type: 'vehicle'; item: Vehicle };
+type DraggedItem = { type: "user"; item: Profile } | { type: "vehicle"; item: Vehicle };
 
 type TaskDialogProps = {
   open: boolean;
@@ -54,6 +57,22 @@ type TaskDialogProps = {
   draggedItem?: DraggedItem | null;
 };
 
+const QUICK_LOCATION_PRESETS = [
+  { id: "almacen", label: "Almacen central", location: "Almacen central" },
+  { id: "taller", label: "Taller general", location: "Taller general" },
+  { id: "oficina", label: "Oficina tecnica", location: "Oficina tecnica" },
+] as const;
+
+const DATE_KEY_FORMAT = "yyyy-MM-dd";
+const toDateKey = (value: Date) => format(value, DATE_KEY_FORMAT);
+const REPEAT_WINDOW_DAYS = 6;
+const EMPTY_SELECT_VALUE = "__none__";
+
+const formatRepeatLabel = (date: Date) => {
+  const label = format(date, "EEEE d 'de' MMMM", { locale: esLocale });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
 export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, users, vehicles, draggedItem }: TaskDialogProps) => {
   const [saving, setSaving] = useState(false);
   const [installationsScreenId, setInstallationsScreenId] = useState<string | null>(null);
@@ -61,150 +80,184 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
-      site: '',
-      location: '',
-      description: '',
+      site: "",
+      location: "",
+      description: "",
       dueDate: selectedDate,
       selectedUsers: [],
       selectedVehicles: [],
-    }
+      locationPreset: null,
+      repeatEnabled: false,
+      repeatDates: [],
+    },
   });
 
-  // Cargar el screen_id de Instalaciones
+  const watchDueDate = form.watch("dueDate");
+  const watchRepeatDates = form.watch("repeatDates") ?? [];
+
+  const repeatOptions = useMemo(() => {
+    if (!watchDueDate) return [];
+    return Array.from({ length: REPEAT_WINDOW_DAYS }).map((_, index) => {
+      const d = addDays(watchDueDate, index + 1);
+      return { key: toDateKey(d), label: formatRepeatLabel(d) };
+    });
+  }, [watchDueDate]);
+
   useEffect(() => {
-    const loadInstallationsScreen = async () => {
+    const loadScreenId = async () => {
       const { data, error } = await supabase
-        .from('screens')
-        .select('id, name, screen_group, screen_type, is_active')
-        .eq('is_active', true);
+        .from("screens")
+        .select("id, name, screen_group, screen_type, is_active")
+        .eq("is_active", true);
 
       if (error) {
-        console.error('Error loading Instalaciones screen:', error);
-        toast.error('No se pudo cargar la pantalla de Instalaciones.');
+        console.error("Error loading screens", error);
+        toast.error("No se pudo cargar la configuracion de pantallas");
         return;
       }
 
-      const allScreens: Pick<Screen, 'id' | 'name' | 'screen_group' | 'screen_type' | 'is_active'>[] = Array.isArray(data)
-        ? data
-        : data
-        ? [data]
-        : [];
-      if (allScreens.length === 0) {
-        toast.error('No hay pantallas configuradas.');
-        console.warn('No screens returned from Supabase.');
-        return;
-      }
-
-      const normalized = allScreens.map((screen) => ({
-        id: screen.id,
-        name: (screen.name ?? '').trim().toLowerCase(),
-        group: (screen.screen_group ?? '').trim().toLowerCase(),
-        type: (screen.screen_type ?? '').trim().toLowerCase(),
-        isActive: screen.is_active ?? true,
+      const normalized = (Array.isArray(data) ? data : []).map((entry) => ({
+        id: entry.id,
+        group: (entry.screen_group ?? "").trim().toLowerCase(),
+        type: (entry.screen_type ?? "").trim().toLowerCase(),
+        isActive: entry.is_active ?? true,
       }));
 
-      const matchExact = normalized.find((screen) => screen.group === 'instalaciones' && screen.isActive);
-      const matchByName = normalized.find((screen) => screen.name.includes('instal') && screen.isActive);
-      const matchByType = normalized.find((screen) => screen.type === 'data' && screen.isActive);
-      const fallback = normalized[0];
+      const match =
+        normalized.find((screen) => screen.group === "instalaciones" && screen.isActive) ||
+        normalized.find((screen) => screen.type === "data" && screen.isActive) ||
+        normalized[0];
 
-      const selected = matchExact || matchByName || matchByType || fallback;
-
-      if (!selected) {
-        toast.error('No existe una pantalla de Instalaciones activa.');
-        console.warn('No suitable screen found among results.', normalized);
+      if (!match) {
+        toast.error("No existe una pantalla activa para Instalaciones");
         return;
       }
 
-      setInstallationsScreenId(selected.id);
+      setInstallationsScreenId(match.id);
     };
-    loadInstallationsScreen();
+
+    loadScreenId();
   }, []);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     if (task) {
       form.reset({
-        site: task.data?.site || '',
-        location: task.location || '',
-        description: task.data?.description || '',
+        site: task.data?.site || task.location || "",
+        location: task.location || "",
+        description: task.data?.description || "",
         dueDate: dayjs(task.start_date).toDate(),
         selectedUsers: task.assigned_users?.map((user) => ({ id: user.id, name: user.full_name })) || [],
         selectedVehicles: task.assigned_vehicles?.map((vehicle) => ({ id: vehicle.id, name: vehicle.name })) || [],
+        locationPreset: null,
+        repeatEnabled: false,
+        repeatDates: [],
       });
       return;
     }
 
-    const initialUsers = draggedItem?.type === 'user'
-      ? [{ id: draggedItem.item.id, name: draggedItem.item.full_name }]
-      : [];
-
-    const initialVehicles = draggedItem?.type === 'vehicle'
-      ? [{ id: draggedItem.item.id, name: draggedItem.item.name }]
-      : [];
+    const initialUsers =
+      draggedItem?.type === "user" ? [{ id: draggedItem.item.id, name: draggedItem.item.full_name }] : [];
+    const initialVehicles =
+      draggedItem?.type === "vehicle" ? [{ id: draggedItem.item.id, name: draggedItem.item.name }] : [];
 
     form.reset({
-      site: '',
-      location: '',
-      description: '',
+      site: "",
+      location: "",
+      description: "",
       dueDate: selectedDate,
       selectedUsers: initialUsers,
       selectedVehicles: initialVehicles,
+      locationPreset: null,
+      repeatEnabled: false,
+      repeatDates: [],
     });
-  }, [task, open, selectedDate, draggedItem, form]);
+  }, [open, task, selectedDate, draggedItem, form]);
+
+  const toggleRepeatDate = (key: string) => {
+    const current = new Set(watchRepeatDates);
+    if (current.has(key)) {
+      current.delete(key);
+    } else {
+      current.add(key);
+    }
+    form.setValue("repeatDates", Array.from(current), { shouldDirty: true });
+  };
 
   const onSubmit = async (data: TaskFormData) => {
     if (!installationsScreenId) {
-      toast.error('Error: No se pudo encontrar la pantalla de Instalaciones');
+      toast.error("No se pudo obtener la pantalla de Instalaciones");
       return;
     }
 
     setSaving(true);
     try {
-      const formattedDate = dayjs(data.dueDate).format('YYYY-MM-DD');
-      const nextState = task?.state ?? 'pendiente';
-      const nextStatus = task?.status ?? 'pendiente';
+      const nextState = task?.state ?? "pendiente";
+      const nextStatus = task?.status ?? "pendiente";
+      const normalizedLocation = formatLocationLabel(data.location);
 
-      const { data: result, error } = await supabase.rpc<UpsertTaskResult[]>('upsert_task', {
-        p_task_id: task?.id || undefined,
-        p_screen_id: installationsScreenId,
-        p_data: {
-          site: data.site,
-          description: data.description,
-        },
-        p_state: nextState,
-        p_status: nextStatus,
-        p_start_date: formattedDate,
-        p_end_date: formattedDate,
-        p_location: formatLocationLabel(data.location),
-        p_responsible_profile_id: null,
-        p_assigned_to: null,
-        p_assigned_profiles: data.selectedUsers.map(u => u.id),
-        p_assigned_vehicles: data.selectedVehicles.map(v => v.id),
-      });
+      const repeatKeys = data.repeatEnabled ? Array.from(new Set(data.repeatDates ?? [])) : [];
+      const baseKey = toDateKey(data.dueDate);
+      const repeatDates = repeatKeys
+        .filter((key) => key !== baseKey)
+        .map((key) => parseISO(key))
+        .filter((dateValue) => !Number.isNaN(dateValue.getTime()));
 
-      if (error) {
-        console.error('Error saving task:', error);
-        const message = error.message ?? 'Error desconocido al guardar la tarea';
-        toast.error(`Error al guardar la tarea: ${message}`);
+      const saveTask = async (targetDate: Date, taskId?: string | null) => {
+        const formattedDate = dayjs(targetDate).format("YYYY-MM-DD");
+        await upsertTask(supabase, {
+          taskId: taskId ?? undefined,
+          screenId: installationsScreenId,
+          data: { site: data.site, description: data.description },
+          state: nextState,
+          status: nextStatus,
+          startDate: formattedDate,
+          endDate: formattedDate,
+          location: normalizedLocation,
+          locationMetadata: normalizedLocation ? { manual_label: normalizedLocation } : {},
+          workSiteId: null,
+          responsibleProfileId: null,
+          assignedTo: null,
+          assignedProfiles: data.selectedUsers.map((user) => user.id),
+          assignedVehicles: data.selectedVehicles.map((vehicle) => vehicle.id),
+        });
+      };
+
+      await saveTask(data.dueDate, task?.id ?? null);
+      for (const dateValue of repeatDates) {
+        await saveTask(dateValue, null);
+      }
+
+      toast.success(
+        repeatDates.length > 0
+          ? `Tarea guardada y replicada en ${repeatDates.length} dÃ­as`
+          : "Tarea guardada correctamente"
+      );
+      onSuccess();
+
+      const isEditing = Boolean(task?.id);
+      if (isEditing) {
+        onOpenChange(false);
         return;
       }
 
-      const outcome = Array.isArray(result) ? result[0] : null;
-      if (!outcome) {
-        console.warn('Respuesta inesperada de upsert_task', result);
+      if (repeatDates.length > 0) {
+        form.reset({
+          ...data,
+          selectedUsers: [...data.selectedUsers],
+          selectedVehicles: [...data.selectedVehicles],
+          repeatEnabled: false,
+          repeatDates: [],
+        });
+        return;
       }
 
-      toast.success(task ? 'Tarea actualizada correctamente' : 'Tarea creada correctamente');
-      onSuccess();
       onOpenChange(false);
-    } catch (error: unknown) {
-      console.error('Error saving task:', error);
-      const message = error instanceof Error ? error.message : 'Error desconocido';
-      toast.error('Error al guardar la tarea: ' + message);
+    } catch (error) {
+      console.error("Error saving task:", error);
+      const message = error instanceof Error ? error.message : "Error desconocido";
+      toast.error(`Error al guardar la tarea: ${message}`);
     } finally {
       setSaving(false);
     }
@@ -212,140 +265,273 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{task ? "Editar Tarea" : "Nueva Tarea"}</DialogTitle>
-          <DialogDescription>Completa los detalles de la tarea de planificación.</DialogDescription>
+      <DialogContent className="sm:max-w-3xl w-full max-h-[90vh] overflow-y-auto hide-scrollbar border border-border/70 bg-background/95 p-0 text-foreground backdrop-blur-2xl">
+        <DialogHeader className="px-6 pt-6">
+          <DialogTitle className="text-2xl font-semibold text-primary">{task ? "Editar Tarea" : "Nueva Tarea"}</DialogTitle>
+          <DialogDescription className="text-muted-foreground">Completa los detalles de la tarea de planificacion.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="site"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sitio de Trabajo</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => {
-                const value = field.value ?? '';
-                const mapsUrl = value.trim()
-                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(value.trim())}`
-                  : null;
-
-                return (
-                  <FormItem>
-                    <FormLabel>Ubicación</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <div className="relative flex-1">
-                          <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            {...field}
-                            value={value}
-                            className="pl-9"
-                            placeholder="Dirección, coordenadas o referencia"
-                          />
-                        </div>
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!value.trim()}
-                        onClick={() => {
-                          if (!value.trim()) return;
-                          const targetUrl = buildMapsSearchUrl(value);
-                          window.open(targetUrl, "_blank", "noopener");
-                        }}
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 px-5 pb-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="site"
+                render={({ field }) => (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Sitio de trabajo</FormLabel>
+                    <FormDescription className="text-slate-400">Se muestra en la vista de instalaciones.</FormDescription>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Ej. Obra Patio Central"
+                       
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
-                );
-              }}
-            />
-            <FormField
-              control={form.control}
-              name="dueDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Fecha</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="locationPreset"
+                render={({ field }) => (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Ubicaciones frecuentes</FormLabel>
+                    <FormDescription className="text-slate-400">Aplica una plantilla rapida para sitio y direccion.</FormDescription>
+                    <Select
+                      value={field.value ?? EMPTY_SELECT_VALUE}
+                      onValueChange={(value) => {
+                        const presetId = value === EMPTY_SELECT_VALUE ? null : value;
+                        field.onChange(presetId);
+                        if (!presetId) return;
+                        const preset = QUICK_LOCATION_PRESETS.find((entry) => entry.id === presetId);
+                        if (preset) {
+                          form.setValue("site", preset.location, { shouldDirty: true });
+                          form.setValue("location", preset.location, { shouldDirty: true });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="border-border/70 bg-background/80 text-foreground">
+                        <SelectValue placeholder="Sin plantilla" />
+                      </SelectTrigger>
+                      <SelectContent className="border-border/70 bg-popover/95 text-popover-foreground backdrop-blur-xl">
+                        <SelectItem value={EMPTY_SELECT_VALUE}>Sin plantilla</SelectItem>
+                        {QUICK_LOCATION_PRESETS.map((preset) => (
+                          <SelectItem key={preset.id} value={preset.id}>
+                            {preset.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => {
+                  const value = field.value ?? "";
+                  return (
+                    <FormItem className={FIELD_WRAPPER}>
+                      <FormLabel>Ubicacion</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <div className="relative flex-1">
+                            <MapPin className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              value={value}
+                              placeholder="Direccion, coordenadas o referencia"
+                              className="pl-11"
+                            />
+                          </div>
+                        </FormControl>
                         <Button
-                          variant={"outline"}
-                          className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                          type="button"
+                          variant="outline"
+                          disabled={!value.trim()}
+                          onClick={() => {
+                            if (!value.trim()) return;
+                            window.open(buildMapsSearchUrl(value), "_blank", "noopener");
+                          }}
+                          className="shrink-0"
                         >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {field.value ? format(field.value, "PPP") : <span>Elige una fecha</span>}
+                          <ExternalLink className="h-4 w-4" />
                         </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+
+              <FormField
+                control={form.control}
+                name="dueDate"
+                render={({ field }) => (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Fecha</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "PPP") : <span>Elige una fecha</span>}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                    <PopoverContent className="w-auto border border-border/70 bg-popover/95 p-0 text-popover-foreground backdrop-blur-xl">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                        classNames={{
+                          caption_label: "text-slate-200",
+                          head_cell: "text-slate-500 rounded-md w-9 font-medium text-[0.8rem]",
+                          day: cn(
+                            buttonVariants({ variant: "ghost", size: "icon" }),
+                            "h-9 w-9 p-0 font-normal text-slate-300 hover:bg-slate-800/70 aria-selected:bg-emerald-500/90 aria-selected:text-emerald-50"
+                          ),
+                          day_today: "bg-slate-800/80 text-slate-200",
+                          nav_button: cn(
+                            buttonVariants({ variant: "outline", size: "icon" }),
+                            "h-7 w-7 border border-slate-700/60 bg-transparent text-slate-300 hover:bg-slate-800/70"
+                          ),
+                        }}
+                      />
                     </PopoverContent>
                   </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
               name="description"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descripción</FormLabel>
-                  <FormControl><Textarea {...field} /></FormControl>
+                <FormItem className={FIELD_WRAPPER}>
+                  <FormLabel>Descripcion</FormLabel>
+                  <FormControl>
+                    <Textarea rows={4} {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
-              name="selectedUsers"
+              name="repeatEnabled"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Operarios Asignados</FormLabel>
-                  <MultiSelectCombobox
-                    options={users.map(u => ({ id: u.id, name: u.full_name }))}
-                    selected={field.value}
-                    onSelectedChange={field.onChange}
-                    placeholder="Seleccionar operarios..."
-                    searchPlaceholder="Buscar operario..."
-                  />
-                  <FormMessage />
+                <FormItem className="rounded-2xl border border-dashed border-border/60 bg-background px-4 py-3 space-y-3 text-foreground sm:px-5 sm:py-4 backdrop-blur-xl">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div>
+                      <FormLabel>Repetir en dÃ­as siguientes</FormLabel>
+                      <FormDescription className="text-muted-foreground">
+                        Duplica la tarea en fechas prÃ³ximas sin cerrar el diÃ¡logo. Usa el conmutador y marca los dÃ­as para generar copias.
+                      </FormDescription>
+                    </div>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        if (!checked) {
+                          form.setValue("repeatDates", [], { shouldDirty: true });
+                        }
+                      }}
+                    />
+                  </div>
+                  {field.value && (
+                    repeatOptions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Selecciona la fecha principal primero.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {repeatOptions.map((option) => {
+                          const isActive = watchRepeatDates.includes(option.key);
+                          return (
+                            <Button
+                              key={option.key}
+                              type="button"
+                              variant={isActive ? "default" : "outline"}
+                              size="sm"
+                              className={cn(
+                                isActive
+                                  ? "bg-primary text-primary-foreground"
+                                  : "border-border/70 text-foreground hover:bg-secondary/30"
+                              )}
+                              onClick={() => toggleRepeatDate(option.key)}
+                            >
+                              {option.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )
+                  )}
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="selectedVehicles"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Vehículos Asignados</FormLabel>
-                  <MultiSelectCombobox
-                    options={vehicles.map(v => ({ id: v.id, name: v.name }))}
-                    selected={field.value}
-                    onSelectedChange={field.onChange}
-                    placeholder="Seleccionar vehículos..."
-                    searchPlaceholder="Buscar vehículo..."
-                  />
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button type="submit" disabled={saving}>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="selectedUsers"
+                render={({ field }) => (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Operarios asignados</FormLabel>
+                    <MultiSelectCombobox
+                      options={users.map((user) => ({ id: user.id, name: user.full_name }))}
+                      selected={field.value}
+                      onSelectedChange={field.onChange}
+                      placeholder="Seleccionar operarios..."
+                      searchPlaceholder="Buscar operario..."
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="selectedVehicles"
+                render={({ field }) => (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Vehiculos asignados</FormLabel>
+                    <MultiSelectCombobox
+                      options={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
+                      selected={field.value}
+                      onSelectedChange={field.onChange}
+                      placeholder="Seleccionar vehiculos..."
+                      searchPlaceholder="Buscar vehiculo..."
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="border-border/70 hover:bg-secondary/40"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving}
+              >
                 {saving ? "Guardando..." : "Guardar"}
               </Button>
             </DialogFooter>
@@ -355,3 +541,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
     </Dialog>
   );
 };
+
+
+
+

@@ -66,9 +66,19 @@ export default function DisplayPage({
         .from("screens")
         .select("*, templates(*)")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
       if (screenError) throw screenError;
+
+      if (!screenDetails) {
+        setScreen(null);
+        setFields([]);
+        setScreenData([]);
+        setTotalCount(0);
+        setTotalPages(1);
+        setIsOnline(false);
+        return;
+      }
       
       setScreen(screenDetails);
       if (screenDetails.templates?.fields && Array.isArray(screenDetails.templates.fields)) {
@@ -238,8 +248,8 @@ export default function DisplayPage({
 
   const headerStyle = screen.header_color ? { backgroundColor: screen.header_color, color: '#fff' } : undefined;
   const headerClassName = screen.header_color
-    ? 'sticky top-0 z-10 shadow-lg'
-    : 'bg-primary text-primary-foreground sticky top-0 z-10 shadow-lg';
+    ? 'sticky top-0 z-10'
+    : 'bg-primary text-primary-foreground sticky top-0 z-10';
   const headerInnerClass = fullWidth
     ? 'mx-auto w-full max-w-[1800px] px-6 py-4'
     : 'container mx-auto px-6 py-4';
@@ -283,7 +293,7 @@ export default function DisplayPage({
             <div className="text-2xl text-muted-foreground">No hay datos para mostrar</div>
           </div>
         ) : (
-          <div className="bg-card rounded-lg shadow-md overflow-hidden border">
+          <div className="bg-card rounded-lg overflow-hidden border">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">

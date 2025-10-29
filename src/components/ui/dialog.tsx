@@ -40,7 +40,7 @@ const DialogContent = React.forwardRef<
     >
       <div
         className={cn(
-          "relative w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg",
+          "relative w-full max-w-lg rounded-lg border bg-background p-6",
           className,
         )}
       >

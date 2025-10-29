@@ -194,7 +194,7 @@ const ScreenDisplay = () => {
 
   return (
     <div className="min-h-screen bg-muted/20">
-      <header className="border-b shadow-sm" style={headerStyle}>
+      <header className="border-b" style={headerStyle}>
         <div className="mx-auto flex w-[98%] flex-wrap items-center justify-between gap-4 py-6">
           <h1 className={cn("text-3xl font-semibold tracking-tight", headerTextClass)}>
             {screen.name || "Pantalla"}

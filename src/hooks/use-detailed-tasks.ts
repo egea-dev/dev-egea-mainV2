@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type {
   DetailedTask,
@@ -128,7 +128,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     // Aplicar ordenamiento
     query = query.order(sort.field, { ascending: sort.direction === 'asc' });
 
-    // Aplicar paginación
+    // Aplicar paginaciÃ³n
     const from = (pagination.page - 1) * pagination.pageSize;
     const to = from + pagination.pageSize - 1;
     query = query.range(from, to);
@@ -174,27 +174,24 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
 
   const createTask = async (taskData: TaskFormData) => {
     try {
-      const { data, error } = await supabase.rpc('upsert_task', {
-        p_screen_id: taskData.screen_id,
-        p_data: taskData.data || {},
-        p_state: taskData.state || 'pendiente',
-        p_status: taskData.status || 'pendiente',
-        p_start_date: taskData.start_date,
-        p_end_date: taskData.end_date,
-        p_location: taskData.location,
-        p_responsible_profile_id: taskData.responsible_profile_id,
-        p_assigned_to: taskData.assigned_to,
-        p_assigned_profiles: taskData.assigned_profiles || [],
-        p_assigned_vehicles: taskData.assigned_vehicles || []
+      const result = await upsertTask(supabase, {
+        screenId: taskData.screen_id,
+        data: taskData.data || {},
+        state: taskData.state || "pendiente",
+        status: taskData.status || "pendiente",
+        startDate: taskData.start_date ?? null,
+        endDate: taskData.end_date ?? null,
+        location: taskData.location ?? null,
+        locationMetadata: taskData.location_metadata || {},
+        workSiteId: taskData.work_site_id ?? null,
+        responsibleProfileId: taskData.responsible_profile_id ?? null,
+        assignedTo: taskData.assigned_to ?? null,
+        assignedProfiles: taskData.assigned_profiles || [],
+        assignedVehicles: taskData.assigned_vehicles || []
       });
 
-      if (error) {
-        throw error;
-      }
-
-      // Refrescar la lista
       await fetchTasks();
-      return data;
+      return result;
     } catch (err) {
       console.error('Error creating task:', err);
       throw err;
@@ -203,28 +200,25 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
 
   const updateTask = async (taskId: string, taskData: TaskFormData) => {
     try {
-      const { data, error } = await supabase.rpc('upsert_task', {
-        p_task_id: taskId,
-        p_screen_id: taskData.screen_id,
-        p_data: taskData.data || {},
-        p_state: taskData.state || 'pendiente',
-        p_status: taskData.status || 'pendiente',
-        p_start_date: taskData.start_date,
-        p_end_date: taskData.end_date,
-        p_location: taskData.location,
-        p_responsible_profile_id: taskData.responsible_profile_id,
-        p_assigned_to: taskData.assigned_to,
-        p_assigned_profiles: taskData.assigned_profiles || [],
-        p_assigned_vehicles: taskData.assigned_vehicles || []
+      const result = await upsertTask(supabase, {
+        taskId,
+        screenId: taskData.screen_id,
+        data: taskData.data || {},
+        state: taskData.state || "pendiente",
+        status: taskData.status || "pendiente",
+        startDate: taskData.start_date ?? null,
+        endDate: taskData.end_date ?? null,
+        location: taskData.location ?? null,
+        locationMetadata: taskData.location_metadata || {},
+        workSiteId: taskData.work_site_id ?? null,
+        responsibleProfileId: taskData.responsible_profile_id ?? null,
+        assignedTo: taskData.assigned_to ?? null,
+        assignedProfiles: taskData.assigned_profiles || [],
+        assignedVehicles: taskData.assigned_vehicles || []
       });
 
-      if (error) {
-        throw error;
-      }
-
-      // Refrescar la lista
       await fetchTasks();
-      return data;
+      return result;
     } catch (err) {
       console.error('Error updating task:', err);
       throw err;
@@ -255,7 +249,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
       // Intentar obtener la tarea desde el estado local (vista detailed_tasks)
       let task = tasks.find((candidate) => candidate.id === taskId);
 
-      // Si no está en memoria, obtenerla desde la vista
+      // Si no estÃ¡ en memoria, obtenerla desde la vista
       if (!task) {
         const { data, error } = await supabase
           .from('detailed_tasks')
@@ -267,7 +261,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
       }
 
       if (!task) {
-        throw new Error('No se encontró la tarea a completar');
+        throw new Error('No se encontrÃ³ la tarea a completar');
       }
 
       // Preparar asignaciones para el archivado
@@ -305,6 +299,8 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
           start_date: task.start_date || null,
           end_date: task.end_date || null,
           location: task.location || null,
+          location_metadata: (task.location_metadata ?? {}) as TaskFormData['location_metadata'],
+          work_site_id: task.work_site_id ?? null,
           responsible_profile_id: task.responsible_profile_id || null,
           assigned_to: task.assigned_to || null,
           assigned_profiles: normalizeAssignedProfiles(task.assigned_profiles).map((profile) => profile.id),
@@ -330,7 +326,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
         throw error;
       }
 
-      return data;
+      return data.slice(0, 3);
     } catch (err) {
       console.error('Error generating checkin token:', err);
       throw err;
@@ -342,7 +338,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     fetchTasks();
   }, [fetchTasks]);
 
-  // Auto-refresh si está habilitado
+  // Auto-refresh si estÃ¡ habilitado
   useEffect(() => {
     if (!autoRefresh) return;
 
@@ -368,7 +364,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
   };
 }
 
-// Hook específico para tareas del dashboard
+// Hook especÃ­fico para tareas del dashboard
 export function useDashboardTasks() {
   const [confeccionTasks, setConfeccionTasks] = useState<DetailedTask[]>([]);
   const [tapiceriaTasks, setTapiceriaTasks] = useState<DetailedTask[]>([]);
@@ -465,8 +461,8 @@ export function useDashboardTasks() {
       };
 
       const [confeccionData, tapiceriaData, pendingData] = await Promise.all([
-        fetchSectionTasks('confeccion', ['Confección', 'Confeccion'], 6),
-        fetchSectionTasks('tapiceria', ['Tapicería', 'Tapiceria'], 6),
+        fetchSectionTasks('confeccion', ['ConfecciÃ³n', 'Confeccion'], 3),
+        fetchSectionTasks('tapiceria', ['TapicerÃ­a', 'Tapiceria'], 3),
         fetchSectionTasks('pendientes', [], null),
       ]);
 
@@ -475,8 +471,17 @@ export function useDashboardTasks() {
         return state === 'incidente' || state === 'arreglo' || state === 'urgente';
       };
 
-      setConfeccionTasks(confeccionData.filter(shouldHighlight));
-      setTapiceriaTasks(tapiceriaData.filter(shouldHighlight));
+      const buildSectionList = (data: DetailedTask[]) => {
+        if (data.length === 0) return data.slice(0, 3);
+        const prioritized = data.filter(shouldHighlight);
+        if (prioritized.length === data.length) return prioritized.slice(0, 3);
+        if (prioritized.length === 0) return data.slice(0, 3);
+        const remainder = data.filter((task) => !shouldHighlight(task));
+        return [...prioritized, ...remainder].slice(0, 3);
+      };
+
+      setConfeccionTasks(buildSectionList(confeccionData));
+      setTapiceriaTasks(buildSectionList(tapiceriaData));
       setPendingTasks(pendingData);
 
       const allTasks = [...confeccionData, ...tapiceriaData, ...pendingData];
@@ -531,7 +536,7 @@ export function useDashboardTasks() {
   };
 }
 
-// Hook para estadísticas del dashboard
+// Hook para estadÃ­sticas del dashboard
 export function useDashboardStats(dateFrom?: string, dateTo?: string) {
   const [stats, setStats] = useState<Database['public']['Functions']['get_dashboard_stats']['Returns'] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -569,3 +574,5 @@ export function useDashboardStats(dateFrom?: string, dateTo?: string) {
 
   return { stats, loading };
 }
+
+

@@ -39,6 +39,7 @@ export const useUpdateProfile = () => {
       if (profile.full_name !== undefined) updates.full_name = profile.full_name;
       if (profile.phone !== undefined) updates.phone = profile.phone;
       if (profile.role !== undefined) updates.role = profile.role;
+      if (profile.status !== undefined) updates.status = profile.status;
       if ('avatar_url' in profile) updates.avatar_url = profile.avatar_url ?? null;
 
       const { error } = await supabase.from('profiles').update(updates).eq('id', profile.id);
@@ -181,25 +182,41 @@ export const useTasksByDate = (date: Date) => {
 export const useUpsertTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (variables: { task_id_in: string | null; start_date_in: string; end_date_in: string; site_in: string; description_in: string; location_in: string; responsible_id_in: string | null; user_ids: string[]; vehicle_ids: string[]; }) => {
-      const { error } = await supabase.rpc('upsert_task', {
-        p_task_id: variables.task_id_in,
-        p_screen_id: 'installations-screen-id', // This needs to be determined - placeholder for now
-        p_data: {
+    mutationFn: async (variables: {
+      task_id_in: string | null;
+      screen_id?: string;
+      start_date_in: string;
+      end_date_in: string;
+      site_in: string;
+      description_in: string;
+      location_in: string;
+      responsible_id_in: string | null;
+      user_ids: string[];
+      vehicle_ids: string[];
+      work_site_id_in?: string | null;
+      location_metadata_in?: Record<string, unknown>;
+    }) => {
+      const screenId = variables.screen_id ?? "installations-screen-id";
+      await upsertTask(supabase, {
+        taskId: variables.task_id_in ?? undefined,
+        screenId,
+        data: {
           site: variables.site_in,
           description: variables.description_in,
         },
-        p_state: 'pendiente',
-        p_status: 'pendiente',
-        p_start_date: variables.start_date_in,
-        p_end_date: variables.end_date_in,
-        p_location: variables.location_in,
-        p_responsible_profile_id: variables.responsible_id_in,
-        p_assigned_to: null,
-        p_assigned_profiles: variables.user_ids,
-        p_assigned_vehicles: variables.vehicle_ids,
+        state: "pendiente",
+        status: "pendiente",
+        startDate: variables.start_date_in,
+        endDate: variables.end_date_in,
+        location: variables.location_in,
+        locationMetadata:
+          variables.location_metadata_in ?? (variables.location_in ? { manual_label: variables.location_in } : {}),
+        workSiteId: variables.work_site_id_in ?? null,
+        responsibleProfileId: variables.responsible_id_in ?? null,
+        assignedTo: null,
+        assignedProfiles: variables.user_ids,
+        assignedVehicles: variables.vehicle_ids,
       });
-      if (error) throw error;
       return variables;
     },
     onSuccess: (data) => {
@@ -437,3 +454,4 @@ export const useCreateScreenData = (screenId: string | null) => {
     }
   });
 };
+

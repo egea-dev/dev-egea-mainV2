@@ -1,80 +1,145 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
-import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Task, Profile, Vehicle } from '@/types';
-import dayjs from 'dayjs';
-import 'dayjs/locale/es';
-import { es } from 'date-fns/locale';
-import { format, subDays, parseISO } from 'date-fns';
-import { cn } from '@/lib/utils';
-dayjs.locale('es');
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useLocation } from "react-router-dom";
+import {
+  DndContext,
+  PointerSensor,
+  DragOverlay,
+  DragEndEvent,
+  DragStartEvent,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import dayjs from "dayjs";
+import "dayjs/locale/es";
+import { es } from "date-fns/locale";
+import { format, parseISO, subDays } from "date-fns";
+import { cn } from "@/lib/utils";
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, User, Car, Share2, Download, Users, MessageSquare, Send } from 'lucide-react';
+import { Task, Profile, Vehicle } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Users, Car, Share2, Download, MessageSquare, Plus, Search } from "lucide-react";
 
-import { DailyTaskTable } from '@/components/installations/DailyTaskTable';
-import { DraggableSidebarItem } from '@/components/installations/DraggableSidebarItem';
-import { TaskDialog } from '@/components/installations/TaskDialog';
-import { useAdminData } from '@/hooks/use-admin-data';
-import { useTasksByDate, useUpdateTaskOrder, useAssignToTask, useCreateSharedPlan, useProfile } from '@/hooks/use-supabase';
 import "@/styles/installations.css";
-import { useIsMobile } from '@/hooks/use-mobile';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { UserDialog } from '@/components/users/UserDialog';
-import { VehicleBadge, StatusBadge } from '@/components/badges';
-import { Badge } from '@/components/ui/badge';
+
+import { DailyTaskTable } from "@/components/installations/DailyTaskTable";
+import { DraggableSidebarItem } from "@/components/installations/DraggableSidebarItem";
+import { TaskDialog } from "@/components/installations/TaskDialog";
+import { UserDialog } from "@/components/users/UserDialog";
+import { VehicleBadge, StatusBadge } from "@/components/badges";
+
+import { useAdminData } from "@/hooks/use-admin-data";
+import {
+  useTasksByDate,
+  useUpdateTaskOrder,
+  useAssignToTask,
+  useCreateSharedPlan,
+  useProfile,
+} from "@/hooks/use-supabase";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+dayjs.locale("es");
+
+const CALENDAR_CLASSNAMES = {
+  today: "bg-orange-500 text-white hover:bg-orange-600 rounded-md font-medium ring-2 ring-orange-300",
+  pending: "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 rounded-md font-medium",
+  busy: "bg-orange-200 text-orange-900 dark:bg-orange-900/50 dark:text-orange-200 rounded-md font-medium",
+};
 
 export default function InstallationsPage() {
-   const { users, vehicles, fetchData: onDataUpdate } = useAdminData();
-   const isMobile = useIsMobile();
-
+  const { users, vehicles, fetchData: refreshAdminData } = useAdminData();
+  const isMobile = useIsMobile();
   const location = useLocation();
+
   const queryParams = new URLSearchParams(location.search);
-  const dateFromQuery = queryParams.get('date');
+  const dateFromQuery = queryParams.get("date");
   const initialDate = dateFromQuery ? dayjs(dateFromQuery).toDate() : new Date();
 
   const [date, setDate] = useState<Date | undefined>(initialDate);
   const [daysWithPendingTasks, setDaysWithPendingTasks] = useState<Date[]>([]);
   const [daysWithTasks, setDaysWithTasks] = useState<Date[]>([]);
-  
+
   const { data: tasks = [], isLoading: loadingTasks, refetch } = useTasksByDate(date!);
   const updateOrderMutation = useUpdateTaskOrder(date);
   const assignToTaskMutation = useAssignToTask(date);
   const createSharedPlanMutation = useCreateSharedPlan();
-  
+
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [draggedItem, setDraggedItem] = useState<{ type: string; item: Profile | Vehicle } | null>(null);
-  
+  const [draggedItem, setDraggedItem] = useState<{ type: "user" | "vehicle"; item: Profile | Vehicle } | null>(null);
+
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
-  const { data: profile } = useProfile();
-  const isManagerView = profile?.role === 'admin' || profile?.role === 'manager';
 
+  const { data: profile } = useProfile();
+  const isManagerView = profile?.role === "admin" || profile?.role === "manager";
+
+  const [operatorSearch, setOperatorSearch] = useState("");
+  const [vehicleSearch, setVehicleSearch] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    const normalizedQuery = operatorSearch.trim().toLowerCase();
+    if (!normalizedQuery) return users;
+    return users.filter((user) => {
+      const name = user.full_name?.toLowerCase() ?? "";
+      const email = user.email?.toLowerCase() ?? "";
+      return name.includes(normalizedQuery) || email.includes(normalizedQuery);
+    });
+  }, [operatorSearch, users]);
+
+  const taskCountByProfile = useMemo(() => {
+    const counts = new Map<string, number>();
+    tasks.forEach((task) => {
+      task.assigned_users.forEach((assigned) => {
+        counts.set(assigned.id, (counts.get(assigned.id) ?? 0) + 1);
+      });
+    });
+    return counts;
+  }, [tasks]);
+
+  const activeVehicles = useMemo(
+    () => vehicles.filter((vehicle) => vehicle.is_active !== false),
+    [vehicles]
+  );
+
+  const filteredVehicles = useMemo(() => {
+    const normalizedQuery = vehicleSearch.trim().toLowerCase();
+    if (!normalizedQuery) return activeVehicles;
+
+    return activeVehicles.filter((vehicle) => {
+      const name = vehicle.name?.toLowerCase() ?? "";
+      const type = (vehicle.type as string | undefined)?.toLowerCase() ?? "";
+      const license = vehicle.license_plate?.toLowerCase() ?? "";
+      return (
+        name.includes(normalizedQuery) ||
+        type.includes(normalizedQuery) ||
+        license.includes(normalizedQuery)
+      );
+    });
+  }, [activeVehicles, vehicleSearch]);
   const sensors = useSensors(useSensor(PointerSensor));
 
-  const calendarModifiers = {
-    today: new Date(),
-    pending: daysWithPendingTasks,
-    busy: daysWithTasks,
-  };
-
-  const modifiersClassNames = {
-    today: "bg-orange-500 text-white hover:bg-orange-600 rounded-md font-medium ring-2 ring-orange-300",
-    pending: "bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 rounded-md font-medium",
-    busy: "bg-orange-200 text-orange-900 dark:bg-orange-900/50 dark:text-orange-200 rounded-md font-medium",
-  };
+  const calendarModifiers = useMemo(
+    () => ({
+      today: new Date(),
+      pending: daysWithPendingTasks,
+      busy: daysWithTasks,
+    }),
+    [daysWithPendingTasks, daysWithTasks]
+  );
 
   const formatTaskTime = (task: Task) => {
-    const start = task.start_date ? dayjs(task.start_date).format('HH:mm') : '--';
-    const end = task.end_date ? dayjs(task.end_date).format('HH:mm') : '--';
-    return `${start} - ${end}`;
+    const startLabel = task.start_date ? dayjs(task.start_date).format("HH:mm") : "--";
+    const endLabel = task.end_date ? dayjs(task.end_date).format("HH:mm") : "--";
+    return `${startLabel} - ${endLabel}`;
   };
 
   const refreshCalendarData = useCallback(async () => {
@@ -101,18 +166,17 @@ export default function InstallationsPage() {
         const taskDate = parseISO(task.start_date);
         if (Number.isNaN(taskDate.getTime())) return;
 
-        const dateKey = format(taskDate, "yyyy-MM-dd");
-        taskDays.add(dateKey);
-
+        const key = format(taskDate, "yyyy-MM-dd");
+        taskDays.add(key);
         if (task.state !== "terminado") {
-          pendingDays.add(dateKey);
+          pendingDays.add(key);
         }
       });
 
-      setDaysWithPendingTasks(Array.from(pendingDays).map((dateStr) => parseISO(dateStr)));
-      setDaysWithTasks(Array.from(taskDays).map((dateStr) => parseISO(dateStr)));
+      setDaysWithPendingTasks(Array.from(pendingDays).map((entry) => parseISO(entry)));
+      setDaysWithTasks(Array.from(taskDays).map((entry) => parseISO(entry)));
     } catch (error) {
-      console.error("Error fetching calendar data:", error);
+      console.error("Error refreshing calendar markers:", error);
     }
   }, []);
 
@@ -126,9 +190,7 @@ export default function InstallationsPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "screen_data" },
-        () => {
-          refreshCalendarData();
-        }
+        () => refreshCalendarData()
       )
       .subscribe();
 
@@ -141,175 +203,133 @@ export default function InstallationsPage() {
     setSelectedTask(task);
     setIsTaskDialogOpen(true);
   };
-  
+
   const handleEditUser = (user: Profile) => {
     setSelectedUser(user);
     setIsUserDialogOpen(true);
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    if (event.active.id.toString().startsWith("sidebar-item-")) {
+      setDraggedItem(event.active.data.current as { type: "user" | "vehicle"; item: Profile | Vehicle });
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    // Always clear dragged item
     setDraggedItem(null);
+    const { active, over } = event;
+    if (!over) return;
 
-    if (!over) {
+    const activeIsDraggableItem = active.id.toString().startsWith("sidebar-item-");
+    const overIsTaskRow = tasks.some((task) => task.id === over.id);
+
+    if (activeIsDraggableItem && overIsTaskRow) {
+      const payload = active.data.current as { type: "user" | "vehicle"; item: Profile | Vehicle };
+      assignToTaskMutation.mutate(
+        { taskId: over.id.toString(), itemId: payload.item.id, type: payload.type },
+        {
+          onSuccess: () => refetch(),
+          onError: () =>
+            toast.error(
+              `Error al asignar ${payload.type === "user" ? "operario" : "vehiculo"}`
+            ),
+        }
+      );
       return;
     }
 
-    const activeIsDraggableItem = active.id.toString().startsWith('sidebar-item-');
-    const overIsTaskRow = tasks.some(t => t.id === over.id);
+    if (active.id === over.id) return;
+    const oldIndex = tasks.findIndex((task) => task.id === active.id);
+    const newIndex = tasks.findIndex((task) => task.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-    if (activeIsDraggableItem && overIsTaskRow) {
-      // Handle assignment of users/vehicles to tasks
-      const { type, item } = active.data.current as { type: string; item: Profile | Vehicle };
-      const taskId = over.id.toString();
-      console.log('Assigning', type, item.id, 'to task', taskId);
-      assignToTaskMutation.mutate(
-        { taskId, itemId: item.id, type: type as 'user' | 'vehicle' },
-        {
-          onSuccess: () => {
-            console.log('Assignment successful');
-            refetch(); // Force refetch to update UI immediately
-          },
-          onError: (error) => {
-            console.error('Assignment failed:', error);
-            toast.error(`Error al asignar ${type === 'user' ? 'operario' : 'vehículo'}`);
-          }
-        }
-      );
-    }
-    else if (active.id !== over.id) {
-      // Handle task reordering with optimistic updates
-      const oldIndex = tasks.findIndex((t) => t.id === active.id);
-      const newIndex = tasks.findIndex((t) => t.id === over.id);
-
-      if (oldIndex === -1 || newIndex === -1) {
-        return;
-      }
-
-      // Optimistic update: immediately reorder the local state
-      const newTasksOrder = arrayMove(tasks, oldIndex, newIndex);
-
-      // Update local state immediately for better UX
-      // Note: This will be overridden by the query refetch, but provides instant feedback
-      // We need to be careful not to cause infinite re-renders
-
-      // Call the mutation to persist the order
-      updateOrderMutation.mutate(newTasksOrder, {
-        onSuccess: () => {
-          console.log('Task order updated successfully');
-          // The query will refetch automatically due to the mutation
-        },
-        onError: (error) => {
-          console.error('Failed to update task order:', error);
-          toast.error('Error al reordenar tareas');
-          // Note: The UI will be corrected by the next successful query refetch
-        }
-      });
-    }
+    const nextOrder = arrayMove(tasks, oldIndex, newIndex);
+    updateOrderMutation.mutate(nextOrder, {
+      onError: () => toast.error("Error al reordenar tareas"),
+    });
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    if (event.active.id.toString().startsWith('sidebar-item-')) {
-      setDraggedItem(event.active.data.current as { type: string; item: Profile | Vehicle });
-    }
-  };
-  
   const handleShare = () => {
     if (date) {
-        createSharedPlanMutation.mutate(date);
+      createSharedPlanMutation.mutate(date);
     }
   };
 
   const handleSendWhatsApp = async () => {
     if (!date || tasks.length === 0) {
-      toast.error('No hay tareas para compartir');
+      toast.error("No hay tareas para compartir");
       return;
     }
 
     setIsSendingWhatsApp(true);
     try {
-      // Agrupar tareas por operario
-      const tasksByUser = tasks.reduce((acc, task) => {
-        task.assigned_users.forEach(user => {
+      const tasksByUser = tasks.reduce<Record<string, { user: Profile; tasks: Task[] }>>((acc, task) => {
+        task.assigned_users.forEach((user) => {
           if (!acc[user.id]) {
-            acc[user.id] = {
-              user,
-              tasks: []
-            };
+            acc[user.id] = { user, tasks: [] };
           }
           acc[user.id].tasks.push(task);
         });
         return acc;
-      }, {} as Record<string, { user: Profile; tasks: Task[] }>);
+      }, {});
 
-      // Enviar notificación a cada operario
-      const notifications = [];
-      
-      for (const [userId, { user, tasks: userTasks }] of Object.entries(tasksByUser)) {
-        if (!user.phone) {
-          console.warn(`Usuario ${user.full_name} no tiene teléfono`);
-          continue;
-        }
+      const notificationsSent: string[] = [];
 
-        // Generar token único
-        const accessToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        
-        // Guardar notificación en base de datos
+      for (const { user, tasks: userTasks } of Object.values(tasksByUser)) {
+        if (!user.phone) continue;
+
         const { data: notification, error: notificationError } = await supabase
-          .from('task_notifications')
+          .from("task_notifications")
           .insert({
-            profile_id: userId,
-            task_ids: userTasks.map(t => t.id),
+            profile_id: user.id,
+            task_ids: userTasks.map((task) => task.id),
             plan_date: date.toISOString(),
-            access_token: accessToken,
-            sent_at: new Date().toISOString()
+            access_token: crypto.randomUUID(),
+            sent_at: new Date().toISOString(),
           })
           .select()
           .single();
 
         if (notificationError) {
-          console.error('Error saving notification:', notificationError);
+          console.error("Error saving notification", notificationError);
           continue;
         }
 
-        // Preparar mensaje para WhatsApp
-        const tasksForMessage = userTasks.map(task => ({
-          site: task.data?.site || 'Sin sitio',
-          address: task.data?.address || 'Sin dirección',
-          time: `${dayjs(task.start_date).format('HH:mm')} - ${dayjs(task.end_date).format('HH:mm')}`,
-          vehicle: task.assigned_vehicles?.map(v => v.name).join(', ')
+        const whatsappTasks = userTasks.map((task) => ({
+          site: task.data?.site || "Sin sitio",
+          address: task.data?.address || "Sin direccion",
+          time: `${dayjs(task.start_date).format("HH:mm")} - ${dayjs(task.end_date).format("HH:mm")}`,
+          vehicle: task.assigned_vehicles?.map((vehicle) => vehicle.name).join(", "),
         }));
 
-        const message = `Hola ${user.full_name}, aquí está tu plan de trabajo para hoy (${dayjs(date).format('DD/MM/YYYY')}):`;
+        const message = `Hola ${user.full_name}, aqui esta tu plan de trabajo para hoy (${dayjs(date).format(
+          "DD/MM/YYYY"
+        )}):`;
 
-        // Llamar a la Edge Function
-        const { error: whatsappError } = await supabase.functions.invoke('send-whatsapp-notification', {
+        const { error: whatsappError } = await supabase.functions.invoke("send-whatsapp-notification", {
           body: {
             to: user.phone,
             message,
-            tasks: tasksForMessage
-          }
+            tasks: whatsappTasks,
+          },
         });
 
         if (whatsappError) {
-          console.error('Error sending WhatsApp:', whatsappError);
-          toast.error(`Error al enviar WhatsApp a ${user.full_name}`);
+          console.error("Error sending WhatsApp", whatsappError);
+          toast.error(`No se pudo enviar WhatsApp a ${user.full_name}`);
         } else {
-          notifications.push({ user: user.full_name, sent: true });
+          notificationsSent.push(notification?.id ?? "");
         }
       }
 
-      if (notifications.length > 0) {
-        toast.success(`Notificaciones enviadas a ${notifications.length} operarios`);
+      if (notificationsSent.length > 0) {
+        toast.success(`Notificaciones enviadas a ${notificationsSent.length} operarios`);
       } else {
-        toast.error('No se pudo enviar ninguna notificación');
+        toast.error("No se pudo enviar ninguna notificacion");
       }
-
     } catch (error) {
-      console.error('Error in handleSendWhatsApp:', error);
-      toast.error('Error al enviar notificaciones por WhatsApp');
+      console.error("Error in handleSendWhatsApp:", error);
+      toast.error("Error al enviar notificaciones por WhatsApp");
     } finally {
       setIsSendingWhatsApp(false);
     }
@@ -317,7 +337,7 @@ export default function InstallationsPage() {
 
   const refreshData = () => {
     refetch();
-    onDataUpdate();
+    refreshAdminData();
   };
 
   if (!isManagerView) {
@@ -327,7 +347,7 @@ export default function InstallationsPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-semibold">Calendario de instalaciones</CardTitle>
             <CardDescription>
-              Selecciona una fecha para ver las tareas asignadas. Los días resaltados en naranja tienen tareas pendientes.
+              Selecciona una fecha para ver las tareas asignadas. Los dias resaltados en naranja tienen tareas pendientes.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
@@ -337,7 +357,7 @@ export default function InstallationsPage() {
               onSelect={setDate}
               initialFocus
               modifiers={calendarModifiers}
-              modifiersClassNames={modifiersClassNames}
+              modifiersClassNames={CALENDAR_CLASSNAMES}
               className="rounded-md border"
             />
           </CardContent>
@@ -346,17 +366,15 @@ export default function InstallationsPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-semibold">
-              Tareas para {date ? dayjs(date).format('dddd, D [de] MMMM') : '...'}
+              Tareas para {date ? dayjs(date).format("dddd, D [de] MMMM") : "..."}
             </CardTitle>
-            <CardDescription>
-              Visualiza tus asignaciones del día. Esta vista es solo informativa.
-            </CardDescription>
+            <CardDescription>Visualiza tus asignaciones del dia. Esta vista es solo informativa.</CardDescription>
           </CardHeader>
           <CardContent>
             {loadingTasks ? (
               <div className="space-y-3">
-                <div className="h-16 w-full animate-pulse rounded-md bg-muted" />
-                <div className="h-16 w-full animate-pulse rounded-md bg-muted" />
+                <div className="h-16 w-full animate-pulse rounded-xl bg-muted" />
+                <div className="h-16 w-full animate-pulse rounded-xl bg-muted" />
               </div>
             ) : tasks.length === 0 ? (
               <div className="rounded-md border-2 border-dashed border-muted p-6 text-center text-sm text-muted-foreground">
@@ -365,35 +383,33 @@ export default function InstallationsPage() {
             ) : (
               <div className="space-y-3">
                 {tasks.map((task) => (
-                  <div key={task.id} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-1">
-                        <h3 className="text-base font-semibold">
-                          {task.data?.site ?? task.data?.location ?? 'Sin sitio definido'}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {formatTaskTime(task)} • Responsable: {task.responsible?.full_name ?? 'Falta responsable'}
-                        </p>
-                        {task.data?.description && (
+                  <Card key={task.id}>
+                    <CardContent className="space-y-3 p-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1">
+                          <h3 className="text-base font-semibold">
+                            {task.data?.site ?? task.data?.location ?? "Sin sitio definido"}
+                          </h3>
                           <p className="text-sm text-muted-foreground">
-                            {task.data.description}
+                            {formatTaskTime(task)} · Responsable: {task.responsible?.full_name ?? "Falta responsable"}
                           </p>
-                        )}
+                          {task.data?.description && (
+                            <p className="text-sm text-muted-foreground">{task.data.description}</p>
+                          )}
+                        </div>
+                        <Badge className="self-start uppercase">{task.state ?? "pendiente"}</Badge>
                       </div>
-                      <Badge className="self-start uppercase">
-                        {task.state ?? 'pendiente'}
-                      </Badge>
-                    </div>
-                    {task.assigned_users && task.assigned_users.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {task.assigned_users.map((user) => (
-                          <Badge key={user.id} variant="outline" className="capitalize">
-                            {user.full_name}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                      {task.assigned_users.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {task.assigned_users.map((user) => (
+                            <Badge key={user.id} variant="outline" className="capitalize">
+                              {user.full_name}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
@@ -404,7 +420,7 @@ export default function InstallationsPage() {
   }
 
   return (
-    <>
+    <div className="space-y-6">
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
@@ -413,126 +429,167 @@ export default function InstallationsPage() {
       >
         <DragOverlay>
           {draggedItem && (
-            <div className="bg-white border-2 border-primary rounded-md shadow-lg p-2 opacity-90">
-              {draggedItem.type === 'user' ? (
+            <div className="rounded-md border border-slate-200 bg-card px-3 py-2">
+              {draggedItem.type === "user" ? (
                 <div className="flex items-center gap-2">
-                  <StatusBadge
-                    status={(draggedItem.item as Profile).status}
-                    size="sm"
-                  />
-                  <span className="font-medium">{(draggedItem.item as Profile).full_name}</span>
+                  <StatusBadge status={(draggedItem.item as Profile).status} size="sm" />
+                  <span className="text-sm font-medium">{(draggedItem.item as Profile).full_name}</span>
                 </div>
               ) : (
                 <VehicleBadge
                   name={(draggedItem.item as Vehicle).name}
                   type={(draggedItem.item as Vehicle).type}
                   size="sm"
+                  className="text-sm"
                 />
               )}
             </div>
           )}
         </DragOverlay>
-        {/* 2-column responsive grid layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] gap-4">
-          {/* Left column: Calendar + Operators + Vehicles */}
+
+        <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
           <div className="space-y-4">
-            {/* Calendar at top left */}
             <Card>
-              <CardContent className="pt-6 flex justify-center">
+              <CardContent className="flex justify-center pt-6">
                 <Calendar
-                   mode="single"
-                   selected={date}
-                   onSelect={setDate}
-                   locale={es}
+                  mode="single"
+                  selected={date}
+                  onSelect={setDate}
+                  locale={es}
                   modifiers={calendarModifiers}
-                  modifiersClassNames={modifiersClassNames}
-                 />
+                  modifiersClassNames={CALENDAR_CLASSNAMES}
+                />
               </CardContent>
             </Card>
 
-            {/* Operators card below calendar */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
+              <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <Users className="h-4 w-4" />
                   Operarios
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-64">
-                  <div className="space-y-2">
-                    {users.map(user => {
-                      const tasksCount = tasks.filter(t => t.assigned_users.some(u => u.id === user.id)).length;
-                      const isOverloaded = tasksCount > 1;
+              <CardContent className="space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    aria-label="Buscar operario"
+                    value={operatorSearch}
+                    onChange={(event) => setOperatorSearch(event.target.value)}
+                    placeholder="Buscar operario..."
+                    className="pl-9"
+                  />
+                </div>
+                <ScrollArea className="h-72 pr-2">
+                  {filteredUsers.length === 0 ? (
+                    <div className="flex h-full items-center justify-center px-3 text-sm text-muted-foreground">
+                      {operatorSearch ? "Sin resultados para la busqueda" : "No hay operarios activos"}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 pr-1">
+                      {filteredUsers.map((user) => {
+                        const taskAmount = taskCountByProfile.get(user.id) ?? 0;
+                        const isOverloaded = taskAmount > 1;
+                        const statusClasses =
+                          user.status === "activo"
+                            ? "bg-[#e8f5ed] text-[#276749] dark:bg-emerald-900/40 dark:text-emerald-200"
+                            : user.status === "vacaciones"
+                            ? "bg-[#fff3e6] text-[#b36109] dark:bg-amber-900/40 dark:text-amber-200"
+                            : "bg-[#ffe8e6] text-[#b91c1c] dark:bg-red-900/40 dark:text-red-200";
 
-                      return (
-                        <div key={user.id} className="group flex items-center gap-2">
-                          <DraggableSidebarItem item={{...user, tasksCount}}>
-                            <div className={`flex items-center gap-2 px-4 py-2 rounded-md flex-1 ${
-                                user.status === 'activo' ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' :
-                                user.status === 'vacaciones' ? 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300' :
-                                'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                            }`}>
-                                <User className="h-4 w-4 flex-shrink-0" />
-                                <span className="text-sm font-medium">{user.full_name}</span>
-                            </div>
-                            {isOverloaded && (
-                                <Badge variant="destructive" className="h-6 w-6 p-0 flex items-center justify-center rounded-full text-xs">
-                                    {tasksCount}
-                                </Badge>
-                            )}
-                          </DraggableSidebarItem>
-                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        return (
+                          <div key={user.id} className="group flex items-center gap-2">
+                            <DraggableSidebarItem item={{ ...user, tasksCount: taskAmount }} className="min-w-0 flex-1">
+                              <div
+                                className={cn(
+                                  "flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-sm font-medium",
+                                  statusClasses
+                                )}
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <Users className="h-4 w-4" />
+                                  <span className="max-w-[180px] truncate text-sm font-medium">{user.full_name}</span>
+                                </div>
+                                {taskAmount > 0 && (
+                                  <Badge
+                                    variant={isOverloaded ? "destructive" : "secondary"}
+                                    className="h-5 min-w-[1.5rem] justify-center px-2 text-xs"
+                                    title={`${taskAmount} tareas asignadas`}
+                                  >
+                                    {taskAmount}
+                                  </Badge>
+                                )}
+                              </div>
+                            </DraggableSidebarItem>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6"
+                              className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
                               onClick={() => handleEditUser(user)}
                             >
-                              <User className="h-4 w-4" />
+                              <Users className="h-4 w-4" />
                             </Button>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </ScrollArea>
               </CardContent>
             </Card>
 
-            {/* Vehicles card below operators */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <Car className="h-4 w-4" />
-                  Vehículos
+                  Vehiculos
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-64">
-                  <div className="space-y-2">
-                    {vehicles.map(vehicle => (
-                      <DraggableSidebarItem key={vehicle.id} item={{...vehicle, type: 'vehicle'}}>
-                        <VehicleBadge
-                          name={vehicle.name}
-                          type={vehicle.type}
-                          size="sm"
-                          className="w-full justify-start"
-                        />
-                      </DraggableSidebarItem>
-                    ))}
-                  </div>
+              <CardContent className="space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    aria-label="Buscar vehiculo"
+                    value={vehicleSearch}
+                    onChange={(event) => setVehicleSearch(event.target.value)}
+                    placeholder="Buscar vehiculo..."
+                    className="pl-9"
+                  />
+                </div>
+                <ScrollArea className="h-72 pr-2">
+                  {filteredVehicles.length === 0 ? (
+                    <div className="flex h-full items-center justify-center px-3 text-sm text-muted-foreground">
+                      {vehicleSearch ? "Sin resultados para la busqueda" : "No hay vehiculos activos"}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 pr-1">
+                      {filteredVehicles.map((vehicle) => (
+                        <DraggableSidebarItem key={vehicle.id} item={{ ...vehicle, type: "vehicle" }} className="block">
+                          <VehicleBadge
+                            name={vehicle.name}
+                            type={vehicle.type}
+                            size="sm"
+                            className="w-full justify-start"
+                          />
+                        </DraggableSidebarItem>
+                      ))}
+                    </div>
+                  )}
                 </ScrollArea>
               </CardContent>
             </Card>
           </div>
 
-          {/* Right column: Planning section at the same level as calendar */}
           <div className="space-y-4">
-            <div className="flex flex-col gap-4">
-              <h2 className="text-xl sm:text-2xl font-bold">
-                Planificación para: {date ? dayjs(date).format('dddd, D [de] MMMM') : '...'}
-              </h2>
+            <div className="flex flex-col gap-3 rounded-md border border-dashed border-muted bg-card/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  Planificacion para: {date ? dayjs(date).format("dddd, D [de] MMMM") : "..."}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Gestiona las tareas para esta fecha, asigna equipos y comparte el plan.
+                </p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={handleShare} size="sm" className="sm:size-default">
                   <Share2 className="h-4 w-4 sm:mr-2" />
@@ -546,16 +603,25 @@ export default function InstallationsPage() {
                   className="sm:size-default"
                 >
                   <MessageSquare className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">{isSendingWhatsApp ? 'Enviando...' : 'Enviar WhatsApp'}</span>
-                  <span className="sm:hidden">{isSendingWhatsApp ? '...' : 'WA'}</span>
+                  <span className="hidden sm:inline">
+                    {isSendingWhatsApp ? "Enviando..." : "Enviar WhatsApp"}
+                  </span>
+                  <span className="sm:hidden">{isSendingWhatsApp ? "..." : "WA"}</span>
                 </Button>
                 <Button variant="outline" size="sm" className="sm:size-default">
                   <Download className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Exportar</span>
                 </Button>
-                <Button onClick={() => { setSelectedTask(null); setIsTaskDialogOpen(true); }} size="sm" className="sm:size-default">
+                <Button
+                  onClick={() => {
+                    setSelectedTask(null);
+                    setIsTaskDialogOpen(true);
+                  }}
+                  size="sm"
+                  className="sm:size-default"
+                >
                   <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Añadir Tarea</span>
+                  <span className="hidden sm:inline">Anadir Tarea</span>
                   <span className="sm:hidden">Nueva</span>
                 </Button>
               </div>
@@ -563,8 +629,10 @@ export default function InstallationsPage() {
 
             <Card>
               <CardContent className="p-0">
-                {loadingTasks ? <div className="p-8 text-center">Cargando...</div> : (
-                  <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                {loadingTasks ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">Cargando...</div>
+                ) : (
+                  <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
                     <DailyTaskTable tasks={tasks} onEditTask={handleEditTask} onRefresh={refreshData} />
                   </SortableContext>
                 )}
@@ -589,12 +657,12 @@ export default function InstallationsPage() {
 
       {isUserDialogOpen && (
         <UserDialog
-            open={isUserDialogOpen}
-            onOpenChange={setIsUserDialogOpen}
-            onSuccess={onDataUpdate}
-            user={selectedUser}
+          open={isUserDialogOpen}
+          onOpenChange={setIsUserDialogOpen}
+          onSuccess={refreshAdminData}
+          user={selectedUser}
         />
       )}
-    </>
+    </div>
   );
 }

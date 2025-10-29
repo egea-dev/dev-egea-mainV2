@@ -63,11 +63,7 @@ export const DraggableTableRow = ({ task, onEditTask, onDeleteTask }: DraggableT
     <TableRow
       ref={setNodeRef}
       style={style}
-      className={cn(
-        "transition-shadow",
-        isOver && "bg-accent",
-        isDragging && "opacity-50"
-      )}
+      className={cn(isOver && "bg-accent", isDragging && "opacity-50")}
     >
       <TableCell className="w-[50px]">
         <div {...listeners} {...attributes} className="cursor-grab p-2 -m-2">

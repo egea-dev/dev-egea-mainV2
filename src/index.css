@@ -28,6 +28,12 @@
     --muted: 220 14.3% 95.9%;
     --muted-foreground: 220 8.9% 46.1%;
 
+    /* Tonos de feedback adicionales */
+    --info: 199 94% 76%;
+    --info-foreground: 210 24% 32%;
+    --warning: 43 96% 56%;
+    --warning-foreground: 24 32% 18%;
+
     /* Accent */
     --accent: 220 14.3% 95.9%;
     --accent-foreground: 222.2 47.4% 11.2%;
@@ -38,6 +44,7 @@
 
     /* Bordes e inputs */
     --border: 220 13% 91%;
+    --input: 220 13% 91%;
     --ring: 14 100% 63%;
 
     /* Radio de bordes más redondeado */
@@ -64,6 +71,10 @@
     --border: 220 16% 28%;
     --input: 220 16% 28%;
     --ring: 14 100% 63%;
+    --info: 199 92% 62%;
+    --info-foreground: 210 32% 92%;
+    --warning: 43 100% 62%;
+    --warning-foreground: 220 22% 14%;
   }
 }
 
@@ -87,10 +98,6 @@
   }
 
   /* Mejorar sombras de tarjetas para más profundidad */
-  .card-shadow {
-    @apply shadow-md hover:shadow-lg transition-shadow duration-200;
-  }
-
   /* Estilos para tablas con mejor espaciado */
   .table-spacing td,
   .table-spacing th {
@@ -117,7 +124,7 @@
     color: white;
     font-weight: bold;
     border-radius: 0.375rem;
-    box-shadow: 0 0 0 2px hsl(14 100% 80%);
+    border: 2px solid hsl(14 100% 80%);
   }
 
   .rdp-day_pending {
@@ -134,59 +141,60 @@
 
   /* Enhanced calendar styling */
   .rdp {
-    --rdp-cell-size: 40px;
     --rdp-accent-color: hsl(var(--primary));
-    --rdp-background-color: hsl(var(--accent) / 0.1);
-    --rdp-outline: 2px solid var(--rdp-accent-color);
-    --rdp-outline-selected: 2px solid hsl(var(--primary));
+    --rdp-outline: 2px solid hsl(var(--primary));
+    font-family: inherit;
   }
 
-  .rdp-months {
-    gap: 1rem;
-  }
-
-  .rdp-month {
-    background-color: hsl(var(--card));
-    border-radius: var(--radius);
-    padding: 1rem;
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  }
-
-  .rdp-caption {
-    margin-bottom: 1rem;
-  }
-
-  .rdp-caption_label {
-    font-size: 1.125rem;
+  .rdp-nav.button_previous,
+  .rdp-nav.button_next {
+    border-radius: 9999px;
+    color: hsl(var(--primary));
     font-weight: 600;
-    color: hsl(var(--foreground));
-  }
-
-  .rdp-nav_button {
-    width: 2rem;
-    height: 2rem;
-    border-radius: 0.375rem;
     transition: all 0.2s;
   }
 
-  .rdp-nav_button:hover {
-    background-color: hsl(var(--accent));
-    color: hsl(var(--accent-foreground));
-  }
-
-  .rdp-head_cell {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: hsl(var(--muted-foreground));
-    padding: 0.5rem 0;
+  .rdp-nav.button_previous:hover,
+  .rdp-nav.button_next:hover {
+    background-color: hsl(var(--primary) / 0.12);
   }
 
   .rdp-day {
-    width: 2.5rem;
-    height: 2.5rem;
+    transition: all 0.2s ease;
     border-radius: 0.375rem;
-    transition: all 0.2s;
+  }
+
+  .rdp-day:not([disabled]):hover {
+    transform: translateY(-1px);
+  }
+
+  .rdp-today {
     position: relative;
+    font-weight: 700;
+  }
+
+  /* Estilos para el calendario embebido */
+  .rdp-month {
+    width: 100%;
+  }
+
+  .rdp-weeknumber,
+  .rdp-cell {
+    padding: 0.25rem;
+  }
+
+  .rdp-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0.25rem;
+  }
+
+  .rdp-head_cell {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: hsl(var(--muted-foreground));
   }
 
   .rdp-day:hover {
@@ -238,57 +246,57 @@
 }
 @layer utilities {
   .bg-pulse-neutral {
-    background-color: #ffffff;
-    color: #000000;
+    background-color: hsl(var(--card));
+    color: hsl(var(--foreground));
     animation: bg-pulse-neutral 1.8s ease-in-out infinite;
   }
 
   .bg-pulse-danger {
-    background-color: #fee2e2;
-    color: #000000;
+    background-color: hsl(var(--destructive) / 0.18);
+    color: hsl(var(--destructive-foreground));
     animation: bg-pulse-danger 1.8s ease-in-out infinite;
   }
 
   .bg-pulse-info {
-    background-color: #bae6fd;
-    color: #000000;
+    background-color: hsl(var(--info) / 0.25);
+    color: hsl(var(--info-foreground));
     animation: bg-pulse-info 1.8s ease-in-out infinite;
   }
 
   .bg-pulse-warning {
-    background-color: #fde68a;
-    color: #000000;
+    background-color: hsl(var(--warning) / 0.25);
+    color: hsl(var(--warning-foreground));
     animation: bg-pulse-warning 1.8s ease-in-out infinite;
   }
 
   .bg-pulse-critical {
-    background-color: #fca5a5;
-    color: #000000;
+    background-color: hsl(var(--destructive) / 0.35);
+    color: hsl(var(--destructive-foreground));
     animation: bg-pulse-critical 1.8s ease-in-out infinite;
   }
 }
 
 @keyframes bg-pulse-neutral {
-  0%, 100% { background-color: #ffffff; }
-  50% { background-color: #f3f4f6; }
+  0%, 100% { background-color: hsl(var(--card)); }
+  50% { background-color: hsl(var(--card) / 0.85); }
 }
 
 @keyframes bg-pulse-danger {
-  0%, 100% { background-color: #fee2e2; }
-  50% { background-color: #fecaca; }
+  0%, 100% { background-color: hsl(var(--destructive) / 0.18); }
+  50% { background-color: hsl(var(--destructive) / 0.32); }
 }
 
 @keyframes bg-pulse-info {
-  0%, 100% { background-color: #bae6fd; }
-  50% { background-color: #7dd3fc; }
+  0%, 100% { background-color: hsl(var(--info) / 0.25); }
+  50% { background-color: hsl(var(--info) / 0.38); }
 }
 
 @keyframes bg-pulse-warning {
-  0%, 100% { background-color: #fde68a; }
-  50% { background-color: #fcd34d; }
+  0%, 100% { background-color: hsl(var(--warning) / 0.25); }
+  50% { background-color: hsl(var(--warning) / 0.4); }
 }
 
 @keyframes bg-pulse-critical {
-  0%, 100% { background-color: #fca5a5; }
-  50% { background-color: #f87171; }
+  0%, 100% { background-color: hsl(var(--destructive) / 0.35); }
+  50% { background-color: hsl(var(--destructive) / 0.5); }
 }

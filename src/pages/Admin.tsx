@@ -153,6 +153,15 @@ const mapDetailedTaskToTask = (task: DetailedTask): Task => {
     return lowered === "n/a" ? undefined : text;
   };
 
+  const parseNumberValue = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
   const normalizeProfileRole = (value: unknown, fallback: Profile["role"] = "operario"): Profile["role"] => {
     const roleText = pickString(value)?.toLowerCase();
     if (!roleText) return fallback;
@@ -261,6 +270,19 @@ const mapDetailedTaskToTask = (task: DetailedTask): Task => {
 
   const resolvedSite = resolveField(DEFAULT_SITE_FIELDS, pickString(task.site));
   const resolvedDescription = resolveField(DEFAULT_DESCRIPTION_FIELDS, pickString(task.description));
+  const workSiteId = pickString(task.work_site_id);
+  const workSiteName = pickMeaningfulString(task.work_site_name);
+  const workSiteAlias = pickMeaningfulString(task.work_site_alias);
+  const workSiteAddress = pickMeaningfulString(task.work_site_address);
+  const workSiteCity = pickMeaningfulString(task.work_site_city);
+  const workSiteProvince = pickMeaningfulString(task.work_site_province);
+  const workSitePostalCode = pickMeaningfulString(task.work_site_postal_code);
+  const workSiteLatitude = parseNumberValue(task.work_site_latitude);
+  const workSiteLongitude = parseNumberValue(task.work_site_longitude);
+  const workSiteMapsUrl = pickMeaningfulString(task.work_site_maps_url);
+  const workSiteImagotipo = typeof task.work_site_imagotipo_enabled === "boolean"
+    ? task.work_site_imagotipo_enabled
+    : null;
 
   return {
     id: task.id,
@@ -271,6 +293,17 @@ const mapDetailedTaskToTask = (task: DetailedTask): Task => {
     state: normalizedState,
     status: normalizedStatus,
     location: task.location ?? null,
+    work_site_id: workSiteId ?? null,
+    work_site_name: workSiteName ?? null,
+    work_site_alias: workSiteAlias ?? null,
+    work_site_address: workSiteAddress ?? null,
+    work_site_city: workSiteCity ?? null,
+    work_site_province: workSiteProvince ?? null,
+    work_site_postal_code: workSitePostalCode ?? null,
+    work_site_latitude: workSiteLatitude,
+    work_site_longitude: workSiteLongitude,
+    work_site_maps_url: workSiteMapsUrl ?? null,
+    work_site_imagotipo_enabled: workSiteImagotipo,
     data: (task.data ?? {}) as Task["data"],
     responsible_profile_id: task.responsible_profile_id ?? null,
     site: resolvedSite,
@@ -1239,12 +1272,21 @@ export default function AdminPage() {
                     const departureLabel = formatSessionTimestamp(sessionSummary?.lastDeparture);
                     const isTerminated = (task.state ?? '').toLowerCase() === 'terminado';
                     const mappedTask = mapDetailedTaskToTask(task);
-                    const locationLabel = normalizeTaskLocation(mappedTask);
-                    const hasMaps = Boolean(locationLabel);
-                    const siteLabel = mappedTask.site
+                    const resolvedLocation = normalizeTaskLocation(task);
+                    const workSiteAddress = typeof task.work_site_address === 'string' && task.work_site_address.trim().length
+                      ? task.work_site_address.trim()
+                      : null;
+                    const workSiteName = typeof task.work_site_name === 'string' && task.work_site_name.trim().length
+                      ? task.work_site_name.trim()
+                      : null;
+                    const siteLabel = workSiteAddress
+                      ?? workSiteName
+                      ?? mappedTask.site
                       ?? (typeof task.data?.site === 'string' ? task.data.site : null)
                       ?? (typeof task.data?.client === 'string' ? task.data.client : null)
                       ?? 'Sin sitio asignado';
+                    const mapsEnabled = Boolean(task.work_site_imagotipo_enabled);
+                    const hasMaps = mapsEnabled && Boolean(resolvedLocation || task.work_site_maps_url);
 
                     return (
                     <TableRow key={task.id} className="hover:bg-muted/50">
@@ -1300,18 +1342,24 @@ export default function AdminPage() {
                           })()}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm font-medium">
-                        <Badge
-                          title={siteLabel}
-                          variant="outline"
-                          className={hasMaps
-                            ? "flex w-fit items-center gap-1 border-emerald-400 bg-emerald-100 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                            : "flex w-fit items-center gap-1 border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
-                          }
-                        >
-                          <MapPin className={`h-3.5 w-3.5 ${hasMaps ? "" : "opacity-60"}`} />
-                          {hasMaps ? 'Maps ON' : 'Maps OFF'}
-                        </Badge>
+                      <TableCell className="text-sm">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-start gap-2">
+                            <MapPin className="mt-1 h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium leading-5" title={siteLabel}>
+                              {siteLabel}
+                            </span>
+                          </div>
+                          {hasMaps && (
+                            <Badge
+                              variant="outline"
+                              title={task.work_site_maps_url ?? resolvedLocation ?? 'Abrir en Maps'}
+                              className="flex w-fit items-center gap-1 border-emerald-400 bg-emerald-100 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                            >
+                              Mapa disponible
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[220px] truncate" title={getTaskDescriptionLabel(task)}>
                         {getTaskDescriptionLabel(task)}
@@ -1359,7 +1407,7 @@ export default function AdminPage() {
                       <TableCell className="text-sm">
                         {sessionSummary ? (
                           sessionSummary.active ? (
-                            <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300">
+                          <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300">
                               Sesión en curso{arrivalLabel ? ` desde ${arrivalLabel}` : ''}
                             </Badge>
                           ) : (

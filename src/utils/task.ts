@@ -137,10 +137,81 @@ export const resolveTaskLocation = (
   const taskRecord = task as Record<string, unknown>;
   const dataCandidate = (taskRecord as { data?: unknown }).data;
   const dataRecord = isRecord(dataCandidate) ? dataCandidate : null;
+  const metadataCandidate = (taskRecord as { location_metadata?: unknown }).location_metadata;
+  const metadataRecord = isRecord(metadataCandidate) ? metadataCandidate : null;
+
+  const workSiteAddress = sanitizeCandidate(taskRecord.work_site_address);
+  const workSiteName = sanitizeCandidate(taskRecord.work_site_name);
+  const workSiteAlias = sanitizeCandidate(taskRecord.work_site_alias);
+  const workSiteLabel = workSiteAddress ?? workSiteName ?? workSiteAlias ?? sanitizeCandidate(
+    (metadataRecord && typeof metadataRecord.address === 'string') ? metadataRecord.address : null
+  );
+
+  const workSiteMapsUrl = sanitizeCandidate(
+    typeof taskRecord.work_site_maps_url === 'string' ? taskRecord.work_site_maps_url : null
+  );
+
+  const workSiteLat = (() => {
+    const fromTask = typeof taskRecord.work_site_latitude === 'number' ? taskRecord.work_site_latitude : null;
+    if (fromTask !== null && Number.isFinite(fromTask)) return fromTask;
+    const metaLat = metadataRecord && typeof metadataRecord.latitude === 'number' ? metadataRecord.latitude : null;
+    if (metaLat !== null && Number.isFinite(metaLat)) return metaLat;
+    const metaLatString =
+      metadataRecord && typeof metadataRecord.latitude === 'string' ? metadataRecord.latitude : null;
+    if (metaLatString) {
+      const parsed = Number(metaLatString);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  })();
+
+  const workSiteLng = (() => {
+    const fromTask = typeof taskRecord.work_site_longitude === 'number' ? taskRecord.work_site_longitude : null;
+    if (fromTask !== null && Number.isFinite(fromTask)) return fromTask;
+    const metaLng = metadataRecord && typeof metadataRecord.longitude === 'number' ? metadataRecord.longitude : null;
+    if (metaLng !== null && Number.isFinite(metaLng)) return metaLng;
+    const metaLngString =
+      metadataRecord && typeof metadataRecord.longitude === 'string' ? metadataRecord.longitude : null;
+    if (metaLngString) {
+      const parsed = Number(metaLngString);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  })();
+
+  if (workSiteLabel) {
+    const coordinates =
+      workSiteLat !== null && workSiteLng !== null ? { lat: workSiteLat, lng: workSiteLng } : null;
+    const normalizedLabel = (() => {
+      if (workSiteMapsUrl && (isHttpUrl(workSiteMapsUrl) || isGoogleMapsUrl(workSiteMapsUrl))) {
+        return coordinates ? `${coordinates.lat},${coordinates.lng}` : formatLocationLabel(workSiteLabel);
+      }
+      return formatLocationLabel(workSiteLabel);
+    })();
+
+    const url = (() => {
+      if (workSiteMapsUrl && (isHttpUrl(workSiteMapsUrl) || isGoogleMapsUrl(workSiteMapsUrl))) {
+        return workSiteMapsUrl;
+      }
+      if (coordinates) {
+        return buildMapsSearchUrl(`${coordinates.lat},${coordinates.lng}`);
+      }
+      return workSiteLabel ? buildMapsSearchUrl(workSiteLabel) : null;
+    })();
+
+    return {
+      rawLabel: workSiteLabel,
+      normalizedLabel: normalizedLabel?.length ? normalizedLabel : workSiteLabel,
+      coordinates,
+      url,
+      source: 'task.work_site',
+    };
+  }
 
   const recordSources: Array<{ record: Record<string, unknown> | null; prefix: string }> = [
     { record: taskRecord, prefix: "task" },
     { record: dataRecord, prefix: "task.data" },
+    { record: metadataRecord, prefix: "task.location_metadata" },
   ];
 
   for (const field of FIELD_PRIORITY) {

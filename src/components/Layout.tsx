@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   SidebarProvider,
   Sidebar,
@@ -115,10 +115,15 @@ const SidebarContentComponent = ({
                 tooltip={item.label}
                 isActive={isActive(item.path)}
               >
-                <Link to={item.path}>
+                <NavLink
+                  to={item.path}
+                  end={item.path === "/admin"}
+                  className="flex w-full items-center gap-3"
+                  aria-current={isActive(item.path) ? "page" : undefined}
+                >
                   <item.icon className="h-4 w-4 shrink-0" />
                   <span className={cn("truncate", isCollapsed && "hidden")}>{item.label}</span>
-                </Link>
+                </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
@@ -142,11 +147,19 @@ const SidebarContentComponent = ({
         )}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Configuración">
-              <Link to="/admin/settings">
+            <SidebarMenuButton
+              asChild
+              tooltip="Configuración"
+              isActive={isActive("/admin/settings")}
+            >
+              <NavLink
+                to="/admin/settings"
+                className="flex w-full items-center gap-3"
+                aria-current={isActive("/admin/settings") ? "page" : undefined}
+              >
                 <Settings className="h-4 w-4 shrink-0" />
                 <span className={cn(isCollapsed && "hidden")}>Configuración</span>
-              </Link>
+              </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -182,6 +195,7 @@ const MainLayout = ({
   previewRole: AppRole | null;
 }) => {
   const { isCollapsed, toggleSidebar } = useSidebar();
+  const resolvedRole = previewRole ?? profile?.role ?? null;
 
   return (
     <div className="relative flex min-h-screen w-full">
@@ -227,7 +241,7 @@ const MainLayout = ({
 
           <div className="flex items-center gap-4">
             <div className="hidden md:flex">
-              <HeaderStatus />
+              <HeaderStatus role={resolvedRole} />
             </div>
             <ThemeToggle />
           </div>
@@ -318,7 +332,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <HeaderStatus />
+            <HeaderStatus role={effectiveRole} />
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleLogout} className="hidden md:inline-flex">
               Cerrar sesion
@@ -375,6 +389,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
 };
 
 export default Layout;
+
 
 
 

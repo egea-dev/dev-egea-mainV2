@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { supabase } from "@/integrations/supabase/client"
 import { toast } from "sonner"
+import { upsertTask } from "@/lib/upsert-task"
 import { parseTemplatesFromWorkbook, ImportedTemplate, mapRowToTemplateData } from "@/lib/template-import"
 import { format } from "date-fns"
 
@@ -203,23 +204,21 @@ export const TemplateImportDialog = ({ open, onOpenChange, onImported }: Templat
             const startDate = getDateValue(dataPayload, ['start_date', 'fecha_inicio', 'fecha', 'date'])
             const endDate = getDateValue(dataPayload, ['end_date', 'fecha_fin', 'fecha_entrega'])
 
-            const { error } = await supabase.rpc('upsert_task', {
-              p_screen_id: selectedScreenId,
-              p_data: dataPayload,
-              p_state: 'pendiente',
-              p_status: 'pendiente',
-              p_start_date: startDate,
-              p_end_date: endDate,
-              p_location: location,
-              p_responsible_profile_id: null,
-              p_assigned_to: null,
-              p_assigned_profiles: [],
-              p_assigned_vehicles: []
+            await upsertTask(supabase, {
+              screenId: selectedScreenId,
+              data: dataPayload,
+              state: 'pendiente',
+              status: 'pendiente',
+              startDate: startDate ?? null,
+              endDate: endDate ?? null,
+              location,
+              locationMetadata: location ? { manual_label: location } : {},
+              workSiteId: null,
+              responsibleProfileId: null,
+              assignedTo: null,
+              assignedProfiles: [],
+              assignedVehicles: []
             })
-
-            if (error) {
-              throw error
-            }
           }
         }
       }

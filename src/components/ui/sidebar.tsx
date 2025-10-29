@@ -70,7 +70,7 @@ export const Sidebar = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
       <aside
         ref={ref}
         className={cn(
-          "fixed inset-y-0 left-0 z-10 hidden h-full flex-col border-r bg-card transition-all duration-300 md:flex",
+          "fixed inset-y-0 left-0 z-10 hidden h-full flex-col border-r border-border/60 bg-background/95 dark:bg-slate-950/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 dark:supports-[backdrop-filter]:bg-slate-950/75 transition-all duration-300 md:flex",
           isCollapsed ? "w-14" : "w-64",
           className
         )}
@@ -124,16 +124,20 @@ export const SidebarMenuButton = React.forwardRef<
     isActive?: boolean;
     tooltip?: string;
   }
->(({ isActive, tooltip, children, ...props }, ref) => {
+>(({ isActive, tooltip, children, className, ...props }, ref) => {
   const { isCollapsed } = useSidebar();
 
   const button = (
     <Button
       ref={ref}
-      variant={isActive ? "secondary" : "ghost"}
+      variant="ghost"
       className={cn(
-        "w-full justify-start gap-3",
-        isCollapsed && "h-9 w-9 justify-center p-0"
+        "w-full justify-start gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors",
+        "hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary",
+        isCollapsed && "h-10 w-10 justify-center p-0",
+        isActive &&
+          "bg-primary/15 text-primary ring-1 ring-primary/40 hover:bg-primary/20 hover:text-primary dark:bg-primary/25 dark:text-primary",
+        className
       )}
       {...props}
     >

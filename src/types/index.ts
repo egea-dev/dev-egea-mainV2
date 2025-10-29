@@ -40,6 +40,18 @@ export type Task = {
   state: TaskState;
   status: TaskStatus;
   location: string | null;
+  location_metadata?: JsonObject;
+  work_site_id?: string | null;
+  work_site_name?: string | null;
+  work_site_alias?: string | null;
+  work_site_address?: string | null;
+  work_site_city?: string | null;
+  work_site_province?: string | null;
+  work_site_postal_code?: string | null;
+  work_site_latitude?: number | null;
+  work_site_longitude?: number | null;
+  work_site_maps_url?: string | null;
+  work_site_imagotipo_enabled?: boolean | null;
   data: TaskData;
   responsible_profile_id: string | null;
   
