@@ -10,6 +10,9 @@ import {
   ClipboardList,
   UserCircle,
   Settings,
+  ShoppingCart,
+  Factory,
+  Package,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -24,12 +27,15 @@ export type AppNavItem = {
 const adminNav: AppNavItem[] = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/installations', label: 'Instalaciones', icon: CalendarCheck },
+  { path: '/admin/comercial', label: 'Comercial', icon: ShoppingCart },
   { path: '/admin/data', label: 'Gestionar Datos', icon: Database },
   { path: '/admin/screens', label: 'Pantallas', icon: Monitor },
   { path: '/admin/templates', label: 'Plantillas', icon: FileText },
   { path: '/admin/users', label: 'Usuarios', icon: Users },
   { path: '/admin/communications', label: 'Comunicaciones', icon: MessageCircle },
   { path: '/admin/archive', label: 'Historial', icon: Archive },
+  { path: '/admin/kiosk', label: 'Producción', icon: Factory },
+  { path: '/admin/warehouse', label: 'Almacén', icon: Package },
 ];
 
 const managerNav: AppNavItem[] = adminNav;

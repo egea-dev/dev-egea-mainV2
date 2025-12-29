@@ -36,24 +36,24 @@ export const VehicleList = ({ vehicles, onVehiclesUpdate }: VehicleListProps) =>
   return (
     <>
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/30 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-orange-100 p-2 text-orange-600">
+            <div className="rounded-full bg-slate-900 p-2 text-blue-400 border border-slate-800">
               <Car className="h-5 w-5" />
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Gestionar vehiculos
+                Gestionar vehículos
               </p>
-              <p className="text-lg font-semibold text-slate-900">Flota disponible</p>
+              <p className="text-lg font-semibold text-white">Flota disponible</p>
             </div>
           </div>
           <Button
             onClick={() => handleOpenDialog()}
-            className="rounded-full bg-[#ff6b4a] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#ff5f3a]"
+            className="rounded-full bg-blue-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 shadow-lg shadow-blue-900/20"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Anadir vehiculo
+            Añadir vehículo
           </Button>
         </div>
 
@@ -61,23 +61,23 @@ export const VehicleList = ({ vehicles, onVehiclesUpdate }: VehicleListProps) =>
           {vehicles.map((vehicle) => (
             <div
               key={vehicle.id}
-              className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
+              className="group flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/20 p-4 transition-colors hover:bg-slate-900/40 hover:border-slate-700"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-full bg-slate-100 p-2 ring-1 ring-slate-200">
+                <div className="flex items-start gap-4">
+                  <div className="rounded-full bg-slate-800 p-2 ring-1 ring-slate-700 mt-1">
                     <Car className="h-5 w-5 text-slate-500" />
                   </div>
                   <div className="min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-900">{vehicle.name}</p>
+                      <p className="text-sm font-bold text-slate-200">{vehicle.name}</p>
                       <VehicleStatusBadge
                         status={vehicle.status || "normal"}
                         size="sm"
                         showIcon={true}
                       />
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
                       <VehicleBadge
                         name={vehicle.name}
                         type={vehicle.type}
@@ -85,20 +85,21 @@ export const VehicleList = ({ vehicles, onVehiclesUpdate }: VehicleListProps) =>
                         showIcon={false}
                         variant="solid"
                       />
-                      <div className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        <span>Capacidad: {vehicle.capacity ?? "N/D"}</span>
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-950/40 border border-slate-800/50">
+                        <Users className="h-3 w-3 text-slate-500" />
+                        <span>Cap: {vehicle.capacity ?? "N/D"}</span>
                       </div>
                       {vehicle.km !== undefined && (
-                        <div className="flex items-center gap-1">
-                          <span>KM: {vehicle.km.toLocaleString()}</span>
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-950/40 border border-slate-800/50">
+                          <span className="font-mono text-blue-400">{vehicle.km.toLocaleString()}</span>
+                          <span className="text-slate-600">km</span>
                         </div>
                       )}
                     </div>
                     {vehicle.license_plate && (
-                      <p className="text-xs text-muted-foreground">
-                        Matricula: {vehicle.license_plate}
-                      </p>
+                      <div className="inline-block px-2 py-0.5 rounded border border-slate-700 bg-slate-800 text-[10px] font-mono text-slate-300">
+                        {vehicle.license_plate}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -106,18 +107,18 @@ export const VehicleList = ({ vehicles, onVehiclesUpdate }: VehicleListProps) =>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100"
+                    className="h-9 w-9 rounded-full border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white"
                     onClick={() => handleOpenDialog(vehicle)}
-                    title="Editar vehiculo"
+                    title="Editar vehículo"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50"
+                    className="h-9 w-9 rounded-full border border-red-900/30 text-slate-500 hover:bg-red-950/30 hover:text-red-400 hover:border-red-900/50"
                     onClick={() => handleDelete(vehicle.id)}
-                    title="Eliminar vehiculo"
+                    title="Eliminar vehículo"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

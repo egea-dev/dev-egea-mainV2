@@ -32,9 +32,11 @@ const FIELD_WRAPPER =
 
 const taskSchema = z.object({
   site: z.string().min(1, { message: "El sitio de trabajo es obligatorio." }),
-  location: z.string().min(1, { message: "La ubicacion es obligatoria." }),
-  description: z.string().min(1, { message: "La descripcion es obligatoria." }),
+  location: z.string().min(1, { message: "La ubicación es obligatoria." }),
+  description: z.string().min(1, { message: "La descripción es obligatoria." }),
   dueDate: z.date({ required_error: "La fecha es obligatoria." }),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
   selectedUsers: z.array(z.object({ id: z.string(), name: z.string() })),
   selectedVehicles: z.array(z.object({ id: z.string(), name: z.string() })),
   locationPreset: z.string().nullable().optional(),
@@ -58,9 +60,9 @@ type TaskDialogProps = {
 };
 
 const QUICK_LOCATION_PRESETS = [
-  { id: "almacen", label: "Almacen central", location: "Almacen central" },
+  { id: "almacen", label: "Almacén central", location: "Almacén central" },
   { id: "taller", label: "Taller general", location: "Taller general" },
-  { id: "oficina", label: "Oficina tecnica", location: "Oficina tecnica" },
+  { id: "oficina", label: "Oficina técnica", location: "Oficina técnica" },
 ] as const;
 
 const DATE_KEY_FORMAT = "yyyy-MM-dd";
@@ -84,6 +86,8 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
       location: "",
       description: "",
       dueDate: selectedDate,
+      startTime: "09:00",
+      endTime: "18:00",
       selectedUsers: [],
       selectedVehicles: [],
       locationPreset: null,
@@ -116,6 +120,8 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
         return;
       }
 
+      console.log("Screens loaded:", data);
+
       const normalized = (Array.isArray(data) ? data : []).map((entry) => ({
         id: entry.id,
         group: (entry.screen_group ?? "").trim().toLowerCase(),
@@ -123,16 +129,22 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
         isActive: entry.is_active ?? true,
       }));
 
+      console.log("[TaskDialog] Normalized screens:", normalized);
+
       const match =
         normalized.find((screen) => screen.group === "instalaciones" && screen.isActive) ||
         normalized.find((screen) => screen.type === "data" && screen.isActive) ||
         normalized[0];
 
+      console.log("[TaskDialog] Match found:", match);
+
       if (!match) {
+        console.error("[TaskDialog] No matching screen found. Available:", normalized);
         toast.error("No existe una pantalla activa para Instalaciones");
         return;
       }
 
+      console.log("[TaskDialog] Selected Screen ID:", match.id);
       setInstallationsScreenId(match.id);
     };
 
@@ -186,7 +198,11 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
   };
 
   const onSubmit = async (data: TaskFormData) => {
+    console.log("[TaskDialog] onSubmit called with data:", data);
+    console.log("[TaskDialog] installationsScreenId:", installationsScreenId);
+
     if (!installationsScreenId) {
+      console.error("[TaskDialog] No installationsScreenId available!");
       toast.error("No se pudo obtener la pantalla de Instalaciones");
       return;
     }
@@ -206,10 +222,16 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
 
       const saveTask = async (targetDate: Date, taskId?: string | null) => {
         const formattedDate = dayjs(targetDate).format("YYYY-MM-DD");
-        await upsertTask(supabase, {
+
+        const taskData = {
           taskId: taskId ?? undefined,
           screenId: installationsScreenId,
-          data: { site: data.site, description: data.description },
+          data: {
+            site: data.site,
+            description: data.description,
+            startTime: data.startTime,
+            endTime: data.endTime,
+          },
           state: nextState,
           status: nextStatus,
           startDate: formattedDate,
@@ -221,20 +243,40 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
           assignedTo: null,
           assignedProfiles: data.selectedUsers.map((user) => user.id),
           assignedVehicles: data.selectedVehicles.map((vehicle) => vehicle.id),
-        });
+        };
+
+        console.log("[TaskDialog] Calling upsertTask with:", taskData);
+
+        try {
+          const result = await upsertTask(supabase, taskData);
+          console.log("[TaskDialog] upsertTask result:", result);
+          return result;
+        } catch (error) {
+          console.error("[TaskDialog] upsertTask error:", error);
+          throw error;
+        }
       };
 
+      console.log("[TaskDialog] Saving main task...");
       await saveTask(data.dueDate, task?.id ?? null);
+      console.log("[TaskDialog] Main task saved successfully");
+
       for (const dateValue of repeatDates) {
+        console.log("[TaskDialog] Saving repeat task for date:", dateValue);
         await saveTask(dateValue, null);
       }
+      console.log("[TaskDialog] All tasks saved, repeatDates count:", repeatDates.length);
 
-      toast.success(
-        repeatDates.length > 0
-          ? `Tarea guardada y replicada en ${repeatDates.length} dÃ­as`
-          : "Tarea guardada correctamente"
-      );
+      const successMessage = repeatDates.length > 0
+        ? `Tarea guardada y replicada en ${repeatDates.length} días`
+        : "Tarea guardada correctamente";
+
+      console.log("[TaskDialog] Showing success toast:", successMessage);
+      toast.success(successMessage);
+
+      console.log("[TaskDialog] Calling onSuccess()");
       onSuccess();
+      console.log("[TaskDialog] onSuccess() completed");
 
       const isEditing = Boolean(task?.id);
       if (isEditing) {
@@ -284,7 +326,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                       <Input
                         {...field}
                         placeholder="Ej. Obra Patio Central"
-                       
+
                       />
                     </FormControl>
                     <FormMessage />
@@ -329,46 +371,8 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
               />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => {
-                  const value = field.value ?? "";
-                  return (
-                    <FormItem className={FIELD_WRAPPER}>
-                      <FormLabel>Ubicacion</FormLabel>
-                      <div className="flex gap-2">
-                        <FormControl>
-                          <div className="relative flex-1">
-                            <MapPin className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              {...field}
-                              value={value}
-                              placeholder="Direccion, coordenadas o referencia"
-                              className="pl-11"
-                            />
-                          </div>
-                        </FormControl>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={!value.trim()}
-                          onClick={() => {
-                            if (!value.trim()) return;
-                            window.open(buildMapsSearchUrl(value), "_blank", "noopener");
-                          }}
-                          className="shrink-0"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-
+            {/* Fecha y Horas en la misma línea */}
+            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-3">
               <FormField
                 control={form.control}
                 name="dueDate"
@@ -387,40 +391,108 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                    <PopoverContent className="w-auto border border-border/70 bg-popover/95 p-0 text-popover-foreground backdrop-blur-xl">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        initialFocus
-                        classNames={{
-                          caption_label: "text-slate-200",
-                          head_cell: "text-slate-500 rounded-md w-9 font-medium text-[0.8rem]",
-                          day: cn(
-                            buttonVariants({ variant: "ghost", size: "icon" }),
-                            "h-9 w-9 p-0 font-normal text-slate-300 hover:bg-slate-800/70 aria-selected:bg-emerald-500/90 aria-selected:text-emerald-50"
-                          ),
-                          day_today: "bg-slate-800/80 text-slate-200",
-                          nav_button: cn(
-                            buttonVariants({ variant: "outline", size: "icon" }),
-                            "h-7 w-7 border border-slate-700/60 bg-transparent text-slate-300 hover:bg-slate-800/70"
-                          ),
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                      <PopoverContent className="w-auto border border-border/70 bg-popover/95 p-0 text-popover-foreground backdrop-blur-xl">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                          classNames={{
+                            caption_label: "text-slate-200",
+                            head_cell: "text-slate-500 rounded-md w-9 font-medium text-[0.8rem]",
+                            day: cn(
+                              buttonVariants({ variant: "ghost", size: "icon" }),
+                              "h-9 w-9 p-0 font-normal text-slate-300 hover:bg-slate-800/70 aria-selected:bg-emerald-500/90 aria-selected:text-emerald-50"
+                            ),
+                            day_today: "bg-slate-800/80 text-slate-200",
+                            nav_button: cn(
+                              buttonVariants({ variant: "outline", size: "icon" }),
+                              "h-7 w-7 border border-slate-700/60 bg-transparent text-slate-300 hover:bg-slate-800/70"
+                            ),
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="startTime"
+                render={({ field }) => (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Hora Inicio</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} className="w-full" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Hora Fin</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} className="w-full" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
+            {/* Ubicación en línea separada */}
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => {
+                const value = field.value ?? "";
+                return (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Ubicación</FormLabel>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <div className="relative flex-1">
+                          <MapPin className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            {...field}
+                            value={value}
+                            placeholder="Dirección, coordenadas o referencia"
+                            className="pl-11"
+                          />
+                        </div>
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={!value.trim()}
+                        onClick={() => {
+                          if (!value.trim()) return;
+                          window.open(buildMapsSearchUrl(value), "_blank", "noopener");
+                        }}
+                        className="shrink-0"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
+            />
+
             <FormField
               control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem className={FIELD_WRAPPER}>
-                  <FormLabel>Descripcion</FormLabel>
+                  <FormLabel>Descripción</FormLabel>
                   <FormControl>
                     <Textarea rows={4} {...field} />
                   </FormControl>
@@ -436,9 +508,9 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                 <FormItem className="rounded-2xl border border-dashed border-border/60 bg-background px-4 py-3 space-y-3 text-foreground sm:px-5 sm:py-4 backdrop-blur-xl">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
-                      <FormLabel>Repetir en dÃ­as siguientes</FormLabel>
+                      <FormLabel>Repetir en días siguientes</FormLabel>
                       <FormDescription className="text-muted-foreground">
-                        Duplica la tarea en fechas prÃ³ximas sin cerrar el diÃ¡logo. Usa el conmutador y marca los dÃ­as para generar copias.
+                        Duplica la tarea en fechas próximas sin cerrar el diálogo. Usa el conmutador y marca los días para generar copias.
                       </FormDescription>
                     </div>
                     <Switch

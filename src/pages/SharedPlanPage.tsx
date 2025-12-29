@@ -87,24 +87,24 @@ export default function SharedPlanPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando plan compartido...</p>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f1115] text-slate-400">
+        <div className="w-12 h-12 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+        <p className="animate-pulse font-medium">Cargando plan compartido...</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="w-full max-w-md mx-4">
-          <CardContent className="text-center p-6">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
-            <p className="text-gray-600">{error}</p>
-            <Button onClick={() => navigate('/')} className="mt-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#0f1115] p-4">
+        <Card className="w-full max-w-md bg-slate-900 border-slate-800">
+          <CardContent className="text-center p-8">
+            <div className="w-16 h-16 bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-900/50">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Error de Acceso</h2>
+            <p className="text-slate-400 mb-6">{error}</p>
+            <Button onClick={() => navigate('/')} variant="outline" className="border-slate-700 text-white hover:bg-slate-800">
               Volver al inicio
             </Button>
           </CardContent>
@@ -118,93 +118,115 @@ export default function SharedPlanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#0f1115] text-slate-200 font-sans selection:bg-blue-500/30 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <div className="text-center border-b border-slate-800 pb-8">
+          <div className="inline-flex items-center justify-center p-3 bg-blue-500/10 rounded-2xl mb-4 border border-blue-500/20">
+            <Calendar className="h-8 w-8 text-blue-400" />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">
             Plan de Instalaciones
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-slate-400 font-medium capitalize">
             {format(new Date(planData.month), 'MMMM yyyy', { locale: es })}
           </p>
         </div>
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total</CardTitle>
+              <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Total</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-4xl font-bold text-white mb-1">
                 {planData.installations.length}
               </div>
-              <p className="text-xs text-gray-500">instalaciones</p>
+              <p className="text-xs text-slate-500 font-mono">instalaciones programadas</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Completadas</CardTitle>
+              <CardTitle className="text-sm font-medium text-emerald-500/70 uppercase tracking-widest">Completadas</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-4xl font-bold text-emerald-400 mb-1">
                 {planData.installations.filter(i => i.status === 'terminado').length}
               </div>
-              <p className="text-xs text-gray-500">instalaciones</p>
+              <p className="text-xs text-slate-500 font-mono">instalaciones finalizadas</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Pendientes</CardTitle>
+              <CardTitle className="text-sm font-medium text-amber-500/70 uppercase tracking-widest">Pendientes</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="text-2xl font-bold text-yellow-600">
+              <div className="text-4xl font-bold text-amber-400 mb-1">
                 {planData.installations.filter(i => i.status === 'pendiente').length}
               </div>
-              <p className="text-xs text-gray-500">instalaciones</p>
+              <p className="text-xs text-slate-500 font-mono">por realizar</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Lista de instalaciones */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Instalaciones del Mes
+        <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+          <CardHeader className="border-b border-slate-800/50">
+            <CardTitle className="flex items-center gap-3 text-white">
+              <div className="p-2 bg-slate-800 rounded-lg">
+                <MapPin className="h-5 w-5 text-slate-400" />
+              </div>
+              Detalle del Mes
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="space-y-3">
               {planData.installations.map((installation) => (
                 <div
                   key={installation.id}
-                  className={`p-4 rounded-lg border-2 ${getStatusColor(installation.status)}`}
+                  className={`group p-4 rounded-xl border transition-all hover:bg-slate-800/30 ${installation.status === 'terminado' ? 'border-emerald-900/30 bg-emerald-950/10' :
+                      installation.status === 'pendiente' ? 'border-amber-900/30 bg-amber-950/10' :
+                        'border-slate-800 bg-slate-900/20'
+                    }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        {installation.title}
-                      </h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>{format(new Date(installation.date), 'dd/MM/yyyy', { locale: es })}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between sm:justify-start gap-4">
+                        <h3 className="font-bold text-slate-200 text-lg group-hover:text-white transition-colors">
+                          {installation.title}
+                        </h3>
+                        <div className="sm:hidden">
+                          {getStatusIcon(installation.status)}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4" />
-                          <span>{installation.operator_name || 'Sin asignar'}</span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+                        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-950/30 border border-slate-800/50">
+                          <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                          <span className="font-mono text-slate-300">{format(new Date(installation.date), 'dd/MM/yyyy', { locale: es })}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5 text-slate-500" />
+                          <span className={installation.operator_name ? "text-slate-300" : "text-slate-600 italic"}>
+                            {installation.operator_name || 'Sin asignar'}
+                          </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3 border-t border-slate-800/50 pt-3 sm:border-0 sm:pt-0">
+                      <Badge variant="outline" className={`capitalize border ${installation.status === 'terminado' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' :
+                          installation.status === 'pendiente' ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' :
+                            'text-slate-400 border-slate-700 bg-slate-800'
+                        }`}>
                         {installation.status}
                       </Badge>
-                      {getStatusIcon(installation.status)}
+                      <div className="hidden sm:block">
+                        {getStatusIcon(installation.status)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -214,13 +236,13 @@ export default function SharedPlanPage() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-sm text-gray-500">
+        <div className="text-center pt-8 text-sm text-slate-600 space-y-4">
           <p>Plan compartido vía Egea MainControl</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate('/')}
-            className="mt-2"
+            className="text-slate-500 hover:text-white hover:bg-slate-800"
           >
             Volver al inicio
           </Button>

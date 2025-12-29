@@ -58,6 +58,8 @@ export interface Screen {
   refresh_interval_sec: number;
   header_color: string;
   is_active: boolean;
+  dashboard_section: string | null;
+  dashboard_order: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -253,7 +255,7 @@ export interface DetailedTask {
   assigned_to: string | null;
   checkin_token: string | null;
   order: number;
-  
+
   // Información del screen
   screen_name: string | null;
   screen_type: string | null;
@@ -262,7 +264,7 @@ export interface DetailedTask {
   header_color: string | null;
   screen_is_active: boolean | null;
   refresh_interval_sec: number | null;
-  
+
   // Información del work site
   work_site_name: string | null;
   work_site_alias: string | null;
@@ -274,7 +276,7 @@ export interface DetailedTask {
   work_site_longitude: number | null;
   work_site_maps_url: string | null;
   work_site_imagotipo_enabled: boolean | null;
-  
+
   // Información del responsable
   responsible_name: string | null;
   responsible_email: string | null;
@@ -282,14 +284,14 @@ export interface DetailedTask {
   responsible_role: string | null;
   responsible_status: string | null;
   responsible_avatar: string | null;
-  
+
   // Información del asignado
   assigned_name: string | null;
   assigned_email: string | null;
   assigned_phone: string | null;
   assigned_role: string | null;
   assigned_status: string | null;
-  
+
   // Campos JSON aplanados
   site: string | null;
   client: string | null;
@@ -297,13 +299,13 @@ export interface DetailedTask {
   description: string | null;
   notes: string | null;
   vehicle_type: string | null;
-  
+
   // Arrays agregados
   assigned_profiles: JsonArray;
   assigned_vehicles: JsonArray;
   assigned_profiles_count: number;
   assigned_vehicles_count: number;
-  
+
   // Indicadores útiles
   is_completed: boolean;
   is_urgent: boolean;
@@ -480,6 +482,8 @@ export interface TaskFilters {
   date_from?: string;
   date_to?: string;
   search?: string;
+  client_id?: string;
+  selectedGroups?: string[];
 }
 
 export interface UserFilters {
@@ -699,6 +703,24 @@ export type Database = {
           user_role: string;
           page: string;
           permission: string;
+        };
+        Returns: boolean;
+      };
+      register_arrival: {
+        Args: {
+          p_profile_id: string;
+          p_task_id: string;
+          p_start_location?: JsonObject;
+          p_device_info?: JsonObject;
+          p_metadata?: JsonObject;
+        };
+        Returns: string;
+      };
+      register_departure: {
+        Args: {
+          p_session_id: string;
+          p_end_location?: JsonObject;
+          p_metadata?: JsonObject;
         };
         Returns: boolean;
       };

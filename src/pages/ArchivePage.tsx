@@ -15,7 +15,8 @@ import {
   Download,
   Filter,
   BarChart3,
-  TrendingUp
+  TrendingUp,
+  Archive
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { TaskStateBadge, StatusBadge, VehicleBadge } from '@/components/badges';
@@ -125,19 +126,19 @@ const ArchiveChart = ({ data }: { data: ArchivedTaskRecord[] }) => {
       const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
       const month = archivedAt?.isValid() ? archivedAt.format('YYYY-MM') : 'Sin fecha';
       const group = task.screen_group || 'Sin grupo';
-      
+
       if (!acc[month]) {
         acc[month] = { month, Instalaciones: 0, Confección: 0, Tapicería: 0, Otros: 0 };
       }
-      
+
       if (group.includes('Instalacion')) acc[month].Instalaciones++;
       else if (group.includes('Confeccion')) acc[month].Confección++;
       else if (group.includes('Tapiceria')) acc[month].Tapicería++;
       else acc[month].Otros++;
-      
+
       return acc;
     }, {});
-    
+
     return Object.values(monthlyData).slice(-12); // Últimos 12 meses
   }, [data]);
 
@@ -150,7 +151,7 @@ const ArchiveChart = ({ data }: { data: ArchivedTaskRecord[] }) => {
         {chartData.map((item: ChartData) => {
           const total = item.Instalaciones + item.Confección + item.Tapicería + item.Otros;
           const percentage = (total / maxValue) * 100;
-          
+
           return (
             <div key={item.month} className="space-y-2">
               <div className="flex justify-between text-sm">
@@ -252,7 +253,7 @@ export default function ArchivePage() {
       // Filtro por rango de fechas
       const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
       const dateMatch = (!dateFrom || (archivedAt?.isValid() ? archivedAt.isAfter(dayjs(dateFrom)) : false)) &&
-                      (!dateTo || (archivedAt?.isValid() ? archivedAt.isBefore(dayjs(dateTo).add(1, 'day')) : false));
+        (!dateTo || (archivedAt?.isValid() ? archivedAt.isBefore(dayjs(dateTo).add(1, 'day')) : false));
 
       return searchMatch && groupMatch && stateMatch && dateMatch;
     });
@@ -270,7 +271,7 @@ export default function ArchivePage() {
       'Archivado', 'Sitio', 'Cliente', 'Dirección', 'Descripción',
       'Responsable', 'Operarios', 'Vehículos', 'Estado', 'Grupo'
     ];
-    
+
     const csvData = filteredTasks.map((task) => {
       const dataRecord = (task.data ?? {}) as Record<string, unknown>;
       const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
@@ -314,18 +315,24 @@ export default function ArchivePage() {
 
   return (
     <div className="space-y-6 p-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Historial de Tareas</h1>
-        <Button onClick={exportToCSV} variant="outline">
-          <Download className="mr-2 h-4 w-4" />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            <Archive className="h-8 w-8" />
+            Historial de Tareas
+          </h1>
+          <p className="text-slate-400 mt-1">Consulta y descarga el histórico de tareas completadas.</p>
+        </div>
+        <Button onClick={exportToCSV} variant="outline" className="gap-2 border-slate-700 hover:bg-slate-800 hover:text-white">
+          <Download className="h-4 w-4" />
           Exportar CSV
         </Button>
       </div>
 
       {/* Gráfico */}
-      <Card>
+      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-white">
             <BarChart3 className="h-5 w-5" />
             Estadísticas
           </CardTitle>
@@ -336,9 +343,9 @@ export default function ArchivePage() {
       </Card>
 
       {/* Filtros */}
-      <Card>
+      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-white">
             <Filter className="h-5 w-5" />
             Filtros
           </CardTitle>
@@ -346,22 +353,22 @@ export default function ArchivePage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Buscar</label>
+              <label className="text-sm font-medium mb-2 block text-slate-300">Buscar</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Sitio, cliente, dirección..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-slate-950/50 border-slate-800 text-white placeholder:text-slate-500"
                 />
               </div>
             </div>
-            
+
             <div>
-              <label className="text-sm font-medium mb-2 block">Grupo</label>
+              <label className="text-sm font-medium mb-2 block text-slate-300">Grupo</label>
               <Select value={groupFilter} onValueChange={setGroupFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-slate-950/50 border-slate-800 text-white">
                   <SelectValue placeholder="Todos los grupos" />
                 </SelectTrigger>
                 <SelectContent>
@@ -375,9 +382,9 @@ export default function ArchivePage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Estado</label>
+              <label className="text-sm font-medium mb-2 block text-slate-300">Estado</label>
               <Select value={stateFilter} onValueChange={setStateFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-slate-950/50 border-slate-800 text-white">
                   <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>
                 <SelectContent>
@@ -390,24 +397,26 @@ export default function ArchivePage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Rango de fechas</label>
+              <label className="text-sm font-medium mb-2 block text-slate-300">Rango de fechas</label>
               <div className="flex gap-2">
                 <Input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   placeholder="Desde"
+                  className="bg-slate-950/50 border-slate-800 text-white"
                 />
                 <Input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   placeholder="Hasta"
+                  className="bg-slate-950/50 border-slate-800 text-white"
                 />
               </div>
             </div>
           </div>
-          
+
           <div className="text-sm text-muted-foreground mt-4">
             Mostrando {currentTasks.length} de {filteredTasks.length} tareas archivadas
           </div>
@@ -415,10 +424,10 @@ export default function ArchivePage() {
       </Card>
 
       {/* Tabla de resultados */}
-      <Card>
+      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
         <CardHeader>
-          <CardTitle>Tareas Archivadas</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-white">Tareas Archivadas</CardTitle>
+          <CardDescription className="text-slate-400">
             Aquí se muestran todas las tareas que han sido completadas o archivadas manualmente.
           </CardDescription>
         </CardHeader>
@@ -426,15 +435,15 @@ export default function ArchivePage() {
           <ScrollArea className="h-96">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Archivado</TableHead>
-                  <TableHead>Periodo</TableHead>
-                  <TableHead>Sitio</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Responsable</TableHead>
-                  <TableHead>Operarios</TableHead>
-                  <TableHead>Vehículos</TableHead>
-                  <TableHead>Estado</TableHead>
+                <TableRow className="border-slate-800 hover:bg-slate-800/50">
+                  <TableHead className="text-slate-400">Archivado</TableHead>
+                  <TableHead className="text-slate-400">Periodo</TableHead>
+                  <TableHead className="text-slate-400">Sitio</TableHead>
+                  <TableHead className="text-slate-400">Descripción</TableHead>
+                  <TableHead className="text-slate-400">Responsable</TableHead>
+                  <TableHead className="text-slate-400">Operarios</TableHead>
+                  <TableHead className="text-slate-400">Vehículos</TableHead>
+                  <TableHead className="text-slate-400">Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -499,7 +508,7 @@ export default function ArchivePage() {
               </TableBody>
             </Table>
           </ScrollArea>
-          
+
           {filteredTasks.length === 0 && !isLoading && (
             <div className="text-center py-12 text-muted-foreground">
               <FileText className="mx-auto h-12 w-12" />
@@ -524,7 +533,7 @@ export default function ArchivePage() {
                       className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                     />
                   </PaginationItem>
-                  
+
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     let pageNum;
                     if (totalPages <= 5) {
@@ -536,7 +545,7 @@ export default function ArchivePage() {
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-                    
+
                     return (
                       <PaginationItem key={pageNum}>
                         <PaginationLink
@@ -549,13 +558,13 @@ export default function ArchivePage() {
                       </PaginationItem>
                     );
                   })}
-                  
+
                   {totalPages > 5 && currentPage < totalPages - 2 && (
                     <PaginationItem>
                       <PaginationEllipsis />
                     </PaginationItem>
                   )}
-                  
+
                   <PaginationItem>
                     <PaginationNext
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}

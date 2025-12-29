@@ -140,39 +140,35 @@ const ScreenDisplay = () => {
     const normalized = (state || "").toLowerCase().trim();
 
     const tones: Record<string, string> = {
-      pendiente: "bg-pulse-neutral border-l-4 border-l-gray-300",
-      incidente:
-        "bg-pulse-danger border-l-4 border-l-destructive/70",
-      arreglo:
-        "bg-pulse-info border-l-4 border-l-sky-500/70",
-      reposicion:
-        "bg-pulse-warning border-l-4 border-l-amber-500/70",
-      urgente:
-        "bg-pulse-critical border-l-4 border-l-red-700",
+      pendiente: 'hover:bg-slate-800/50',
+      incidente: 'bg-red-900/10 border-l-4 border-l-red-500 hover:bg-red-900/20',
+      arreglo: 'bg-blue-900/10 border-l-4 border-l-blue-500 hover:bg-blue-900/20',
+      reposicion: 'bg-amber-900/10 border-l-4 border-l-amber-500 hover:bg-amber-900/20',
+      urgente: 'bg-red-950/30 border-l-4 border-l-red-600 hover:bg-red-900/30',
     };
 
-    return tones[normalized] ?? null;
+    return tones[normalized] ?? 'hover:bg-slate-800/50';
   };
 
   const resolveCellDisplay = (raw: unknown) => {
     if (raw === null || raw === undefined || raw === "") {
-      return { content: "-", className: "text-muted-foreground" };
+      return { content: "-", className: "text-slate-600" };
     }
 
     if (typeof raw === "number") {
-      return { content: raw, className: "" };
+      return { content: raw, className: "text-slate-200" };
     }
 
     if (raw instanceof Date) {
-      return { content: raw.toLocaleString("es-ES"), className: "" };
+      return { content: raw.toLocaleString("es-ES"), className: "text-slate-300" };
     }
 
     if (typeof raw === "object") {
-      return { content: JSON.stringify(raw), className: "font-mono text-xs" };
+      return { content: JSON.stringify(raw), className: "font-mono text-xs text-slate-400" };
     }
 
     let text = String(raw).trim();
-    const classes: string[] = [];
+    const classes: string[] = ["text-slate-200"];
 
     const applyMarker = (start: string, end: string, className: string) => {
       if (
@@ -185,76 +181,97 @@ const ScreenDisplay = () => {
       }
     };
 
-    applyMarker("**", "**", "font-semibold text-foreground");
-    applyMarker("##", "##", "text-xl");
-    applyMarker("!!", "!!", "uppercase tracking-wide");
+    applyMarker("**", "**", "font-bold text-white");
+    applyMarker("##", "##", "text-xl font-semibold");
+    applyMarker("!!", "!!", "uppercase tracking-wide text-amber-400");
 
     return { content: text, className: classes.join(" ") };
   };
 
   return (
-    <div className="min-h-screen bg-muted/20">
-      <header className="border-b" style={headerStyle}>
-        <div className="mx-auto flex w-[98%] flex-wrap items-center justify-between gap-4 py-6">
-          <h1 className={cn("text-3xl font-semibold tracking-tight", headerTextClass)}>
-            {screen.name || "Pantalla"}
-          </h1>
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-[#0f1115] text-white font-sans selection:bg-blue-500/30">
+      <header className="border-b border-slate-800/50 bg-slate-950/50 backdrop-blur-md sticky top-0 z-20">
+        <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
+              <Loader2 className={cn("h-6 w-6 text-blue-400", isRefreshing ? "animate-spin" : "")} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                {screen.name || "Pantalla de Datos"}
+              </h1>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">
+                VISUALIZACIÓN DETALLADA
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
             <span
               className={cn(
-                "flex items-center gap-2 text-sm font-medium",
-                headerTextClass || "text-muted-foreground",
+                "flex items-center gap-2 text-xs font-medium uppercase tracking-wider",
+                isOnline ? "text-emerald-500" : "text-red-500",
               )}
             >
               {isOnline ? (
                 <>
-                  <Wifi className={cn("h-4 w-4", headerTextClass && "text-white")} />
+                  <Wifi className="h-4 w-4" />
                   <span>Conectado</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className={cn("h-4 w-4", headerTextClass && "text-white")} />
-                  <span>Sin conexion</span>
+                  <WifiOff className="h-4 w-4" />
+                  <span>Sin conexión</span>
                 </>
               )}
             </span>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => refetch()}
               disabled={isRefreshing}
-              className={cn(headerTextClass && "text-white hover:text-white/80")}
+              className="border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
             >
-              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+              Actualizar
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/admin/screens")}
+              className="text-slate-500 hover:text-white"
+            >
+              Volver
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto w-[98%] py-8">
+      <main className="w-full px-6 py-8">
         {resolvedDataList.length === 0 ? (
-          <div className="flex min-h-[60vh] items-center justify-center rounded-lg border bg-card text-muted-foreground">
-            No hay datos para mostrar todavia.
+          <div className="flex flex-col items-center justify-center min-h-[60vh] border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/20">
+            <p className="text-xl font-medium text-slate-500">No hay datos para mostrar</p>
+            <p className="text-sm text-slate-600 mt-2">Los registros aparecerán aquí automáticamente.</p>
           </div>
         ) : (
-          <div className="rounded-lg border bg-card">
-            <div className="flex items-center justify-between border-b px-6 py-3">
-              <span className="text-sm text-muted-foreground">
-                {totalRecords} registro{totalRecords === 1 ? "" : "s"}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-sm shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3 bg-slate-950/30">
+              <span className="text-xs font-medium uppercase tracking-widest text-slate-500">
+                {totalRecords} registro{totalRecords === 1 ? "" : "s"} encontrados
               </span>
             </div>
             <div className="overflow-x-auto">
               <Table className="w-full">
-                <TableHeader>
-                  <TableRow className="bg-muted/60">
+                <TableHeader className="bg-slate-950/80">
+                  <TableRow className="border-slate-800 hover:bg-transparent">
                     {displayColumns.map((column) => (
-                      <TableHead key={column.key} className="whitespace-nowrap">
+                      <TableHead key={column.key} className="h-14 font-bold text-slate-300 uppercase tracking-wider text-xs whitespace-nowrap">
                         {column.label}
                       </TableHead>
                     ))}
-                    <TableHead className="whitespace-nowrap">Estado</TableHead>
-                    <TableHead className="whitespace-nowrap">Seguimiento</TableHead>
-                    <TableHead className="whitespace-nowrap">Actualizado</TableHead>
+                    <TableHead className="h-14 font-bold text-slate-300 uppercase tracking-wider text-xs whitespace-nowrap">Estado</TableHead>
+                    <TableHead className="h-14 font-bold text-slate-300 uppercase tracking-wider text-xs whitespace-nowrap">Seguimiento</TableHead>
+                    <TableHead className="h-14 font-bold text-slate-300 uppercase tracking-wider text-xs whitespace-nowrap">Actualizado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -267,21 +284,21 @@ const ScreenDisplay = () => {
                       <TableRow
                         key={item.id}
                         className={cn(
-                          rowTone ?? "hover:bg-muted/30",
-                          !rowTone && index % 2 === 0 ? "bg-muted/25" : "",
-                          "transition-colors",
+                          'border-slate-800/50 transition-colors',
+                          rowTone,
+                          !rowTone && index % 2 === 0 ? "bg-slate-900/30" : "",
                         )}
                       >
                         {displayColumns.map((column) => {
                           if (column.key === "__raw__") {
                             return (
-                              <TableCell key="__raw__" className="align-top">
+                              <TableCell key="__raw__" className="align-top py-4">
                                 {item.data && Object.keys(item.data).length > 0 ? (
-                                  <pre className="max-h-48 w-full overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-3 text-xs font-mono">
+                                  <pre className="max-h-48 w-full overflow-auto whitespace-pre-wrap rounded-md bg-black/50 p-3 text-xs font-mono text-slate-400 border border-slate-800">
                                     {JSON.stringify(item.data, null, 2)}
                                   </pre>
                                 ) : (
-                                  <span className="text-muted-foreground">-</span>
+                                  <span className="text-slate-600">-</span>
                                 )}
                               </TableCell>
                             );
@@ -297,19 +314,19 @@ const ScreenDisplay = () => {
                           return (
                             <TableCell
                               key={column.key}
-                              className={cn("text-base font-medium", className)}
+                              className={cn("text-sm py-4", className)}
                             >
                               {content}
                             </TableCell>
                           );
                         })}
-                        <TableCell>
+                        <TableCell className="py-4">
                           <TaskStateBadge state={item.state} size="sm" />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-4">
                           <StatusBadge status={item.status} size="sm" />
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="py-4 font-mono text-xs text-slate-400">
                           {item.updated_at
                             ? new Date(item.updated_at).toLocaleString("es-ES")
                             : new Date(item.created_at).toLocaleString("es-ES")}

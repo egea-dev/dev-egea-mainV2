@@ -6,8 +6,10 @@ import type {
   SortOption,
   PaginationOptions,
   TaskFormData,
-  Database
+  Database,
+  Screen
 } from '@/integrations/supabase/client';
+import { upsertTask } from '@/lib/upsert-task';
 
 type TemplateFieldDefinition = {
   name?: string | null;
@@ -50,7 +52,7 @@ const normalizeAssignedProfiles = (value: unknown): AssignedProfileRecord[] => {
         email: typeof record.email === 'string' ? record.email : null,
       };
     })
-    .filter((profile): profile is AssignedProfileRecord => profile !== null);
+    .filter((profile): profile is AssignedProfileRecord & { email: string | null } => profile !== null);
 };
 
 const normalizeAssignedVehicles = (value: unknown): AssignedVehicleRecord[] => {
@@ -68,7 +70,7 @@ const normalizeAssignedVehicles = (value: unknown): AssignedVehicleRecord[] => {
         type: typeof record.type === 'string' ? record.type : null,
       };
     })
-    .filter((vehicle): vehicle is AssignedVehicleRecord => vehicle !== null);
+    .filter((vehicle): vehicle is AssignedVehicleRecord & { type: string | null } => vehicle !== null);
 };
 
 interface UseDetailedTasksOptions {
@@ -144,6 +146,8 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     filters.screen_group,
     filters.state,
     filters.status,
+    (filters as any).client_id,
+    (filters as any).selectedGroups,
     pagination.page,
     pagination.pageSize,
     sort.direction,
@@ -411,23 +415,29 @@ export function useDashboardTasks() {
 
       const templateFieldsMapByScreen: DashboardTemplateFieldMap = {};
 
-      const sectionMap: Record<'confeccion' | 'tapiceria' | 'pendientes', string[]> = {
+      const sectionMap: Record<string, string[]> = {
         confeccion: [],
         tapiceria: [],
         pendientes: [],
       };
 
-      (dashboardScreens ?? []).forEach((screen) => {
-        const section = screen.dashboard_section as 'confeccion' | 'tapiceria' | 'pendientes' | null;
+      (dashboardScreens as any[] || []).forEach((item) => {
+        const screen = item as Screen;
+        const section = screen.dashboard_section;
         if (section && sectionMap[section]) {
           sectionMap[section].push(screen.id);
         }
 
-        const fields = screen.template_id ? (templateMapById.get(screen.template_id) ?? []) : [];
+        const fields = Array.isArray((screen as any).templates?.fields)
+          ? (screen as any).templates.fields
+          : [];
         templateFieldsMapByScreen[screen.id] = fields;
       });
 
       setTemplateFieldsByScreen(templateFieldsMapByScreen);
+
+      // Grupos que siempre queremos incluir en la sección de pendientes si no hay pantallas específicas
+      const PENDING_FALLBACK_GROUPS = ['Instalaciones', 'Instalación', 'Instalacion', 'Tareas Generales', 'Pendientes'];
 
       const fetchSectionTasks = async (
         section: 'confeccion' | 'tapiceria' | 'pendientes',
@@ -445,10 +455,29 @@ export function useDashboardTasks() {
         }
 
         const screenIds = sectionMap[section];
-        if (screenIds.length > 0) {
-          query = query.in('screen_id', screenIds);
-        } else if (fallbackGroups.length > 0) {
-          query = query.in('screen_group', fallbackGroups);
+
+        if (section === 'pendientes') {
+          // Para pendientes, queremos ser inclusivos: screens asignadas O grupos fallback
+          const groups = [...fallbackGroups, ...PENDING_FALLBACK_GROUPS];
+          const hasScreens = screenIds.length > 0;
+          const hasGroups = groups.length > 0;
+
+          if (hasScreens && hasGroups) {
+            // Combinar filtros de screen_id y screen_group
+            query = query.or(`screen_id.in.(${screenIds.join(',')}),screen_group.in.(${groups.map(g => `"${g}"`).join(',')})`);
+          } else if (hasScreens) {
+            query = query.in('screen_id', screenIds);
+          } else if (hasGroups) {
+            query = query.in('screen_group', groups);
+          }
+          // Si no hay nada configurado, traemos TODO (pero le aplicamos el estado pendiente por defecto del hook)
+        } else {
+          // Confección/Tapicería: Screens tienen prioridad, si no hay, usamos grupos
+          if (screenIds.length > 0) {
+            query = query.in('screen_id', screenIds);
+          } else if (fallbackGroups.length > 0) {
+            query = query.in('screen_group', fallbackGroups);
+          }
         }
 
         if (limit) {

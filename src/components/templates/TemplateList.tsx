@@ -83,82 +83,97 @@ export const TemplateList = () => {
   }
 
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h2 className="text-xl sm:text-2xl font-semibold">Plantillas</h2>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/30 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="rounded-full bg-slate-900 p-2 text-blue-400 border border-slate-800">
+            <Plus className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Configuración</p>
+            <h2 className="text-xl sm:text-2xl font-semibold text-white">Plantillas de Datos</h2>
+          </div>
+        </div>
         <div className="flex gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
-            className="sm:size-default flex-1 sm:flex-none"
+            className="sm:size-default flex-1 sm:flex-none border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
             onClick={() => setImportDialogOpen(true)}
           >
             <UploadCloud className="mr-2 h-4 w-4" />
-            Importar planilla
+            Importar
           </Button>
-          <Button variant="outline" onClick={() => setDialogOpen(true)} size="sm" className="sm:size-default flex-1 sm:flex-none">
+          <Button
+            onClick={() => setDialogOpen(true)}
+            size="sm"
+            className="sm:size-default flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Nueva Plantilla
           </Button>
         </div>
       </div>
 
-      <Accordion type="single" collapsible className="w-full">
-        {templates.map((template) => (
-          <AccordionItem value={template.id} key={template.id}>
-            <AccordionTrigger>
-              <div className="flex justify-between items-center w-full pr-2 sm:pr-4">
-                <div className="flex flex-col items-start flex-1">
-                  <span className="text-base sm:text-lg font-semibold truncate w-full">{template.name}</span>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs sm:text-sm text-muted-foreground">{template.template_type}</span>
-                    {template.category && (
-                      <Badge variant="secondary" className="text-xs">
-                        {template.category}
-                      </Badge>
-                    )}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-1">
+        <Accordion type="single" collapsible className="w-full space-y-1">
+          {templates.map((template) => (
+            <AccordionItem value={template.id} key={template.id} className="border-b-0">
+              <AccordionTrigger className="hover:no-underline px-4 py-3 hover:bg-slate-800/50 rounded-xl group transition-all data-[state=open]:bg-slate-800/50">
+                <div className="flex justify-between items-center w-full pr-2 sm:pr-4">
+                  <div className="flex flex-col items-start flex-1 text-left">
+                    <span className="text-base sm:text-lg font-bold text-slate-200 group-hover:text-white transition-colors">{template.name}</span>
+                    <div className="flex items-center gap-2 flex-wrap mt-1">
+                      <span className="text-xs sm:text-sm text-slate-500 font-mono">{template.template_type}</span>
+                      {template.category && (
+                        <Badge variant="secondary" className="text-[10px] bg-slate-800 text-slate-300 pointer-events-none">
+                          {template.category}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 sm:gap-2 opacity-50 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="inline-flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap rounded-md text-xs sm:text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-slate-700 bg-slate-900/50 hover:bg-slate-800 text-slate-300 h-8 px-2 sm:h-9 sm:px-3 cursor-pointer"
+                      onClick={() => handleEdit(template)}
+                    >
+                      <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Editar</span>
+                    </div>
+                    <div
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-red-950/30 border border-transparent hover:border-red-900/50 h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-red-500 cursor-pointer"
+                      onClick={() => handleDelete(template.id)}
+                    >
+                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-1 sm:gap-2" onClick={(e) => e.stopPropagation()}>
-                  <div
-                    className="inline-flex items-center justify-center gap-1 sm:gap-2 whitespace-nowrap rounded-md text-xs sm:text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-2 sm:h-9 sm:px-3 cursor-pointer"
-                    onClick={() => handleEdit(template)}
-                  >
-                    <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline">Editar</span>
-                  </div>
-                  <div
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-7 w-7 sm:h-8 sm:w-8 text-destructive/70 hover:text-destructive cursor-pointer"
-                    onClick={() => handleDelete(template.id)}
-                  >
-                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="pl-2 pr-2 pb-2 pt-2 border-t border-slate-800/50 mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+                    {template.fields.length} campos definidos:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {template.fields.map((field, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 rounded bg-slate-950/30 border border-slate-800/50 text-sm">
+                        <span className="font-medium text-slate-300">{field.label || field.name}</span>
+                        <span className="text-xs text-slate-500 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">{field.type}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="pl-2 pr-2 pb-2">
-                <p className="text-sm text-muted-foreground mb-2">
-                  {template.fields.length} campos definidos:
-                </p>
-                <ul className="list-disc pl-6 space-y-1">
-                  {template.fields.map((field, index) => (
-                    <li key={index} className="text-sm">
-                      <span className="font-medium">{field.label || field.name}</span> ({field.type})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
 
-      {templates.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No hay plantillas. Crea una nueva para comenzar.
-        </div>
-      )}
+        {templates.length === 0 && (
+          <div className="text-center py-16 text-slate-500 border-2 border-dashed border-slate-800 rounded-xl m-4">
+            <p>No hay plantillas creadas. Define la primera para comenzar a capturar datos.</p>
+          </div>
+        )}
+      </div>
 
       <TemplateDialog
         open={dialogOpen}

@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CalendarCheck, Users, Car, ClipboardList, MoreHorizontal, Archive, Eye, Pencil, Filter, Clock, LogOut, User, AlertTriangle, CheckCircle, RotateCcw, AlarmClock, MapPin, Database } from "lucide-react";
+import { CalendarCheck, Users, Car, ClipboardList, MoreHorizontal, Archive, Eye, Pencil, Filter, Clock, LogOut, User, AlertTriangle, CheckCircle, RotateCcw, AlarmClock, MapPin, Database, LayoutDashboard } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,9 +36,10 @@ import type { TaskActionConfig } from "@/components/tasks/TaskActionButtons";
 import { useNavigate } from "react-router-dom";
 import { StatusBadge, VehicleBadge, TaskStateBadge } from "@/components/badges";
 import { useDashboardTasks, useDashboardStats } from "@/hooks/use-detailed-tasks";
-import { useScreens, useVehicles } from "@/hooks/use-supabase";
+import { useScreens, useVehicles, useUsers } from "@/hooks/use-supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { DetailedTask } from "@/integrations/supabase/client";
+import { TaskDialog } from "@/components/installations/TaskDialog";
 import { Badge } from "@/components/ui/badge";
 import { buildMapsSearchUrl } from "@/utils/maps";
 import { normalizeTaskLocation } from "@/utils/task";
@@ -120,8 +121,8 @@ const mapDetailedTaskToTask = (task: DetailedTask): Task => {
     typeof task.order === "number"
       ? task.order
       : Number.isFinite(Number(task.order))
-      ? Number(task.order)
-      : 0;
+        ? Number(task.order)
+        : 0;
 
   const normalizedState = (() => {
     const allowed: Task["state"][] = ["urgente", "pendiente", "a la espera", "en fabricacion", "terminado"];
@@ -258,14 +259,14 @@ const mapDetailedTaskToTask = (task: DetailedTask): Task => {
   const responsible: Profile | null =
     task.responsible_profile_id && typeof task.responsible_name === "string"
       ? {
-          id: task.responsible_profile_id,
-          full_name: task.responsible_name,
-          email: pickString(task.responsible_email) ?? null,
-          phone: pickString(task.responsible_phone) ?? null,
-          whatsapp: null,
-          role: normalizeProfileRole(task.responsible_role, "responsable"),
-          status: normalizeProfileStatus(task.responsible_status) ?? "activo",
-        }
+        id: task.responsible_profile_id,
+        full_name: task.responsible_name,
+        email: pickString(task.responsible_email) ?? null,
+        phone: pickString(task.responsible_phone) ?? null,
+        whatsapp: null,
+        role: normalizeProfileRole(task.responsible_role, "responsable"),
+        status: normalizeProfileStatus(task.responsible_status) ?? "activo",
+      }
       : null;
 
   const resolvedSite = resolveField(DEFAULT_SITE_FIELDS, pickString(task.site));
@@ -364,15 +365,15 @@ interface SimpleVehicle {
 type DashboardAssignedProfile = {
   id: string;
   full_name: string;
-  email?: string | null;
-  role?: string | null;
-  status?: string | null;
+  email: string | null;
+  role: string | null;
+  status: string | null;
 };
 
 type DashboardAssignedVehicle = {
   id: string;
   name: string;
-  type: string;
+  type: string | null;
 };
 
 const normalizeAssignedProfiles = (value: unknown): DashboardAssignedProfile[] => {
@@ -392,7 +393,11 @@ const normalizeAssignedProfiles = (value: unknown): DashboardAssignedProfile[] =
         status: typeof record.status === 'string' ? record.status : null,
       };
     })
-    .filter((profile): profile is DashboardAssignedProfile => profile !== null);
+    .filter((profile): profile is DashboardAssignedProfile =>
+      profile !== null &&
+      typeof profile.id === 'string' &&
+      typeof profile.full_name === 'string'
+    );
 };
 
 const normalizeAssignedVehicles = (value: unknown): DashboardAssignedVehicle[] => {
@@ -404,11 +409,21 @@ const normalizeAssignedVehicles = (value: unknown): DashboardAssignedVehicle[] =
       const id = typeof record.id === 'string' ? record.id : null;
       const name = typeof record.name === 'string' ? record.name : null;
       const type = typeof record.type === 'string' ? record.type : null;
-      if (!id || !name || !type) return null;
-      return { id, name, type };
+      if (!id || !name) return null;
+      return {
+        id,
+        name,
+        type: type || null
+      };
     })
-    .filter((vehicle): vehicle is DashboardAssignedVehicle => vehicle !== null);
+    .filter((vehicle): vehicle is DashboardAssignedVehicle =>
+      vehicle !== null &&
+      typeof vehicle.id === 'string' &&
+      typeof vehicle.name === 'string'
+    );
 };
+
+import { CalendarModule } from "@/components/dashboard/CalendarModule";
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -424,12 +439,21 @@ export default function AdminPage() {
 
   const { data: screens = [] } = useScreens();
   const { data: vehicles = [] } = useVehicles();
+  const { data: users = [] } = useUsers();
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isRegisteringArrival, setIsRegisteringArrival] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'all' | 'instalaciones' | 'confeccion' | 'tapiceria'>('instalaciones');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<SimpleProfile | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Combina todas las tareas para el calendario
+  const rawAllTasks = useMemo(() => {
+    return [...confeccionTasks, ...tapiceriaTasks, ...pendingTasks];
+  }, [confeccionTasks, tapiceriaTasks, pendingTasks]);
+
 
   const refreshCalendarData = useCallback(async () => {
     try {
@@ -749,18 +773,15 @@ export default function AdminPage() {
         const mapped = mapDetailedTaskToTask(task);
         const fallback = normalizeTaskLocation(mapped);
         const locationPayload = fallback
-          ? {
-              label: fallback,
-              source: 'task',
-              collected_at: new Date().toISOString(),
-            }
-          : null;
-
-        const { error } = await supabase.rpc('start_work_session', {
+        const { data, error } = await supabase.rpc('register_arrival', {
           p_profile_id: currentUser.id,
           p_task_id: task.id,
-          p_start_location: locationPayload,
-          p_metadata: { source: 'admin-dashboard' },
+          p_start_location: {
+            label: normalizeTaskLocation(mapDetailedTaskToTask(task)),
+            source: 'admin_dashboard',
+            collected_at: new Date().toISOString()
+          } as any,
+          p_metadata: { source: 'admin' } as any
         });
 
         if (error) throw error;
@@ -777,25 +798,57 @@ export default function AdminPage() {
   );
 
   const handleEditTask = (taskId: string) => {
-    navigate('/admin/installations', { state: { editTaskId: taskId } });
+    // Find task in any list (using sortedTasks which is our source of truth)
+    const candidate = sortedTasks.find(t => t.id === taskId);
+    if (candidate) {
+      const task = mapDetailedTaskToTask(candidate);
+      setEditingTask(task);
+      setTaskDialogOpen(true);
+    }
   };
+
+  // Tareas filtradas y ordenadas para el calendario lateral
+  // Se define después para asegurar que sortedTasks ya existe
 
   // Filtrar tareas según la categoría seleccionada y fecha
   const filteredTasks = useMemo(() => {
     return pendingTasks.filter(task => {
+
+      // LOG DEBUG
+      // console.log('Checking task:', task.id, task.screen_group, task.start_date);
+
       let categoryMatch = false;
       if (taskFilter === 'all') categoryMatch = true;
-      else if (taskFilter === 'confeccion') categoryMatch = task.screen_group === 'Confección';
-      else if (taskFilter === 'tapiceria') categoryMatch = task.screen_group === 'Tapicería';
-      else if (taskFilter === 'instalaciones') categoryMatch = task.screen_group === 'Instalaciones';
+      else {
+        // Normalización robusta
+        const rawGroup = task.screen_group;
+        const group = sanitizeString(rawGroup);
+        const filter = sanitizeString(taskFilter);
+
+        // Mapeo flexible
+        if (filter.includes('instalacion')) categoryMatch = group.includes('instalacion');
+        else if (filter.includes('confeccion')) categoryMatch = group.includes('confeccion');
+        else if (filter.includes('tapiceria')) categoryMatch = group.includes('tapiceria');
+        // Fallback genérico para otros grupos
+        else categoryMatch = group.includes(filter);
+
+        if (!categoryMatch && filter.includes('instalacion')) {
+          // Debug why mismatch
+          // console.log('Mismatch:', { rawGroup, group, filter });
+        }
+      }
 
       let dateMatch = true;
       if (selectedDate) {
         if (!task.start_date) {
           dateMatch = true;
         } else {
-          const taskDate = parseISO(task.start_date);
-          dateMatch = isSameDay(taskDate, selectedDate) || isBefore(taskDate, selectedDate);
+          // Mejorado: Normalizar fecha para comparación robusta
+          const dateStr = (task.start_date || '').replace(' ', 'T');
+          const taskDate = dateStr ? new Date(dateStr) : null;
+          dateMatch = taskDate && !isNaN(taskDate.getTime()) ? isSameDay(taskDate, selectedDate) : false;
+
+          // if (!dateMatch) console.log('Date mismatch:', { taskDate, selectedDate });
         }
       }
 
@@ -812,7 +865,7 @@ export default function AdminPage() {
         if (aTerminated === bTerminated) {
           return a.index - b.index;
         }
-        return aTerminated ? -1 : 1;
+        return aTerminated ? 1 : -1; // Terminated at the bottom
       })
       .map((entry) => entry.task);
   }, [filteredTasks]);
@@ -836,39 +889,36 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      {/* Cabecera mejorada con reloj y avatar */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-4">
-            <Clock className="h-8 w-8 text-primary" />
-            <div className="text-4xl font-bold text-primary">
-              {format(currentTime, 'HH:mm:ss')}
-            </div>
-          </div>
-          <div className="text-2xl font-semibold text-muted-foreground">
-            {format(currentTime, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
-          </div>
+      {/* Header Estándar Unificado */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            <LayoutDashboard className="h-8 w-8" />
+            Panel de Control
+          </h1>
+          <p className="text-slate-400 mt-1">
+            {format(currentTime, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })} · {format(currentTime, 'HH:mm:ss')}
+          </p>
         </div>
-        
+
         <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="text-sm text-muted-foreground">Bienvenido</div>
-            <div className="font-semibold">{currentUser?.full_name || 'Usuario'}</div>
-            <div className="text-xs text-muted-foreground capitalize">{currentUser?.role || 'Administrador'}</div>
+          <div className="text-right hidden sm:block">
+            <div className="text-sm font-medium text-white">{currentUser?.full_name || 'Usuario'}</div>
+            <div className="text-xs text-slate-500 capitalize">{currentUser?.role || 'Administrador'}</div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-12 w-12 rounded-full">
-                <Avatar className="h-12 w-12">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full ring-2 ring-slate-800 hover:ring-slate-700">
+                <Avatar className="h-10 w-10">
                   <AvatarImage src={currentUser?.avatar_url} alt={currentUser?.full_name} />
-                  <AvatarFallback>
+                  <AvatarFallback className="bg-slate-900 text-slate-200">
                     {currentUser?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
               </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuItem onClick={handleLogout}>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56 bg-slate-900 border-slate-800 text-slate-200" align="end" forceMount>
+              <DropdownMenuItem onClick={handleLogout} className="hover:bg-slate-800 focus:bg-slate-800 cursor-pointer">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar sesión</span>
               </DropdownMenuItem>
@@ -876,132 +926,113 @@ export default function AdminPage() {
           </DropdownMenu>
         </div>
       </div>
+
       {/* Responsive Dashboard Layout */}
       <div className="space-y-6">
-        {/* Metrics Cards - Responsive Grid */}
+        {/* Metrics Cards - Responsive Grid Estándar */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tareas Totales</CardTitle>
-              <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-slate-400">Tareas Totales</CardTitle>
+              <CalendarCheck className="h-4 w-4 text-white" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold text-white">
                 {statsLoading ? (
-                  <div className="animate-pulse bg-muted h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-slate-800 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.total_tasks || 0
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">Tareas en el sistema</p>
+              <p className="text-xs text-slate-500">Tareas en el sistema</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Usuarios Activos</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-slate-400">Usuarios Activos</CardTitle>
+              <Users className="h-4 w-4 text-white" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold text-white">
                 {statsLoading ? (
-                  <div className="animate-pulse bg-muted h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-slate-800 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.active_users || 0
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">Operarios activos</p>
+              <p className="text-xs text-slate-500">Operarios activos</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Vehículos</CardTitle>
-              <Car className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-slate-400">Vehículos</CardTitle>
+              <Car className="h-4 w-4 text-white" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold text-white">
                 {statsLoading ? (
-                  <div className="animate-pulse bg-muted h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-slate-800 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.active_vehicles || 0
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">Vehículos registrados</p>
+              <p className="text-xs text-slate-500">Vehículos registrados</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-slate-400">Pendientes</CardTitle>
+              <ClipboardList className="h-4 w-4 text-white" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold text-white">
                 {statsLoading ? (
-                  <div className="animate-pulse bg-muted h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-slate-800 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.pending_tasks || 0
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">Tareas pendientes</p>
+              <p className="text-xs text-slate-500">Tareas pendientes</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content - Single Row with 4 Columns */}
-        <div className="flex flex-row flex-nowrap gap-6">
-          {/* Calendar Card */}
-          <Card className="flex-1">
-            <CardHeader>
-              <CardTitle className="text-base">Calendario</CardTitle>
-            </CardHeader>
-            <CardContent className="flex justify-center">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                numberOfMonths={isMobile ? 1 : 1}
-                locale={es}
-                className="rounded-lg"
-                modifiers={{
-                  today: new Date(),
-                  pending: calendarPendingDays,
-                  hasTasks: calendarTaskDays
-                }}
-                modifiersClassNames={{
-                  today: "bg-orange-500 text-white hover:bg-orange-600 rounded-md font-medium ring-2 ring-orange-300",
-                  pending: "rdp-day_pending",
-                  hasTasks: "hasTasks"
-                }}
-              />
-            </CardContent>
-          </Card>
+        {/* Calendar Module - Full Width */}
+        <CalendarModule
+          selectedDate={selectedDate}
+          onDateSelect={setSelectedDate}
+          isMobile={isMobile}
+        />
 
+        {/* Main Content - Row with 3 Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Data Shortcuts Card */}
-          <Card className="flex-1">
+          <Card className="flex-1 bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Database className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base flex items-center gap-2 text-white">
+                <Database className="h-4 w-4 text-blue-400" />
                 Accesos Gestión de Datos
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-slate-500">
                 Configura estos accesos en "Gestión de Tablas de Datos".
               </CardDescription>
             </CardHeader>
             <CardContent>
               {dataShortcutScreens.length > 0 ? (
-                <div className="space-y-2 max-h-[320px] overflow-y-auto">
+                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
                   {dataShortcutScreens.map((screen) => (
                     <Button
                       key={screen.id}
                       variant="outline"
-                      className="w-full justify-between"
+                      className="w-full justify-between border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-slate-300"
                       onClick={() => handleOpenDataShortcut(screen.id)}
                     >
                       <span className="truncate text-left">{screen.name}</span>
                       {screen.screen_group ? (
-                        <Badge variant="secondary" className="ml-2 whitespace-nowrap">
+                        <Badge variant="secondary" className="ml-2 whitespace-nowrap bg-slate-900 text-slate-400">
                           {screen.screen_group}
                         </Badge>
                       ) : null}
@@ -1014,7 +1045,7 @@ export default function AdminPage() {
                   <p className="text-sm">Añade accesos desde Gestión de Tablas de Datos.</p>
                   <Button
                     variant="link"
-                    className="mt-2"
+                    className="mt-2 text-blue-400"
                     onClick={() => navigate("/admin/data")}
                   >
                     Abrir Gestión de Datos
@@ -1025,10 +1056,10 @@ export default function AdminPage() {
           </Card>
 
           {/* Confección Card */}
-          <Card className="flex-1">
+          <Card className="flex-1 bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+              <CardTitle className="text-base flex items-center gap-2 text-white">
+                <div className="w-3 h-3 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50"></div>
                 Confección
               </CardTitle>
             </CardHeader>
@@ -1037,14 +1068,14 @@ export default function AdminPage() {
                 <div className="space-y-2">
                   {Array.from({ length: 2 }).map((_, i) => (
                     <div key={i} className="grid grid-cols-3 gap-4">
-                      <div className="animate-pulse bg-muted h-6 rounded" />
-                      <div className="animate-pulse bg-muted h-6 rounded" />
-                      <div className="animate-pulse bg-muted h-6 rounded" />
+                      <div className="animate-pulse bg-slate-800 h-6 rounded" />
+                      <div className="animate-pulse bg-slate-800 h-6 rounded" />
+                      <div className="animate-pulse bg-slate-800 h-6 rounded" />
                     </div>
                   ))}
                 </div>
               ) : confeccionTasks.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-slate-500">
                   No hay tareas de confección
                 </div>
               ) : (
@@ -1052,21 +1083,21 @@ export default function AdminPage() {
                   <div className="overflow-x-auto">
                     <Table className="min-w-full">
                       <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-sm">Nº Orden</TableHead>
-                          <TableHead className="text-sm">Obra</TableHead>
-                          <TableHead className="text-sm">Estado</TableHead>
+                        <TableRow className="border-slate-800 hover:bg-slate-800/50">
+                          <TableHead className="text-sm text-slate-400">Nº Orden</TableHead>
+                          <TableHead className="text-sm text-slate-400">Obra</TableHead>
+                          <TableHead className="text-sm text-slate-400">Estado</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {confeccionTasks.slice(0, 2).map((task) => {
                           const statusColor = getStateBadgeClasses(task.state);
                           return (
-                            <TableRow key={task.id}>
-                              <TableCell className="text-sm font-medium">
+                            <TableRow key={task.id} className="border-slate-800 hover:bg-slate-800/50">
+                              <TableCell className="text-sm font-medium text-slate-200">
                                 {getOrderNumberLabel(task)}
                               </TableCell>
-                              <TableCell className="text-sm">{getConfeccionObraLabel(task)}</TableCell>
+                              <TableCell className="text-sm text-slate-300">{getConfeccionObraLabel(task)}</TableCell>
                               <TableCell>
                                 <Badge variant="secondary" className={statusColor}>
                                   {task.state}
@@ -1080,17 +1111,17 @@ export default function AdminPage() {
                   </div>
                   {confeccionTasks.length > 2 && (
                     <div className="overflow-x-auto">
-                      <div className="max-h-48 overflow-y-auto rounded-md border border-muted/40">
+                      <div className="max-h-48 overflow-y-auto rounded-md border border-slate-800 custom-scrollbar">
                         <Table className="min-w-full">
                           <TableBody>
                             {confeccionTasks.slice(2).map((task) => {
                               const statusColor = getStateBadgeClasses(task.state);
                               return (
-                                <TableRow key={task.id}>
-                                  <TableCell className="text-sm font-medium">
+                                <TableRow key={task.id} className="border-slate-800 hover:bg-slate-800/50">
+                                  <TableCell className="text-sm font-medium text-slate-200">
                                     {getOrderNumberLabel(task)}
                                   </TableCell>
-                                  <TableCell className="text-sm">{getConfeccionObraLabel(task)}</TableCell>
+                                  <TableCell className="text-sm text-slate-300">{getConfeccionObraLabel(task)}</TableCell>
                                   <TableCell>
                                     <Badge variant="secondary" className={statusColor}>
                                       {task.state}
@@ -1110,10 +1141,10 @@ export default function AdminPage() {
           </Card>
 
           {/* Tapicería Card */}
-          <Card className="flex-1">
+          <Card className="flex-1 bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+              <CardTitle className="text-base flex items-center gap-2 text-white">
+                <div className="w-3 h-3 bg-purple-500 rounded-full shadow-lg shadow-purple-500/50"></div>
                 Tapicería
               </CardTitle>
             </CardHeader>
@@ -1121,24 +1152,24 @@ export default function AdminPage() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-sm">Nº Orden</TableHead>
-                      <TableHead className="text-sm">Gestor</TableHead>
-                      <TableHead className="text-sm">Estado</TableHead>
+                    <TableRow className="border-slate-800 hover:bg-slate-800/50">
+                      <TableHead className="text-sm text-slate-400">Nº Orden</TableHead>
+                      <TableHead className="text-sm text-slate-400">Gestor</TableHead>
+                      <TableHead className="text-sm text-slate-400">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {tasksLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell><div className="animate-pulse bg-muted h-4 w-8 rounded"></div></TableCell>
-                          <TableCell><div className="animate-pulse bg-muted h-4 w-16 rounded"></div></TableCell>
-                          <TableCell><div className="animate-pulse bg-muted h-4 w-20 rounded"></div></TableCell>
+                          <TableCell><div className="animate-pulse bg-slate-800 h-4 w-8 rounded"></div></TableCell>
+                          <TableCell><div className="animate-pulse bg-slate-800 h-4 w-16 rounded"></div></TableCell>
+                          <TableCell><div className="animate-pulse bg-slate-800 h-4 w-20 rounded"></div></TableCell>
                         </TableRow>
                       ))
                     ) : tapiceriaTasks.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                      <TableRow className="border-slate-800 hover:bg-slate-800/50">
+                        <TableCell colSpan={3} className="text-center text-slate-500 py-8">
                           No hay tareas de tapicería
                         </TableCell>
                       </TableRow>
@@ -1147,9 +1178,9 @@ export default function AdminPage() {
                         const statusColor = getStateBadgeClasses(task.state);
 
                         return (
-                          <TableRow key={task.id}>
-                            <TableCell className="text-sm font-medium">{getOrderNumberLabel(task)}</TableCell>
-                            <TableCell className="text-sm">{getTapiceriaGestorLabel(task)}</TableCell>
+                          <TableRow key={task.id} className="border-slate-800 hover:bg-slate-800/50">
+                            <TableCell className="text-sm font-medium text-slate-200">{getOrderNumberLabel(task)}</TableCell>
+                            <TableCell className="text-sm text-slate-300">{getTapiceriaGestorLabel(task)}</TableCell>
                             <TableCell>
                               <Badge variant="secondary" className={statusColor}>
                                 {task.state}
@@ -1272,7 +1303,7 @@ export default function AdminPage() {
                     const departureLabel = formatSessionTimestamp(sessionSummary?.lastDeparture);
                     const isTerminated = (task.state ?? '').toLowerCase() === 'terminado';
                     const mappedTask = mapDetailedTaskToTask(task);
-                    const resolvedLocation = normalizeTaskLocation(task);
+                    const resolvedLocation = normalizeTaskLocation(mappedTask);
                     const workSiteAddress = typeof task.work_site_address === 'string' && task.work_site_address.trim().length
                       ? task.work_site_address.trim()
                       : null;
@@ -1289,183 +1320,196 @@ export default function AdminPage() {
                     const hasMaps = mapsEnabled && Boolean(resolvedLocation || task.work_site_maps_url);
 
                     return (
-                    <TableRow key={task.id} className="hover:bg-muted/50">
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedTaskIds.has(task.id)}
-                          onCheckedChange={(checked) => {
-                            const newSelected = new Set(selectedTaskIds);
-                            if (checked) {
-                              newSelected.add(task.id);
-                            } else {
-                              newSelected.delete(task.id);
-                            }
-                            setSelectedTaskIds(newSelected);
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {getTaskDateLabel(task)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {(() => {
-                            const assignedProfiles = normalizeAssignedProfiles(task.assigned_profiles);
-                            if (assignedProfiles.length === 0) {
-                              return (
-                                <span className="text-xs text-muted-foreground">Sin asignar</span>
-                              );
-                            }
+                      <TableRow
+                        key={task.id}
+                        className="hover:bg-muted/50 cursor-pointer"
+                        onDoubleClick={() => handleEditTask(task.id)}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedTaskIds.has(task.id)}
+                            onCheckedChange={(checked) => {
+                              const newSelected = new Set(selectedTaskIds);
+                              if (checked) {
+                                newSelected.add(task.id);
+                              } else {
+                                newSelected.delete(task.id);
+                              }
+                              setSelectedTaskIds(newSelected);
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {getTaskDateLabel(task)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {(() => {
+                              const assignedProfiles = normalizeAssignedProfiles(task.assigned_profiles);
+                              if (assignedProfiles.length === 0) {
+                                return (
+                                  <span className="text-xs text-muted-foreground">Sin asignar</span>
+                                );
+                              }
 
-                            return assignedProfiles.map((profile) => {
-                              const taskCount = pendingTasks.filter(
-                                (pendingTask) =>
-                                  normalizeAssignedProfiles(pendingTask.assigned_profiles).some(
-                                    (assigned) => assigned.id === profile.id
-                                  )
-                              ).length;
+                              return assignedProfiles.map((profile) => {
+                                const taskCount = pendingTasks.filter(
+                                  (pendingTask) =>
+                                    normalizeAssignedProfiles(pendingTask.assigned_profiles).some(
+                                      (assigned) => assigned.id === profile.id
+                                    )
+                                ).length;
 
-                              const bgColor = 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200';
+                                const bgColor = 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200';
 
-                              return (
-                                <div key={profile.id} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${bgColor}`}>
-                                  <User className="h-3 w-3 flex-shrink-0" />
-                                  <span className="truncate max-w-[80px]">{profile.full_name}</span>
-                                  {taskCount > 1 && (
-                                    <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-xs text-blue-800 dark:text-blue-200">
-                                      {taskCount}
-                                    </Badge>
-                                  )}
-                                </div>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-start gap-2">
-                            <MapPin className="mt-1 h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium leading-5" title={siteLabel}>
-                              {siteLabel}
-                            </span>
+                                return (
+                                  <div key={profile.id} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${bgColor}`}>
+                                    <User className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate max-w-[80px]">{profile.full_name}</span>
+                                    {taskCount > 1 && (
+                                      <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-xs text-blue-800 dark:text-blue-200">
+                                        {taskCount}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                );
+                              });
+                            })()}
                           </div>
-                          {hasMaps && (
-                            <Badge
-                              variant="outline"
-                              title={task.work_site_maps_url ?? resolvedLocation ?? 'Abrir en Maps'}
-                              className="flex w-fit items-center gap-1 border-emerald-400 bg-emerald-100 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
-                            >
-                              Mapa disponible
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[220px] truncate" title={getTaskDescriptionLabel(task)}>
-                        {getTaskDescriptionLabel(task)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {normalizeAssignedVehicles(task.assigned_vehicles).length > 0 ? (
-                            normalizeAssignedVehicles(task.assigned_vehicles).map((vehicle) => (
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-start gap-2">
+                              <MapPin className="mt-1 h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium leading-5" title={siteLabel}>
+                                {siteLabel}
+                              </span>
+                            </div>
+                            {hasMaps && (
+                              <Badge
+                                variant="outline"
+                                title={task.work_site_maps_url ?? resolvedLocation ?? 'Abrir en Maps'}
+                                className="flex w-fit items-center gap-1 border-emerald-400 bg-emerald-100 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+                              >
+                                Mapa disponible
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-[220px] truncate" title={getTaskDescriptionLabel(task)}>
+                          {getTaskDescriptionLabel(task)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {normalizeAssignedVehicles(task.assigned_vehicles).length > 0 ? (
+                              normalizeAssignedVehicles(task.assigned_vehicles).map((vehicle) => (
+                                <VehicleBadge
+                                  key={`${task.id}-${vehicle.id}`}
+                                  name={vehicle.name}
+                                  type={vehicle.type}
+                                  size="sm"
+                                />
+                              ))
+                            ) : task.vehicle_type ? (
                               <VehicleBadge
-                                key={`${task.id}-${vehicle.id}`}
-                                name={vehicle.name}
-                                type={vehicle.type}
+                                key={`${task.id}-vehicle-type`}
+                                name={task.vehicle_type}
+                                type={task.vehicle_type}
                                 size="sm"
                               />
-                            ))
-                          ) : task.vehicle_type ? (
-                            <VehicleBadge
-                              key={`${task.id}-vehicle-type`}
-                              name={task.vehicle_type}
-                              type={task.vehicle_type}
-                              size="sm"
-                            />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Sin vehículo</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <TaskStateBadge state={task.state} />
-                          {isTerminated && (
-                            <div className="flex items-center gap-1">
-                              <Badge className="flex items-center gap-1 bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-200">
-                                <CheckCircle className="h-3 w-3" />
-                                Verificado
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Sin vehículo</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <TaskStateBadge state={task.state} />
+                            {isTerminated && (
+                              <div className="flex items-center gap-1">
+                                <Badge className="flex items-center gap-1 bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-200">
+                                  <CheckCircle className="h-3 w-3" />
+                                  Verificado
+                                </Badge>
+                                <Badge variant="outline" className="flex w-fit items-center gap-1 text-xs">
+                                  <AlarmClock className="h-3 w-3" />
+                                  Pendiente
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {sessionSummary ? (
+                            sessionSummary.active ? (
+                              <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300">
+                                Sesión en curso{arrivalLabel ? ` desde ${arrivalLabel}` : ''}
                               </Badge>
-                              <Badge variant="outline" className="flex w-fit items-center gap-1 text-xs">
-                                <AlarmClock className="h-3 w-3" />
-                                Pendiente
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {sessionSummary ? (
-                          sessionSummary.active ? (
-                          <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300">
-                              Sesión en curso{arrivalLabel ? ` desde ${arrivalLabel}` : ''}
-                            </Badge>
+                            ) : (
+                              <div className="flex flex-col text-xs text-muted-foreground">
+                                {arrivalLabel && <span>Última llegada: {arrivalLabel}</span>}
+                                {departureLabel && <span>Salida: {departureLabel}</span>}
+                                {!arrivalLabel && !departureLabel && (
+                                  <span>Sin registros recientes</span>
+                                )}
+                              </div>
+                            )
                           ) : (
-                            <div className="flex flex-col text-xs text-muted-foreground">
-                              {arrivalLabel && <span>Última llegada: {arrivalLabel}</span>}
-                              {departureLabel && <span>Salida: {departureLabel}</span>}
-                              {!arrivalLabel && !departureLabel && (
-                                <span>Sin registros recientes</span>
-                              )}
-                            </div>
-                          )
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Sin registros</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onSelect={(event) => {
-                                event.preventDefault();
-                                handleViewDetails(task);
-                              }}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver detalles
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditTask(task.id)}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => updateTaskState(task.id, 'pendiente')}>
-                              <RotateCcw className="mr-2 h-4 w-4" />
-                              Marcar como pendiente
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateTaskState(task.id, 'urgente')}>
-                              <AlertTriangle className="mr-2 h-4 w-4 text-amber-500" />
-                              Marcar como urgente
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => updateTaskState(task.id, 'terminado')}>
-                              <CheckCircle className="mr-2 h-4 w-4 text-emerald-500" />
-                              Marcar como terminado
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleArchiveTask(task.id)}>
-                              <Archive className="mr-2 h-4 w-4" />
-                              Archivar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                            <span className="text-xs text-muted-foreground">Sin registros</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground hidden sm:inline-flex"
+                            onClick={() => handleEditTask(task.id)}
+                            title="Editar tarea"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onSelect={(event) => {
+                                  event.preventDefault();
+                                  handleViewDetails(task);
+                                }}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver detalles
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditTask(task.id)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => updateTaskState(task.id, 'pendiente')}>
+                                <RotateCcw className="mr-2 h-4 w-4" />
+                                Marcar como pendiente
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => updateTaskState(task.id, 'urgente')}>
+                                <AlertTriangle className="mr-2 h-4 w-4 text-amber-500" />
+                                Marcar como urgente
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => updateTaskState(task.id, 'terminado')}>
+                                <CheckCircle className="mr-2 h-4 w-4 text-emerald-500" />
+                                Marcar como terminado
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleArchiveTask(task.id)}>
+                                <Archive className="mr-2 h-4 w-4" />
+                                Archivar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 )}
@@ -1488,15 +1532,15 @@ export default function AdminPage() {
         const actions: TaskActionConfig[] = [
           ...(canRegisterArrival && !isTerminated
             ? [
-                {
-                  id: "register",
-                  label: "Registrar llegada",
-                  icon: <Clock className="h-4 w-4" />,
-                  variant: "primary",
-                  onClick: () => handleRegisterArrival(selectedTask),
-                  loading: isRegisteringArrival,
-                } satisfies TaskActionConfig,
-              ]
+              {
+                id: "register",
+                label: "Registrar llegada",
+                icon: <Clock className="h-4 w-4" />,
+                variant: "primary",
+                onClick: () => handleRegisterArrival(selectedTask),
+                loading: isRegisteringArrival,
+              } satisfies TaskActionConfig,
+            ]
             : []),
           {
             id: "maps",
@@ -1508,17 +1552,17 @@ export default function AdminPage() {
           },
           ...(isTerminated
             ? [
-                {
-                  id: "archive",
-                  label: "Archivar tarea",
-                  icon: <Archive className="h-4 w-4" />,
-                  variant: "outline-success",
-                  onClick: async () => {
-                    await handleArchiveTask(selectedTask.id);
-                    setDetailsDialogOpen(false);
-                  },
-                } satisfies TaskActionConfig,
-              ]
+              {
+                id: "archive",
+                label: "Archivar tarea",
+                icon: <Archive className="h-4 w-4" />,
+                variant: "outline-success",
+                onClick: async () => {
+                  await handleArchiveTask(selectedTask.id);
+                  setDetailsDialogOpen(false);
+                },
+              } satisfies TaskActionConfig,
+            ]
             : []),
         ];
 
@@ -1554,6 +1598,18 @@ export default function AdminPage() {
           </TaskDetailsDialog>
         );
       })()}
+      <TaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        onSuccess={() => {
+          setTaskDialogOpen(false);
+          refreshAllData();
+        }}
+        task={editingTask}
+        selectedDate={selectedDate || new Date()}
+        users={users}
+        vehicles={vehicles}
+      />
     </div>
   );
 }

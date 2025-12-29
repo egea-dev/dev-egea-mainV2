@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
+import { Monitor } from 'lucide-react';
 import DisplayPage from './Display';
 
 type Screen = {
@@ -134,15 +135,31 @@ export default function GroupDisplayPage() {
   }, [clearTimer]);
 
   if (!groupName) {
-    return <div className="flex h-screen items-center justify-center">No se especifico un grupo.</div>;
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-[#0f1115] text-slate-400">
+        <Monitor className="h-16 w-16 mb-4 opacity-20" />
+        <div className="text-xl font-medium">No se especificó un grupo visual.</div>
+      </div>
+    );
   }
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center">Cargando grupo...</div>;
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-[#0f1115] text-slate-400">
+        <div className="w-12 h-12 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+        <div className="text-xl font-medium animate-pulse">Cargando visualización de grupo...</div>
+      </div>
+    );
   }
-  
+
   if (screens.length === 0) {
-    return <div className="flex h-screen items-center justify-center">No se encontraron pantallas para el grupo "{groupName}".</div>;
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-[#0f1115] text-slate-400">
+        <Monitor className="h-16 w-16 mb-4 text-amber-500/50" />
+        <div className="text-xl font-medium text-white">Grupo "{groupName}" sin pantallas activas</div>
+        <p className="text-slate-600 mt-2">Verifique la configuración en el Panel de Admin.</p>
+      </div>
+    );
   }
 
   return (

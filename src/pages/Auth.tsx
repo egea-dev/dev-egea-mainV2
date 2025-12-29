@@ -12,15 +12,45 @@ export default function AuthPage() {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate("/admin");
+        // Obtener perfil para redirigir según rol
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('auth_user_id', session.user.id)
+          .maybeSingle();
+
+        const role = profile?.role?.toLowerCase() || 'operario';
+
+        // Admin y Manager van al dashboard principal
+        if (role === 'admin' || role === 'manager') {
+          navigate("/admin");
+        } else {
+          // Operarios y responsables van a su jornada
+          navigate("/admin/workday");
+        }
       }
     };
 
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
-        navigate("/admin");
+        // Obtener perfil para redirigir según rol
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('auth_user_id', session.user.id)
+          .maybeSingle();
+
+        const role = profile?.role?.toLowerCase() || 'operario';
+
+        // Admin y Manager van al dashboard principal
+        if (role === 'admin' || role === 'manager') {
+          navigate("/admin");
+        } else {
+          // Operarios y responsables van a su jornada
+          navigate("/admin/workday");
+        }
       }
     });
 

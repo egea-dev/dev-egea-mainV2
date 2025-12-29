@@ -105,33 +105,33 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
   return (
     <>
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/30 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-orange-100 p-2 text-orange-600">
+            <div className="rounded-full bg-slate-900 p-2 text-blue-400 border border-slate-800">
               <User className="h-5 w-5" />
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Gestionar operarios
               </p>
-              <p className="text-lg font-semibold text-slate-900">Directorio de usuarios</p>
+              <p className="text-lg font-semibold text-white">Directorio de usuarios</p>
             </div>
           </div>
           <Button
             onClick={() => handleOpenDialog()}
-            className="rounded-full bg-[#ff6b4a] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#ff5f3a]"
+            className="rounded-full bg-blue-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 shadow-lg shadow-blue-900/20"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Anadir operario
+            Añadir operario
           </Button>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/30 px-4 py-3">
           <Input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Buscar por nombre, email o telefono"
-            className="border-slate-200"
+            placeholder="Buscar por nombre, email o teléfono"
+            className="border-slate-800 bg-slate-900/50 text-slate-200 placeholder:text-slate-500 focus-visible:ring-blue-500/50"
           />
         </div>
 
@@ -139,107 +139,114 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
           {filteredUsers.map((user) => {
             const availability = availabilityChip(user.status);
             return (
-            <div
-              key={user.id}
-              className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
-            >
-              <div className="flex flex-col gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="h-11 w-11 rounded-full bg-slate-100 ring-1 ring-slate-200">
-                    {user.avatar_url ? (
-                      <img
-                        src={user.avatar_url}
-                        alt={user.full_name}
-                        className="h-full w-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <User className="m-3 h-6 w-6 text-slate-400" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-slate-900">{user.full_name}</p>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                          <StatusBadge status={user.status} size="sm" variant="dot" />
-                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium capitalize text-slate-600">
-                            {user.role}
-                          </span>
-                          {!user.auth_user_id && <span className="text-orange-500">Acceso pendiente</span>}
+              <div
+                key={user.id}
+                className="group flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/20 p-4 transition-colors hover:bg-slate-900/40 hover:border-slate-700"
+              >
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="h-11 w-11 rounded-full bg-slate-800 ring-1 ring-slate-700 overflow-hidden">
+                      {user.avatar_url ? (
+                        <img
+                          src={user.avatar_url}
+                          alt={user.full_name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <User className="h-5 w-5 text-slate-500" />
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${availability.className}`}>
-                          {availability.label}
-                        </span>
-                        {!user.auth_user_id && user.email && (
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-slate-200">{user.full_name}</p>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                            <StatusBadge status={user.status} size="sm" variant="dot" />
+                            <span className="rounded-full bg-slate-800 px-2.5 py-0.5 font-medium capitalize text-slate-400 border border-slate-700">
+                              {user.role}
+                            </span>
+                            {!user.auth_user_id && <span className="text-amber-500 font-medium">Acceso pendiente</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold border ${availability.label === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                            availability.label === "Vacaciones" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                              "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                            }`}>
+                            {availability.label}
+                          </span>
+                          {!user.auth_user_id && user.email && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                              title="Invitar o vincular usuario"
+                              onClick={() => handleInviteUser(user)}
+                              disabled={inviteLoadingId === user.id}
+                            >
+                              <Link2 className={`h-4 w-4 ${inviteLoadingId === user.id ? "animate-spin" : ""}`} />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-full border border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100"
-                            title="Invitar o vincular usuario"
-                            onClick={() => handleInviteUser(user)}
-                            disabled={inviteLoadingId === user.id}
+                            className="h-8 w-8 rounded-full border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white"
+                            onClick={() => handleOpenDialog(user)}
+                            title="Ver o editar operario"
                           >
-                            <Link2 className={`h-4 w-4 ${inviteLoadingId === user.id ? "animate-spin" : ""}`} />
+                            <Edit className="h-4 w-4" />
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100"
-                          onClick={() => handleOpenDialog(user)}
-                          title="Ver o editar operario"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50"
-                          onClick={() => handleDelete(user.id)}
-                          title="Eliminar operario"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-                      <div className="flex items-center gap-1 break-words">
-                        <Mail className="h-3 w-3" />
-                        <span>{user.email ?? "Sin correo"}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Phone className="h-3 w-3" />
-                        <span>{user.phone ?? "Sin telefono"}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <MessageCircle className="h-3 w-3" />
-                        <span>{user.whatsapp ?? "Sin whatsapp"}</span>
-                      </div>
-                      {user.public_url && (
-                        <div className="flex items-center gap-1">
-                          <ExternalLink className="h-3 w-3" />
-                          <a
-                            href={user.public_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline"
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full border border-red-900/30 text-slate-500 hover:bg-red-950/30 hover:text-red-400 hover:border-red-900/50"
+                            onClick={() => handleDelete(user.id)}
+                            title="Eliminar operario"
                           >
-                            Perfil publico
-                          </a>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      )}
+                      </div>
+                      <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2 mt-3 p-3 rounded-lg bg-slate-950/20 border border-slate-800/50">
+                        <div className="flex items-center gap-2 break-words">
+                          <Mail className="h-3 w-3 text-slate-600" />
+                          <span className="text-slate-400">{user.email ?? "Sin correo"}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-3 w-3 text-slate-600" />
+                          <span className="text-slate-400">{user.phone ?? "Sin teléfono"}</span>
+                        </div>
+                        {(user.whatsapp) && (
+                          <div className="flex items-center gap-2">
+                            <MessageCircle className="h-3 w-3 text-emerald-600/70" />
+                            <span className="text-slate-400">{user.whatsapp}</span>
+                          </div>
+                        )}
+                        {user.public_url && (
+                          <div className="flex items-center gap-2">
+                            <ExternalLink className="h-3 w-3 text-blue-500/70" />
+                            <a
+                              href={user.public_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:underline hover:text-blue-300"
+                            >
+                              Perfil público
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
             );
           })}
 
           {!filteredUsers.length && (
-            <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-muted-foreground">
+            <p className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 px-4 py-8 text-center text-sm text-slate-500">
               No se encontraron usuarios con el filtro aplicado.
             </p>
           )}

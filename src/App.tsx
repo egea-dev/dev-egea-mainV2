@@ -26,9 +26,12 @@ import DataEntryPage from "./pages/DataEntry";
 import TemplatesPage from "./pages/TemplatesPage";
 import MyTasksPage from "./pages/MyTasksPage";
 import WorkdayPage from "./pages/WorkdayPage";
+import KioskPage from "./pages/KioskPage";
+import WarehousePage from "./pages/WarehousePage";
 
 // --- LAYOUTS Y COMPONENTES PRINCIPALES ---
-import AdminLayout from "./pages/AdminLayout"; // CORRECCIÓN DEFINITIVA: Importación nombrada
+import AdminLayout from "./pages/AdminLayout";
+import CommercialPage from "./pages/CommercialPage";
 import { DataManagement } from "./components/data/DataManagement";
 import { ScreenList } from "./components/screens/ScreenList";
 import ScreenDisplay from "./pages/ScreenDisplay";
@@ -44,43 +47,45 @@ const App = () => (
       <RolePreviewProvider>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
-          {/* Rutas Públicas */}
-          <Route path="/" element={<IndexPage />} />
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/share/plan/:token" element={<SharedPlanPage />} />
-          <Route path="/display/:id" element={<DisplayPage />} />
-          <Route path="/group/:groupName" element={<GroupDisplayPage />} />
-          <Route path="/screen/:screenId" element={<ScreenDisplay />} />
-          <Route path="/checkin/:token" element={<CheckinPage />} />
-          <Route path="/mis-tareas/:token" element={<MyTasksPage />} />
+            {/* Rutas Públicas */}
+            <Route path="/" element={<IndexPage />} />
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/share/plan/:token" element={<SharedPlanPage />} />
+            <Route path="/display/:id" element={<DisplayPage />} />
+            <Route path="/group/:groupName" element={<GroupDisplayPage />} />
+            <Route path="/screen/:screenId" element={<ScreenDisplay />} />
+            <Route path="/checkin/:token" element={<CheckinPage />} />
+            <Route path="/mis-tareas/:token" element={<MyTasksPage />} />
 
-          {/* Rutas Protegidas del Panel de Administración */}
-          <Route path="/admin" element={<AuthGuard><PermissionGuardEnhanced resource="dashboard" action="view"><AdminLayout /></PermissionGuardEnhanced></AuthGuard>}>
-            <Route index element={<PermissionGuardEnhanced resource="admin" action="view"><AdminPage /></PermissionGuardEnhanced>} />
-            <Route path="installations" element={<InstallationsPage />} />
-            <Route
-              path="users"
-              element={
-                <PermissionGuardEnhanced resource="users" action="view">
-                  <UsersAndVehiclesPage />
-                </PermissionGuardEnhanced>
-              }
-            />
-            <Route
-              path="communications"
-              element={<CommunicationsPage />}
-            />
-            <Route path="workday" element={<WorkdayPage />} />
-            <Route path="settings" element={<PermissionGuardEnhanced resource="admin" action="view"><SettingsPage /></PermissionGuardEnhanced>} />
-            <Route path="archive" element={<PermissionGuardEnhanced resource="admin" action="view"><ArchivePage /></PermissionGuardEnhanced>} />
-            <Route path="data" element={<PermissionGuardEnhanced resource="admin" action="view"><DataManagement /></PermissionGuardEnhanced>} />
-            <Route path="screens" element={<PermissionGuardEnhanced resource="admin" action="view"><ScreenList /></PermissionGuardEnhanced>} />
-            <Route path="templates" element={<PermissionGuardEnhanced resource="admin" action="view"><TemplatesPage /></PermissionGuardEnhanced>} />
-          </Route>
-          
-          <Route path="/data-entry/:id" element={<AuthGuard><DataEntryPage /></AuthGuard>} />
-          
-          <Route path="*" element={<NotFound />} />
+            <Route path="/admin" element={<AuthGuard><AdminLayout /></AuthGuard>}>
+              <Route index element={<PermissionGuardEnhanced resource="admin" action="view"><AdminPage /></PermissionGuardEnhanced>} />
+              <Route path="installations" element={<InstallationsPage />} />
+              <Route path="comercial" element={<CommercialPage />} />
+              <Route
+                path="users"
+                element={
+                  <PermissionGuardEnhanced resource="users" action="view">
+                    <UsersAndVehiclesPage />
+                  </PermissionGuardEnhanced>
+                }
+              />
+              <Route
+                path="communications"
+                element={<CommunicationsPage />}
+              />
+              <Route path="workday" element={<WorkdayPage />} />
+              <Route path="settings" element={<PermissionGuardEnhanced resource="admin" action="view"><SettingsPage /></PermissionGuardEnhanced>} />
+              <Route path="archive" element={<PermissionGuardEnhanced resource="admin" action="view"><ArchivePage /></PermissionGuardEnhanced>} />
+              <Route path="data" element={<PermissionGuardEnhanced resource="admin" action="view"><DataManagement /></PermissionGuardEnhanced>} />
+              <Route path="screens" element={<PermissionGuardEnhanced resource="admin" action="view"><ScreenList /></PermissionGuardEnhanced>} />
+              <Route path="templates" element={<PermissionGuardEnhanced resource="admin" action="view"><TemplateList /></PermissionGuardEnhanced>} />
+              <Route path="kiosk" element={<KioskPage />} />
+              <Route path="warehouse" element={<WarehousePage />} />
+            </Route>
+
+            <Route path="/data-entry/:id" element={<AuthGuard><DataEntryPage /></AuthGuard>} />
+
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </RolePreviewProvider>

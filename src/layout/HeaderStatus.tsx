@@ -3,9 +3,11 @@ import { Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseProductivity } from "@/integrations/supabase/dual-client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const ALERT_MANAGER_ROLES = new Set(["admin", "manager", "responsable"]);
 
@@ -15,7 +17,8 @@ type HeaderStatusProps = {
 
 export const HeaderStatus = ({ role }: HeaderStatusProps) => {
   const [currentTime, setCurrentTime] = useState(() => new Date());
-  const [isConnected, setIsConnected] = useState(true);
+  const [mainConnected, setMainConnected] = useState(true);
+  const [productivityConnected, setProductivityConnected] = useState(true);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const navigate = useNavigate();
 
@@ -35,20 +38,37 @@ export const HeaderStatus = ({ role }: HeaderStatusProps) => {
 
   // Verificar conexion con Supabase cada 30 segundos
   useEffect(() => {
-    const checkConnection = async () => {
+    const checkConnections = async () => {
+      // Test MAIN
       try {
         const { error } = await supabase.from("profiles").select("id").limit(1);
-        setIsConnected(!error);
-      } catch {
-        setIsConnected(false);
+        if (error) throw error;
+        setMainConnected(true);
+      } catch (err) {
+        if (mainConnected) {
+          toast.error("Conexión perdida con DB MAIN");
+        }
+        setMainConnected(false);
+      }
+
+      // Test PRODUCTIVITY
+      try {
+        const { error } = await supabaseProductivity.schema('comercial').from("orders").select("id").limit(1);
+        if (error) throw error;
+        setProductivityConnected(true);
+      } catch (err) {
+        if (productivityConnected) {
+          toast.error("Conexión perdida con DB PRODUCTIVITY");
+        }
+        setProductivityConnected(false);
       }
     };
 
-    checkConnection();
-    const interval = setInterval(checkConnection, 30000);
+    checkConnections();
+    const interval = setInterval(checkConnections, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [mainConnected, productivityConnected]);
 
   useEffect(() => {
     if (!canManageAlerts) {
@@ -97,20 +117,18 @@ export const HeaderStatus = ({ role }: HeaderStatusProps) => {
 
   return (
     <div className="flex items-center gap-4 text-sm">
-      <div className="flex items-center gap-2">
-        {isConnected ? (
-          <>
-            <Wifi className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
-            <span className="hidden sm:inline font-medium text-emerald-600 dark:text-emerald-300">
-              Conectado
-            </span>
-          </>
-        ) : (
-          <>
-            <WifiOff className="h-4 w-4 text-destructive" />
-            <span className="hidden sm:inline font-medium text-destructive">Desconectado</span>
-          </>
-        )}
+      <div className="flex items-center gap-3">
+        {/* DB MAIN Status */}
+        <div className="flex items-center gap-1.5" title={mainConnected ? "MAIN: Conectado" : "MAIN: Desconectado"}>
+          <Wifi className={cn("h-4 w-4 transition-colors", mainConnected ? "text-emerald-500" : "text-destructive")} />
+          <span className="hidden lg:inline text-xs font-medium text-muted-foreground">MAIN</span>
+        </div>
+
+        {/* DB PRODUCTIVITY Status */}
+        <div className="flex items-center gap-1.5" title={productivityConnected ? "PRODUCTIVITY: Conectado" : "PRODUCTIVITY: Desconectado"}>
+          <Wifi className={cn("h-4 w-4 transition-colors", productivityConnected ? "text-emerald-500" : "text-destructive")} />
+          <span className="hidden lg:inline text-xs font-medium text-muted-foreground">PROD</span>
+        </div>
       </div>
       <div className="hidden sm:block capitalize font-medium text-muted-foreground">
         {formattedDate}
@@ -132,7 +150,7 @@ export const HeaderStatus = ({ role }: HeaderStatusProps) => {
       <div
         className={cn(
           "font-mono bg-primary text-primary-foreground px-3 py-1.5 rounded-md transition-all duration-300 font-semibold text-base shadow-sm",
-          !isConnected && "bg-destructive text-destructive-foreground animate-pulse"
+          (!mainConnected || !productivityConnected) && "bg-destructive text-destructive-foreground animate-pulse"
         )}
       >
         {formattedTime}

@@ -71,13 +71,13 @@ export default function SettingsPage() {
   const [newConfigValue, setNewConfigValue] = useState('');
   const [newConfigDescription, setNewConfigDescription] = useState('');
   const [newConfigCategory, setNewConfigCategory] = useState('general');
-  
+
   // Estados para gestión de usuarios
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
-  
+
   // Estados para avatar
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
@@ -88,7 +88,7 @@ export default function SettingsPage() {
 
   const AVATAR_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
   const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
-  
+
   // Estados para permisos
   const [rolePermissions, setRolePermissions] = useState<Record<string, Record<string, { can_view: boolean; can_edit: boolean }>>>({});
   const handleUsersRefresh = () => {
@@ -129,9 +129,9 @@ export default function SettingsPage() {
         const { data: permissions, error } = await supabase
           .from('role_permissions')
           .select('*');
-        
+
         if (error) throw error;
-        
+
         const permissionsByRole: Record<string, Record<string, { can_view: boolean; can_edit: boolean }>> = {};
 
         // Inicializar estructura base
@@ -144,7 +144,7 @@ export default function SettingsPage() {
             permissionsByRole[role][page] = { can_view: role === 'admin', can_edit: role === 'admin' };
           });
         });
-        
+
         // Cargar permisos desde la base de datos
         permissions?.forEach(permission => {
           if (permissionsByRole[permission.role] && permissionsByRole[permission.role][permission.page]) {
@@ -154,13 +154,13 @@ export default function SettingsPage() {
             };
           }
         });
-        
+
         setRolePermissions(permissionsByRole);
       } catch (error) {
         console.error('Error al cargar permisos:', error);
       }
     };
-    
+
     loadRolePermissions();
   }, []);
 
@@ -377,9 +377,14 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Configuración</h1>
-        <p className="text-muted-foreground">Gestiona la configuración del sistema y tu perfil</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+            <Settings className="h-8 w-8" />
+            Configuración
+          </h1>
+          <p className="text-slate-400 mt-1">Gestiona la configuración del sistema y tu perfil.</p>
+        </div>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
@@ -436,7 +441,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="fullName">Nombre Completo</Label>
                 <Input
@@ -526,11 +531,11 @@ export default function SettingsPage() {
                         <Button
                           onClick={async () => {
                             if (!inviteEmail) return;
-                            
+
                             try {
                               const { error } = await supabase.auth.admin.inviteUserByEmail(inviteEmail);
                               if (error) throw error;
-                              
+
                               toast.success('Invitación enviada');
                               setInviteEmail('');
                               setIsInviteDialogOpen(false);
@@ -616,7 +621,7 @@ export default function SettingsPage() {
                                       .update({ status: newStatus })
                                       .eq('id', user.id);
                                     if (error) throw error;
-                                    
+
                                     toast.success(`Usuario ${newStatus === 'activo' ? 'activado' : 'desactivado'}`);
                                     handleUsersRefresh();
                                   } catch (error) {
@@ -705,7 +710,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ))}
-                
+
                 <div className="flex justify-end">
                   <Button onClick={async () => {
                     try {
@@ -717,7 +722,7 @@ export default function SettingsPage() {
                         .in('role', rolesToReset.length ? rolesToReset : ['admin', 'manager', 'responsable', 'operario']);
 
                       if (error) throw error;
-                      
+
                       // Insertar nuevos permisos
                       const permissionsToInsert = [];
                       for (const [role, pages] of Object.entries(rolePermissions)) {
@@ -733,15 +738,15 @@ export default function SettingsPage() {
                           }
                         }
                       }
-                      
+
                       if (permissionsToInsert.length > 0) {
                         const { error: insertError } = await supabase
                           .from('role_permissions')
                           .insert(permissionsToInsert);
-                        
+
                         if (insertError) throw insertError;
                       }
-                      
+
                       toast.success('Permisos actualizados correctamente');
                     } catch (error) {
                       console.error('Error al guardar permisos:', error);

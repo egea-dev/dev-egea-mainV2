@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -16,8 +18,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 224 71.4% 4.1%;
 
-    /* Color primario: naranja (#FF7043 - similar a la referencia) */
-    --primary: 14 100% 63%;
+    /* Color primario: Verde Esmeralda Industrial (#14CC7F) - 155 81% 44% */
+    --primary: 155 81% 44%;
     --primary-foreground: 0 0% 100%;
 
     /* Color secundario */
@@ -45,32 +47,49 @@
     /* Bordes e inputs */
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 14 100% 63%;
+    --ring: 155 81% 44%;
 
     /* Radio de bordes más redondeado */
     --radius: 0.75rem;
+    
+    font-family: 'Inter', sans-serif;
   }
 
   .dark {
-    --background: 222 28% 14%;
-    --foreground: 210 32% 92%;
-    --card: 222 24% 18%;
-    --card-foreground: 210 32% 92%;
-    --popover: 222 24% 18%;
-    --popover-foreground: 210 32% 92%;
-    --primary: 14 100% 63%;
+    /* Industrial Dark Mode Palette 
+       Bg App: #1A1D1F -> 210 9% 11%
+       Surface: #323438 -> 220 6% 21%
+       Border: #45474A -> 216 3% 28%
+       Primary: #14CC7F -> 155 81% 44%
+    */
+    --background: 210 9% 11%;
+    --foreground: 0 0% 100%; /* #FFFFFF Title text */
+    
+    --card: 220 6% 21%;
+    --card-foreground: 210 2% 72%; /* #B5B8BA Body text equivalent */
+    
+    --popover: 220 6% 21%;
+    --popover-foreground: 0 0% 100%;
+    
+    --primary: 155 81% 44%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 222 20% 22%;
-    --secondary-foreground: 210 32% 92%;
-    --muted: 222 18% 24%;
-    --muted-foreground: 215 18% 70%;
-    --accent: 220 20% 26%;
-    --accent-foreground: 210 32% 92%;
-    --destructive: 0 70% 44%;
-    --destructive-foreground: 210 40% 96%;
-    --border: 220 16% 28%;
-    --input: 220 16% 28%;
-    --ring: 14 100% 63%;
+    
+    --secondary: 216 3% 28%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 220 6% 21%;
+    --muted-foreground: 210 2% 55%; /* #8B8D90 Meta text */
+    
+    --accent: 220 6% 26%; /* Un poco más claro que card para hover */
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 216 3% 28%;
+    --input: 216 3% 28%;
+    --ring: 155 81% 44%;
+    
     --info: 199 92% 62%;
     --info-foreground: 210 32% 92%;
     --warning: 43 100% 62%;
