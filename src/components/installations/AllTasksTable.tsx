@@ -45,7 +45,7 @@ export const AllTasksTable = ({ tasks, onEditTask }: AllTasksTableProps) => {
                       {task.assigned_users.map(user => (
                         <div
                           key={user.id}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm bg-blue-50/70 dark:bg-blue-950/20 text-blue-700 dark:text-blue-200 ring-1 ring-blue-500/30"
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm bg-muted/60 text-foreground ring-1 ring-border/60"
                         >
                           <User className="h-4 w-4" />
                           {user.full_name}
@@ -53,9 +53,9 @@ export const AllTasksTable = ({ tasks, onEditTask }: AllTasksTableProps) => {
                       ))}
                       {task.assigned_vehicles.map(vehicle => {
                         const vehicleBgColor =
-                          vehicle.type?.toLowerCase().includes('jumper') ? 'bg-blue-50/50 dark:bg-blue-950/10 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20' :
-                          vehicle.type?.toLowerCase().includes('camión') || vehicle.type?.toLowerCase().includes('camion') ? 'bg-yellow-50/50 dark:bg-yellow-950/10 text-yellow-600 dark:text-yellow-400 ring-1 ring-yellow-500/20' :
-                          'bg-gray-50/50 dark:bg-gray-950/10 text-gray-600 dark:text-gray-400 ring-1 ring-gray-500/20';
+                          vehicle.type?.toLowerCase().includes('jumper') ? 'bg-muted/60 text-foreground ring-1 ring-border/60' :
+                          vehicle.type?.toLowerCase().includes('camión') || vehicle.type?.toLowerCase().includes('camion') ? 'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/30' :
+                          'bg-muted/40 text-muted-foreground ring-1 ring-border/60';
 
                         return (
                           <div key={vehicle.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${vehicleBgColor}`}>

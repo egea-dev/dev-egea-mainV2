@@ -1,5 +1,5 @@
 .rdp-day_pending { @apply bg-amber-200 text-amber-900 rounded-md font-medium; }
-.rdp-day_busy { @apply bg-sky-200 text-sky-900 rounded-md font-medium; }
+.rdp-day_busy { @apply bg-muted/70 text-foreground rounded-md font-medium; }
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 

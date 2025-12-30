@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   SidebarProvider,
@@ -11,34 +11,41 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { LogOut, Settings, PanelLeft, Heart, Plus } from "lucide-react";
+import { LogOut, PanelLeft, Heart, Plus, ChevronDown } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, shellBackground } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./theme-toggle";
 import { useProfile } from "@/hooks/use-supabase";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import { HeaderStatus } from "@/layout/HeaderStatus";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Profile } from "@/types";
-import type { AppNavItem } from "@/config/navigation";
+import type { AppNavEntry, AppNavGroup, AppNavItem } from "@/config/navigation";
 import { getNavItemsForRole } from "@/config/navigation";
 import { MobileNavigation } from "./layout/MobileNavigation";
 import { useRolePreview } from "@/context/RolePreviewContext";
 import type { AppRole } from "@/config/navigation";
+
 const logoPlaceholder = "/logo-placeholder.png";
 
 type LayoutProps = {
   children: React.ReactNode;
   profile?: Profile | null;
-  navItems?: AppNavItem[];
+  navItems?: AppNavEntry[];
 };
 
 type SidebarContentProps = {
   profile: Profile | null | undefined;
-  navItems: AppNavItem[];
+  navItems: AppNavEntry[];
 };
 
 const SidebarContentComponent = ({
@@ -56,6 +63,8 @@ const SidebarContentComponent = ({
   const navigate = useNavigate();
   const { isCollapsed } = useSidebar();
   const appVersion = import.meta.env.VITE_APP_VERSION;
+  const autoCollapseGroups = useMemo(() => new Set(["Actividad", "Sistema"]), []);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   const userName = profile?.full_name || "Usuario";
 
@@ -81,6 +90,45 @@ const SidebarContentComponent = ({
   const isActive = (path: string) =>
     location.pathname === path || (path !== "/admin" && location.pathname.startsWith(path));
 
+  const isGroupActive = (group: AppNavGroup) => group.items.some((item) => isActive(item.path));
+
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const next = { ...prev };
+      navItems.forEach((entry) => {
+        if (entry.type === "group" && autoCollapseGroups.has(entry.label)) {
+          next[entry.label] = isGroupActive(entry);
+        }
+      });
+      return next;
+    });
+  }, [location.pathname, navItems, autoCollapseGroups]);
+
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  const renderItem = (item: AppNavItem, variant: "main" | "nested" = "main") => (
+    <SidebarMenuItem key={item.path}>
+      <SidebarMenuButton
+        asChild
+        tooltip={item.label}
+        isActive={isActive(item.path)}
+        className={cn(variant === "nested" && "h-9 text-xs text-muted-foreground")}
+      >
+        <NavLink
+          to={item.path}
+          end={item.path === "/admin"}
+          className="flex w-full items-center gap-3"
+          aria-current={isActive(item.path) ? "page" : undefined}
+        >
+          <item.icon className={cn("h-4 w-4 shrink-0", variant === "nested" && "h-3.5 w-3.5")} />
+          <span className={cn("truncate", isCollapsed && "hidden")}>{item.label}</span>
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+
   return (
     <>
       <SidebarHeader>
@@ -93,7 +141,7 @@ const SidebarContentComponent = ({
             )}
           </Avatar>
           <div className={cn("flex flex-col", isCollapsed && "hidden")}>
-            <span className="text-sm font-semibold text-foreground">Egea Productivity</span>
+            <span className="text-sm font-semibold text-foreground">Envios</span>
             <span className="text-xs text-muted-foreground capitalize">{profile?.role ?? "usuario"}</span>
           </div>
         </div>
@@ -108,25 +156,40 @@ const SidebarContentComponent = ({
       )}
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => (
-            <SidebarMenuItem key={item.path}>
-              <SidebarMenuButton
-                asChild
-                tooltip={item.label}
-                isActive={isActive(item.path)}
-              >
-                <NavLink
-                  to={item.path}
-                  end={item.path === "/admin"}
-                  className="flex w-full items-center gap-3"
-                  aria-current={isActive(item.path) ? "page" : undefined}
-                >
-                  <item.icon className="h-4 w-4 shrink-0" />
-                  <span className={cn("truncate", isCollapsed && "hidden")}>{item.label}</span>
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {navItems.map((entry) => {
+            if (entry.type === "item") {
+              return renderItem(entry);
+            }
+
+            const isAutoCollapse = autoCollapseGroups.has(entry.label);
+            const isOpen = !isAutoCollapse ? true : Boolean(openGroups[entry.label]);
+            return (
+              <SidebarMenuItem key={entry.label}>
+                {isAutoCollapse ? (
+                  <SidebarMenuButton
+                    onClick={() => toggleGroup(entry.label)}
+                    isActive={isGroupActive(entry)}
+                    className="justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <entry.icon className="h-4 w-4 shrink-0" />
+                      <span className={cn("truncate", isCollapsed && "hidden")}>{entry.label}</span>
+                    </div>
+                    {!isCollapsed && (
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+                    )}
+                  </SidebarMenuButton>
+                ) : (
+                  <div className={cn("px-3 pt-3 pb-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground", isCollapsed && "hidden")}>
+                    {entry.label}
+                  </div>
+                )}
+                <SidebarMenu className={cn("mt-1", isAutoCollapse && !isOpen && "hidden")}>
+                  {entry.items.map((item) => renderItem(item, "nested"))}
+                </SidebarMenu>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
@@ -137,7 +200,7 @@ const SidebarContentComponent = ({
                 <div className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                   EGEA
                 </div>
-                <p className="text-xs text-muted-foreground mb-1">Versión {appVersion}</p>
+                <p className="text-xs text-muted-foreground mb-1">Version {appVersion}</p>
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
                   Hecho con <Heart className="h-3 w-3 text-red-500 fill-red-500" /> por Hacchi
                 </p>
@@ -146,22 +209,6 @@ const SidebarContentComponent = ({
           </Accordion>
         )}
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip="Configuración"
-              isActive={isActive("/admin/settings")}
-            >
-              <NavLink
-                to="/admin/settings"
-                className="flex w-full items-center gap-3"
-                aria-current={isActive("/admin/settings") ? "page" : undefined}
-              >
-                <Settings className="h-4 w-4 shrink-0" />
-                <span className={cn(isCollapsed && "hidden")}>Configuración</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} tooltip="Cerrar sesion">
               <LogOut className="h-4 w-4 shrink-0" />
@@ -189,7 +236,7 @@ const MainLayout = ({
 }: {
   children: React.ReactNode;
   profile: Profile | null | undefined;
-  navItems: AppNavItem[];
+  navItems: AppNavEntry[];
   showPreviewBanner: boolean;
   onClearPreview: () => void;
   previewRole: AppRole | null;
@@ -198,7 +245,7 @@ const MainLayout = ({
   const resolvedRole = previewRole ?? profile?.role ?? null;
 
   return (
-    <div className="relative flex min-h-screen w-full">
+    <div className="relative flex min-h-screen w-full bg-background">
       <Sidebar>
         <SidebarContentComponent
           profile={profile}
@@ -246,7 +293,9 @@ const MainLayout = ({
             <ThemeToggle />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-2 sm:p-4">{children}</main>
+        <main className={cn("flex-1 overflow-y-auto p-2 sm:p-4", shellBackground)}>
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -306,12 +355,53 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
   const isActive = (path: string) =>
     location.pathname === path || (path !== "/admin" && location.pathname.startsWith(path));
 
+  const handleNavigate = (path: string) => {
+    if (!isActive(path)) navigate(path);
+  };
+
+  const renderCompactItem = (entry: AppNavEntry) => {
+    if (entry.type === "item") {
+      return (
+        <Button
+          key={entry.path}
+          variant={isActive(entry.path) ? "secondary" : "ghost"}
+          className="gap-2"
+          onClick={() => handleNavigate(entry.path)}
+        >
+          <entry.icon className="h-4 w-4" />
+          {entry.label}
+        </Button>
+      );
+    }
+
+    const groupActive = entry.items.some((item) => isActive(item.path));
+    return (
+      <DropdownMenu key={entry.label}>
+        <DropdownMenuTrigger asChild>
+          <Button variant={groupActive ? "secondary" : "ghost"} className="gap-2">
+            <entry.icon className="h-4 w-4" />
+            {entry.label}
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {entry.items.map((item) => (
+            <DropdownMenuItem key={item.path} onClick={() => handleNavigate(item.path)}>
+              <item.icon className="mr-2 h-4 w-4" />
+              {item.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className={cn("relative min-h-screen", shellBackground)}>
       <div className="hidden border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:block">
         {previewRole && (
           <div className="border-b border-primary/30 bg-primary/10">
-            <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-2 text-sm text-primary">
+          <div className="w-full flex items-center justify-between px-6 py-2 text-sm text-primary">
               <span>
                 Previsualizando como{" "}
                 <span className="font-semibold capitalize">{previewRole}</span>
@@ -322,7 +412,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
             </div>
           </div>
         )}
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        <div className="w-full flex items-center justify-between px-6 py-4">
           <div>
             <p className="text-sm text-muted-foreground">
               Hola, {resolvedProfile?.full_name ?? "Usuario"}
@@ -339,20 +429,8 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
             </Button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-5xl gap-2 px-6 pb-4">
-          {navItems.map((item) => (
-            <Button
-              key={item.path}
-              variant={isActive(item.path) ? "secondary" : "ghost"}
-              className="gap-2"
-              onClick={() => {
-                if (!isActive(item.path)) navigate(item.path);
-              }}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Button>
-          ))}
+        <nav className="w-full flex flex-wrap gap-2 px-6 pb-4">
+          {navItems.map(renderCompactItem)}
         </nav>
       </div>
 
@@ -369,7 +447,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
         <MobileNavigation currentUser={currentUser} navItems={navItems} />
       </div>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-24 pt-0 md:max-w-5xl md:pb-10 md:pt-6">
+      <main className="w-full flex flex-col gap-4 px-4 pb-24 pt-0 md:pb-10 md:pt-6">
         {children}
       </main>
 
@@ -389,7 +467,3 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
 };
 
 export default Layout;
-
-
-
-

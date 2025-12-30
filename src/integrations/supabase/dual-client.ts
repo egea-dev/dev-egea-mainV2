@@ -29,14 +29,14 @@ export const supabaseMain = createClient<MainDatabase>(MAIN_URL, MAIN_ANON_KEY, 
 });
 
 // Cliente PRODUCTIVITY (comercial, producción, almacén)
-// NOTA: Se ha eliminado la restricción de esquema para evitar errores 406 si 'almacen' no está expuesto.
-// Se recomienda usar tablas en 'public' o asegurarse de exponer los esquemas necesarios en la API de Supabase.
+// NOTA: Comparte la sesión de autenticación con MAIN usando el mismo storage
 export const supabaseProductivity = createClient<ProductivityDatabase>(PRODUCTIVITY_URL, PRODUCTIVITY_ANON_KEY, {
   auth: {
-    persistSession: false,
-    autoRefreshToken: false,
+    persistSession: true,
+    autoRefreshToken: true,
     detectSessionInUrl: false,
-    storageKey: 'supabase.productivity.token',
+    storageKey: 'supabase.main.auth.token', // Usa el mismo token que MAIN
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
   },
 });
 

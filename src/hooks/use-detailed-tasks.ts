@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type {
   DetailedTask,
@@ -368,19 +369,11 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
   };
 }
 
-// Hook especÃ­fico para tareas del dashboard
+// Hook específico para tareas del dashboard
 export function useDashboardTasks() {
-  const [confeccionTasks, setConfeccionTasks] = useState<DetailedTask[]>([]);
-  const [tapiceriaTasks, setTapiceriaTasks] = useState<DetailedTask[]>([]);
-  const [pendingTasks, setPendingTasks] = useState<DetailedTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [templateFieldsByScreen, setTemplateFieldsByScreen] = useState<DashboardTemplateFieldMap>({});
-  const [sessionInfoByTask, setSessionInfoByTask] = useState<Record<string, DashboardTaskSessionInfo>>({});
-
-  const fetchDashboardTasks = useCallback(async () => {
-    try {
-      setLoading(true);
-
+  const { data, isLoading: loading, refetch: refresh } = useQuery({
+    queryKey: ['dashboard-tasks', 'sections'],
+    queryFn: async () => {
       const { data: dashboardScreens, error: dashboardError } = await supabase
         .from('screens')
         .select('id, dashboard_section, dashboard_order, template_id')
@@ -434,8 +427,6 @@ export function useDashboardTasks() {
         templateFieldsMapByScreen[screen.id] = fields;
       });
 
-      setTemplateFieldsByScreen(templateFieldsMapByScreen);
-
       // Grupos que siempre queremos incluir en la sección de pendientes si no hay pantallas específicas
       const PENDING_FALLBACK_GROUPS = ['Instalaciones', 'Instalación', 'Instalacion', 'Tareas Generales', 'Pendientes'];
 
@@ -444,40 +435,60 @@ export function useDashboardTasks() {
         fallbackGroups: string[],
         limit: number | null
       ) => {
+        const screenIds = sectionMap[section];
+        let finalScreenIds: string[] = [...screenIds];
+
+        // PASO 1: Si necesitamos filtrar por grupos, obtener screen_ids de la tabla screens
+        if (section === 'pendientes') {
+          const groups = [...fallbackGroups, ...PENDING_FALLBACK_GROUPS];
+          if (groups.length > 0) {
+            const { data: screensData, error: screensError } = await supabase
+              .from('screens')
+              .select('id')
+              .in('screen_group', groups);
+
+            if (screensError) {
+              console.error('[fetchSectionTasks] Error fetching screens:', screensError);
+            } else if (screensData) {
+              const groupScreenIds = screensData.map(s => s.id);
+              // Combinar screen_ids de dashboard_section + screen_ids de grupos
+              finalScreenIds = Array.from(new Set([...finalScreenIds, ...groupScreenIds]));
+            }
+          }
+        } else {
+          // Para confección/tapicería, si no hay screenIds, buscar por grupos
+          if (screenIds.length === 0 && fallbackGroups.length > 0) {
+            const { data: screensData, error: screensError } = await supabase
+              .from('screens')
+              .select('id')
+              .in('screen_group', fallbackGroups);
+
+            if (screensError) {
+              console.error('[fetchSectionTasks] Error fetching screens:', screensError);
+            } else if (screensData) {
+              finalScreenIds = screensData.map(s => s.id);
+            }
+          }
+        }
+
+        // PASO 2: Consultar screen_data con los screen_ids obtenidos
         let query = supabase
           .from('detailed_tasks')
           .select('*')
-          .order('is_urgent', { ascending: false })
           .order('start_date', { ascending: true, nullsFirst: true });
 
-        if (section !== 'pendientes') {
+        // IMPORTANTE: Para pendientes, excluimos tareas terminadas
+        // Las tareas pendientes son TODAS las no archivadas, sin importar la fecha
+        if (section === 'pendientes') {
+          query = query.neq('state', 'terminado');
+        } else {
+          // Para confección/tapicería, también excluimos terminadas
           query = query.neq('state', 'terminado');
         }
 
-        const screenIds = sectionMap[section];
-
-        if (section === 'pendientes') {
-          // Para pendientes, queremos ser inclusivos: screens asignadas O grupos fallback
-          const groups = [...fallbackGroups, ...PENDING_FALLBACK_GROUPS];
-          const hasScreens = screenIds.length > 0;
-          const hasGroups = groups.length > 0;
-
-          if (hasScreens && hasGroups) {
-            // Combinar filtros de screen_id y screen_group
-            query = query.or(`screen_id.in.(${screenIds.join(',')}),screen_group.in.(${groups.map(g => `"${g}"`).join(',')})`);
-          } else if (hasScreens) {
-            query = query.in('screen_id', screenIds);
-          } else if (hasGroups) {
-            query = query.in('screen_group', groups);
-          }
-          // Si no hay nada configurado, traemos TODO (pero le aplicamos el estado pendiente por defecto del hook)
-        } else {
-          // Confección/Tapicería: Screens tienen prioridad, si no hay, usamos grupos
-          if (screenIds.length > 0) {
-            query = query.in('screen_id', screenIds);
-          } else if (fallbackGroups.length > 0) {
-            query = query.in('screen_group', fallbackGroups);
-          }
+        // Aplicar filtro de screen_ids si tenemos alguno
+        if (finalScreenIds.length > 0) {
+          query = query.in('screen_id', finalScreenIds);
         }
 
         if (limit) {
@@ -485,13 +496,28 @@ export function useDashboardTasks() {
         }
 
         const { data, error } = await query;
-        if (error) throw error;
-        return data ?? [];
+        if (error) {
+          console.error('[fetchSectionTasks] Error:', error);
+          throw error;
+        }
+
+        // Transformar datos: ya vienen desde la vista detailed_tasks
+        const transformedData = (data ?? []).map((item: any) => {
+          return {
+            ...item,
+            // Las asignaciones ya vienen agregadas como JSON en la vista detailed_tasks
+            assigned_profiles: item.assigned_profiles || [],
+            assigned_vehicles: item.assigned_vehicles || []
+          };
+        });
+
+        console.log(`[fetchSectionTasks] ${section}:`, transformedData.length, 'tasks');
+        return transformedData;
       };
 
       const [confeccionData, tapiceriaData, pendingData] = await Promise.all([
-        fetchSectionTasks('confeccion', ['ConfecciÃ³n', 'Confeccion'], 3),
-        fetchSectionTasks('tapiceria', ['TapicerÃ­a', 'Tapiceria'], 3),
+        fetchSectionTasks('confeccion', ['Confección', 'Confeccion'], 3),
+        fetchSectionTasks('tapiceria', ['Tapicería', 'Tapiceria'], 3),
         fetchSectionTasks('pendientes', [], null),
       ]);
 
@@ -509,13 +535,14 @@ export function useDashboardTasks() {
         return [...prioritized, ...remainder].slice(0, 3);
       };
 
-      setConfeccionTasks(buildSectionList(confeccionData));
-      setTapiceriaTasks(buildSectionList(tapiceriaData));
-      setPendingTasks(pendingData);
+      const confeccionTasks = buildSectionList(confeccionData);
+      const tapiceriaTasks = buildSectionList(tapiceriaData);
+      const pendingTasks = pendingData;
 
       const allTasks = [...confeccionData, ...tapiceriaData, ...pendingData];
       const taskIds = Array.from(new Set(allTasks.map((task) => task.id)));
 
+      let sessionInfoByTask: Record<string, DashboardTaskSessionInfo> = {};
       if (taskIds.length > 0) {
         const { data: sessionsData, error: sessionsError } = await supabase
           .from('work_sessions')
@@ -525,81 +552,58 @@ export function useDashboardTasks() {
 
         if (sessionsError) throw sessionsError;
 
-        const summaryMap: Record<string, DashboardTaskSessionInfo> = {};
         (sessionsData ?? []).forEach((session) => {
           const taskId = session.task_id as string | null;
-          if (!taskId || summaryMap[taskId]) return;
-          summaryMap[taskId] = {
+          if (!taskId || sessionInfoByTask[taskId]) return;
+          sessionInfoByTask[taskId] = {
             active: session.status === 'active' && !session.ended_at,
             lastArrival: session.started_at ?? null,
             lastDeparture: session.ended_at ?? null,
           };
         });
-
-        setSessionInfoByTask(summaryMap);
-      } else {
-        setSessionInfoByTask({});
       }
-    } catch (err) {
-      console.error('Error fetching dashboard tasks:', err);
-      setSessionInfoByTask({});
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
-  useEffect(() => {
-    fetchDashboardTasks();
-    const interval = setInterval(fetchDashboardTasks, 60000);
-    return () => clearInterval(interval);
-  }, [fetchDashboardTasks]);
+      return {
+        confeccionTasks,
+        tapiceriaTasks,
+        pendingTasks,
+        templateFieldsByScreen: templateFieldsMapByScreen,
+        sessionInfoByTask
+      };
+    },
+    refetchInterval: 60000
+  });
 
   return {
-    confeccionTasks,
-    tapiceriaTasks,
-    pendingTasks,
+    confeccionTasks: data?.confeccionTasks || [],
+    tapiceriaTasks: data?.tapiceriaTasks || [],
+    pendingTasks: data?.pendingTasks || [],
     loading,
-    templateFieldsByScreen,
-    sessionInfoByTask,
-    refresh: fetchDashboardTasks,
+    templateFieldsByScreen: data?.templateFieldsByScreen || {},
+    sessionInfoByTask: data?.sessionInfoByTask || {},
+    refresh,
   };
 }
 
-// Hook para estadÃ­sticas del dashboard
+// Hook para estadísticas del dashboard
 export function useDashboardStats(dateFrom?: string, dateTo?: string) {
-  const [stats, setStats] = useState<Database['public']['Functions']['get_dashboard_stats']['Returns'] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: stats, isLoading: loading } = useQuery({
+    queryKey: ['dashboard-stats', dateFrom, dateTo],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_dashboard_stats', {
+        p_date_from: dateFrom,
+        p_date_to: dateTo
+      });
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await supabase.rpc('get_dashboard_stats', {
-          p_date_from: dateFrom,
-          p_date_to: dateTo
-        });
+      if (error) throw error;
 
-        if (error) {
-          throw error;
-        }
-
-        const normalized: Database['public']['Functions']['get_dashboard_stats']['Returns'] | null = Array.isArray(data)
-          ? (data[0] ?? null)
-          : (data as Database['public']['Functions']['get_dashboard_stats']['Returns'] | null);
-        setStats(normalized);
-      } catch (err) {
-        console.error('Error fetching dashboard stats:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-
-    // Refrescar cada 5 minutos
-    const interval = setInterval(fetchStats, 300000);
-    return () => clearInterval(interval);
-  }, [dateFrom, dateTo]);
+      const normalized: Database['public']['Functions']['get_dashboard_stats']['Returns'] | null = Array.isArray(data)
+        ? (data[0] ?? null)
+        : (data as Database['public']['Functions']['get_dashboard_stats']['Returns'] | null);
+      return normalized;
+    },
+    refetchInterval: 300000 // 5 minutes
+  });
 
   return { stats, loading };
 }

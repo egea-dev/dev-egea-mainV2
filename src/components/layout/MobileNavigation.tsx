@@ -1,33 +1,17 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Menu,
-  LayoutDashboard,
-  CalendarCheck,
-  Database,
-  Monitor,
-  FileText,
-  Users,
-  Archive,
-  MessageCircle,
-  LogOut,
-} from "lucide-react";
+import { Menu, LogOut, MessageCircle, ChevronDown } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useDirectMessages } from "@/hooks/use-direct-messages";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
-
-type NavItem = {
-  path: string;
-  label: string;
-  icon: LucideIcon;
-};
+import { flattenNavItems, getNavItemsForRole } from "@/config/navigation";
+import type { AppNavEntry, AppNavItem, AppRole } from "@/config/navigation";
 
 interface MobileNavigationProps {
   currentUser?: {
@@ -35,28 +19,25 @@ interface MobileNavigationProps {
     role: string;
     avatar_url?: string;
   } | null;
-  navItems?: NavItem[];
+  navItems?: AppNavEntry[];
 }
 
-const defaultNavItems: NavItem[] = [
-  { path: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/admin/installations", label: "Instalaciones", icon: CalendarCheck },
-  { path: "/admin/data", label: "Gestionar Datos", icon: Database },
-  { path: "/admin/screens", label: "Pantallas", icon: Monitor },
-  { path: "/admin/templates", label: "Plantillas", icon: FileText },
-  { path: "/admin/users", label: "Usuarios", icon: Users },
-  { path: "/admin/archive", label: "Historial", icon: Archive },
-];
+const resolveRole = (role?: string | null): AppRole =>
+  role === "manager" || role === "responsable" || role === "operario" ? role : "admin";
 
 export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProps) => {
-  const logoPlaceholder = '/logo-placeholder.png';
+  const logoPlaceholder = "/logo-placeholder.png";
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { unreadCount } = useDirectMessages();
 
-  const items = navItems ?? defaultNavItems;
-  const showBottomLogout = currentUser?.role === 'operario' || currentUser?.role === 'responsable';
+  const role = resolveRole(currentUser?.role);
+  const entries = navItems ?? getNavItemsForRole(role);
+  const flatItems = flattenNavItems(entries);
+  const autoCollapseGroups = useMemo(() => new Set(["Actividad", "Sistema"]), []);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const showBottomLogout = currentUser?.role === "operario" || currentUser?.role === "responsable";
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -66,19 +47,55 @@ export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProp
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      navigate('/auth');
-      toast.success('Sesion cerrada correctamente');
+      navigate("/auth");
+      toast.success("Sesion cerrada correctamente");
     } catch (error) {
-      toast.error('Error al cerrar sesion');
+      toast.error("Error al cerrar sesion");
     }
   };
 
   const isActive = (path: string) =>
-    location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path));
+    location.pathname === path || (path !== "/admin" && location.pathname.startsWith(path));
+
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const next = { ...prev };
+      entries.forEach((entry) => {
+        if (entry.type === "group" && autoCollapseGroups.has(entry.label)) {
+          next[entry.label] = entry.items.some((item) => isActive(item.path));
+        }
+      });
+      return next;
+    });
+  }, [location.pathname, entries, autoCollapseGroups]);
+
+  const renderNavButton = (item: AppNavItem, variant: "main" | "nested" = "main") => {
+    const Icon = item.icon;
+    const active = isActive(item.path);
+    return (
+      <Button
+        key={item.path}
+        variant="ghost"
+        className={cn(
+          "w-full justify-start h-12",
+          active && "text-primary ring-1 ring-primary/30 bg-transparent",
+          variant === "nested" && "h-10 text-sm"
+        )}
+        onClick={() => handleNavigation(item.path)}
+      >
+        <Icon className={cn("h-5 w-5 mr-3", variant === "nested" && "h-4 w-4")} />
+        <span className="flex-1 text-left">{item.label}</span>
+        {item.path === "/admin/communications" && unreadCount > 0 && (
+          <Badge className="h-5 w-5 p-0 flex items-center justify-center text-xs">
+            {unreadCount}
+          </Badge>
+        )}
+      </Button>
+    );
+  };
 
   return (
     <div className="lg:hidden">
-      {/* Cabecera movil */}
       <div className="flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-3">
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -92,17 +109,16 @@ export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProp
                 <SheetTitle className="text-lg font-semibold text-left">Menu</SheetTitle>
               </SheetHeader>
 
-              {/* Perfil de usuario */}
               {currentUser && (
                 <div className="p-6 border-b">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
-                      <AvatarImage src={currentUser.avatar_url || ''} />
+                      <AvatarImage src={currentUser.avatar_url || ""} />
                       <AvatarFallback>
                         {currentUser.full_name
-                          .split(' ')
+                          .split(" ")
                           .map((n) => n[0])
-                          .join('')
+                          .join("")
                           .toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -116,26 +132,40 @@ export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProp
                 </div>
               )}
 
-              {/* Navegacion principal */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 overflow-hidden">
                 <nav className="p-4 space-y-2">
-                  {items.map((item) => {
-                    const Icon = item.icon;
+                  {entries.map((entry) => {
+                    if (entry.type === "item") {
+                      return renderNavButton(entry);
+                    }
+
+                    const isAutoCollapse = autoCollapseGroups.has(entry.label);
+                    const isOpen = !isAutoCollapse ? true : Boolean(openGroups[entry.label]);
                     return (
-                      <Button
-                        key={item.path}
-                        variant={isActive(item.path) ? 'secondary' : 'ghost'}
-                        className="w-full justify-start h-12"
-                        onClick={() => handleNavigation(item.path)}
-                      >
-                        <Icon className="h-5 w-5 mr-3" />
-                        <span className="flex-1 text-left">{item.label}</span>
-                        {item.path === '/admin/communications' && unreadCount > 0 && (
-                          <Badge className="h-5 w-5 p-0 flex items-center justify-center text-xs">
-                            {unreadCount}
-                          </Badge>
+                      <div key={entry.label} className="pt-2">
+                        {isAutoCollapse ? (
+                          <Button
+                            variant="ghost"
+                            className={cn(
+                              "w-full justify-between h-10 px-2 text-[11px] uppercase tracking-[0.2em]",
+                              isOpen ? "text-primary" : "text-muted-foreground"
+                            )}
+                            onClick={() =>
+                              setOpenGroups((prev) => ({ ...prev, [entry.label]: !prev[entry.label] }))
+                            }
+                          >
+                            <span>{entry.label}</span>
+                            <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+                          </Button>
+                        ) : (
+                          <div className="px-2 pb-2 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                            {entry.label}
+                          </div>
                         )}
-                      </Button>
+                        <div className={cn("space-y-1 pl-2 border-l border-border/60", isAutoCollapse && !isOpen && "hidden")}>
+                          {entry.items.map((item) => renderNavButton(item, "nested"))}
+                        </div>
+                      </div>
                     );
                   })}
                 </nav>
@@ -177,12 +207,12 @@ export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProp
                 )}
               </Button>
               <Avatar className="h-10 w-10">
-                <AvatarImage src={currentUser.avatar_url || ''} />
+                <AvatarImage src={currentUser.avatar_url || ""} />
                 <AvatarFallback className="text-sm">
                   {currentUser.full_name
-                    .split(' ')
+                    .split(" ")
                     .map((n) => n[0])
-                    .join('')
+                    .join("")
                     .toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -191,21 +221,24 @@ export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProp
         </div>
       </div>
 
-      {/* Bottom navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t lg:hidden z-50">
-        <div className={cn('grid gap-1 p-2', showBottomLogout ? 'grid-cols-4' : 'grid-cols-5')}>
-          {items.slice(0, 5).map((item) => {
+        <div className={cn("grid gap-1 p-2", showBottomLogout ? "grid-cols-4" : "grid-cols-5")}>
+          {flatItems.slice(0, 5).map((item) => {
             const Icon = item.icon;
+            const active = isActive(item.path);
             return (
               <Button
                 key={item.path}
-                variant={isActive(item.path) ? 'secondary' : 'ghost'}
-                className="relative flex flex-col h-16 gap-1"
+                variant="ghost"
+                className={cn(
+                  "relative flex flex-col h-16 gap-1",
+                  active && "text-primary ring-1 ring-primary/30 bg-transparent"
+                )}
                 onClick={() => handleNavigation(item.path)}
               >
                 <Icon className="h-5 w-5" />
                 <span className="text-xs">{item.label}</span>
-                {item.path === '/admin/communications' && unreadCount > 0 && (
+                {item.path === "/admin/communications" && unreadCount > 0 && (
                   <Badge className="absolute -top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
                     {unreadCount}
                   </Badge>

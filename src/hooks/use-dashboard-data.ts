@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabaseProductivity } from "@/integrations/supabase/client";
 import { addDays, format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { DetailedTask } from "@/integrations/supabase/types";
 
@@ -33,14 +33,18 @@ export const useDashboardCalendarData = (
     const endStr = format(endDate, 'yyyy-MM-dd');
 
     // Query for Commercial Orders
-    const { data: orders = [], isLoading: loadingOrders } = useQuery({
+    const { data: orders = [], isLoading: loadingOrders, refetch: refetchOrders } = useQuery({
         queryKey: ['commercial-orders-calendar', startStr, endStr],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('orders')
-                .select('id, order_number, customer_name, status, created_at, quantity_total')
-                .gte('created_at', startStr) // Simplified filter
-                .order('created_at', { ascending: false });
+            // Fetch Active Orders (not delivered/cancelled) OR Orders in the current date range
+            const statusFilter = `status.in.(PENDIENTE_PAGO,PAGADO,EN_PRODUCCION,LISTO_ENVIO,PTE_ENVIO)`;
+            const dateFilter = `and(delivery_date.gte.${startStr},delivery_date.lte.${endStr})`;
+
+            const { data, error } = await supabaseProductivity
+                .from('comercial_orders')
+                .select('id, order_number, customer_name, status, delivery_date, quantity_total, created_at')
+                .or(`${statusFilter},${dateFilter}`)
+                .order('delivery_date', { ascending: true });
 
             if (error) {
                 console.error("Error fetching commercial calendar orders:", error);
@@ -52,8 +56,8 @@ export const useDashboardCalendarData = (
                 order_number: o.order_number,
                 customer_name: o.customer_name,
                 status: o.status,
-                delivery_date: o.created_at, // Fallback to created_at
-                production_start_date: o.created_at,
+                delivery_date: o.delivery_date || o.created_at, // Fallback to created_at if no delivery date
+                production_start_date: o.delivery_date || o.created_at,
                 quantity_total: o.quantity_total
             })) as CommercialOrder[];
         },
@@ -61,27 +65,69 @@ export const useDashboardCalendarData = (
     });
 
     // Query for Installation Tasks
-    const { data: tasks = [], isLoading: loadingTasks } = useQuery({
+    const { data: tasks = [], isLoading: loadingTasks, refetch: refetchTasks } = useQuery({
         queryKey: ['dashboard-tasks', startStr, endStr],
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('detailed_tasks')
-                .select('*')
-                .gte('start_date', startStr)
-                .lte('start_date', endStr);
+            let query = supabase
+                .from('screen_data')
+                .select(`
+                    *,
+                    screens!inner(id, name, screen_group, screen_type),
+                    assigned_profiles:task_profiles(profile_id, profiles(id, full_name)),
+                    assigned_vehicles:task_vehicles(vehicle_id, vehicles(id, name))
+                `);
+
+            // Logic: Fetch ALL non-terminated tasks (Active)
+            // PLUS terminated tasks that are within the current date range.
+            // This ensures we always see pending work, but don't load 5 years of history.
+            const activeFilter = `state.neq.terminado`;
+            const historyFilter = `and(state.eq.terminado,start_date.gte.${startStr},start_date.lte.${endStr})`;
+
+            query = query.or(`${activeFilter},${historyFilter}`);
+
+            // Order by date to keep the calendar organized, nulls first for attention
+            query = query.order('start_date', { ascending: true, nullsFirst: true });
+
+            const { data, error } = await query;
 
             if (error) {
                 console.error("Error fetching tasks:", error);
                 throw error;
             }
-            return (data as any[]) as DetailedTask[];
+
+            // Transformar datos para DetailedTask
+            return (data ?? []).map((item: any) => {
+                const screen = item.screens || {};
+
+                // Map assignments from joins
+                const profiles = (item.assigned_profiles || []).map((p: any) => p.profiles).filter(Boolean);
+                const vehicles = (item.assigned_vehicles || []).map((v: any) => v.vehicles).filter(Boolean);
+
+                return {
+                    ...item,
+                    screen_group: screen.screen_group || null,
+                    screen_name: screen.name || null,
+                    screen_type: screen.screen_type || null,
+                    assigned_profiles: profiles,
+                    assigned_vehicles: vehicles
+                };
+            }) as DetailedTask[];
         },
         enabled: mode === 'installations',
     });
 
+    const refetch = async () => {
+        if (mode === 'commercial') {
+            return refetchOrders();
+        } else {
+            return refetchTasks();
+        }
+    };
+
     return {
         orders,
         tasks,
-        isLoading: mode === 'commercial' ? loadingOrders : loadingTasks
+        isLoading: mode === 'commercial' ? loadingOrders : loadingTasks,
+        refetch
     };
 };

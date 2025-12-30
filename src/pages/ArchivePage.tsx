@@ -323,14 +323,14 @@ export default function ArchivePage() {
           </h1>
           <p className="text-slate-400 mt-1">Consulta y descarga el histórico de tareas completadas.</p>
         </div>
-        <Button onClick={exportToCSV} variant="outline" className="gap-2 border-slate-700 hover:bg-slate-800 hover:text-white">
+        <Button onClick={exportToCSV} variant="outline" className="gap-2 border-border/60 hover:bg-muted/60 hover:text-white">
           <Download className="h-4 w-4" />
           Exportar CSV
         </Button>
       </div>
 
       {/* Gráfico */}
-      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+      <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <BarChart3 className="h-5 w-5" />
@@ -343,7 +343,7 @@ export default function ArchivePage() {
       </Card>
 
       {/* Filtros */}
-      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+      <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <Filter className="h-5 w-5" />
@@ -360,7 +360,7 @@ export default function ArchivePage() {
                   placeholder="Sitio, cliente, dirección..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-slate-950/50 border-slate-800 text-white placeholder:text-slate-500"
+                  className="pl-10 bg-muted/40 border-border/60 text-white placeholder:text-slate-500"
                 />
               </div>
             </div>
@@ -368,7 +368,7 @@ export default function ArchivePage() {
             <div>
               <label className="text-sm font-medium mb-2 block text-slate-300">Grupo</label>
               <Select value={groupFilter} onValueChange={setGroupFilter}>
-                <SelectTrigger className="bg-slate-950/50 border-slate-800 text-white">
+                <SelectTrigger className="bg-muted/40 border-border/60 text-white">
                   <SelectValue placeholder="Todos los grupos" />
                 </SelectTrigger>
                 <SelectContent>
@@ -384,7 +384,7 @@ export default function ArchivePage() {
             <div>
               <label className="text-sm font-medium mb-2 block text-slate-300">Estado</label>
               <Select value={stateFilter} onValueChange={setStateFilter}>
-                <SelectTrigger className="bg-slate-950/50 border-slate-800 text-white">
+                <SelectTrigger className="bg-muted/40 border-border/60 text-white">
                   <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>
                 <SelectContent>
@@ -404,14 +404,14 @@ export default function ArchivePage() {
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   placeholder="Desde"
-                  className="bg-slate-950/50 border-slate-800 text-white"
+                  className="bg-muted/40 border-border/60 text-white"
                 />
                 <Input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   placeholder="Hasta"
-                  className="bg-slate-950/50 border-slate-800 text-white"
+                  className="bg-muted/40 border-border/60 text-white"
                 />
               </div>
             </div>
@@ -424,7 +424,7 @@ export default function ArchivePage() {
       </Card>
 
       {/* Tabla de resultados */}
-      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+      <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
         <CardHeader>
           <CardTitle className="text-white">Tareas Archivadas</CardTitle>
           <CardDescription className="text-slate-400">
@@ -435,7 +435,7 @@ export default function ArchivePage() {
           <ScrollArea className="h-96">
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-800 hover:bg-slate-800/50">
+                <TableRow className="border-border/60 hover:bg-muted/60">
                   <TableHead className="text-slate-400">Archivado</TableHead>
                   <TableHead className="text-slate-400">Periodo</TableHead>
                   <TableHead className="text-slate-400">Sitio</TableHead>

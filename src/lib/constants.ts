@@ -17,7 +17,7 @@ export type InstallationState = typeof INSTALLATION_STATES[keyof typeof INSTALLA
 export const INSTALLATION_STATE_COLORS: Record<InstallationState, string> = {
   [INSTALLATION_STATES.URGENTE]: 'bg-red-500 hover:bg-red-600 text-white border-red-600',
   [INSTALLATION_STATES.EN_FABRICACION]: 'bg-orange-500 hover:bg-orange-600 text-white border-orange-600',
-  [INSTALLATION_STATES.A_LA_ESPERA]: 'bg-blue-500 hover:bg-blue-600 text-white border-blue-600',
+  [INSTALLATION_STATES.A_LA_ESPERA]: 'bg-muted/60 hover:bg-muted/60 text-foreground border-border/60',
   [INSTALLATION_STATES.TERMINADO]: 'bg-green-500 hover:bg-green-600 text-white border-green-600',
 };
 
@@ -66,7 +66,7 @@ export type TaskState = typeof TASK_STATES[keyof typeof TASK_STATES];
 export const TASK_STATE_COLORS: Record<TaskState, string> = {
   [TASK_STATES.URGENTE]: 'bg-red-500 hover:bg-red-600 text-white border-red-600',
   [TASK_STATES.PENDIENTE]: 'bg-orange-500 hover:bg-orange-600 text-white border-orange-600',
-  [TASK_STATES.A_LA_ESPERA]: 'bg-blue-500 hover:bg-blue-600 text-white border-blue-600',
+  [TASK_STATES.A_LA_ESPERA]: 'bg-muted/60 hover:bg-muted/60 text-foreground border-border/60',
   [TASK_STATES.EN_FABRICACION]: 'bg-purple-500 hover:bg-purple-600 text-white border-purple-600',
   [TASK_STATES.TERMINADO]: 'bg-green-500 hover:bg-green-600 text-white border-green-600',
   [TASK_STATES.INCIDENTE]: 'bg-destructive hover:bg-destructive/90 text-destructive-foreground border-destructive',
@@ -126,7 +126,7 @@ export const VEHICLE_TYPES = {
 export type VehicleType = typeof VEHICLE_TYPES[keyof typeof VEHICLE_TYPES] | string;
 
 export const VEHICLE_TYPE_COLORS: Record<string, string> = {
-  [VEHICLE_TYPES.JUMPER]: 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200',
+  [VEHICLE_TYPES.JUMPER]: 'bg-muted/60 text-foreground border-border/60 hover:bg-muted/60',
   [VEHICLE_TYPES.CAMION]: 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200',
   [VEHICLE_TYPES.FURGONETA]: 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200',
   [VEHICLE_TYPES.OTRO]: 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200',

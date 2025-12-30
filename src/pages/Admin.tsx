@@ -636,7 +636,7 @@ export default function AdminPage() {
       case 'en fabricacion':
         return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
       case 'a la espera':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+        return 'bg-muted/60 text-foreground border border-border/60';
       case 'terminado':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'pendiente':
@@ -810,51 +810,40 @@ export default function AdminPage() {
   // Tareas filtradas y ordenadas para el calendario lateral
   // Se define después para asegurar que sortedTasks ya existe
 
-  // Filtrar tareas según la categoría seleccionada y fecha
+  // Filtrar tareas según la categoría seleccionada
   const filteredTasks = useMemo(() => {
+    console.log(`[DEBUG] Filtering pendingTasks. Total: ${pendingTasks?.length}`, {
+      filter: taskFilter,
+      sampleTask: pendingTasks?.[0]
+    });
+
+    if (!pendingTasks) return [];
+
     return pendingTasks.filter(task => {
-
-      // LOG DEBUG
-      // console.log('Checking task:', task.id, task.screen_group, task.start_date);
-
+      // 1. Check Category
       let categoryMatch = false;
       if (taskFilter === 'all') categoryMatch = true;
       else {
-        // Normalización robusta
-        const rawGroup = task.screen_group;
+        const rawGroup = task.screen_group || '';
         const group = sanitizeString(rawGroup);
         const filter = sanitizeString(taskFilter);
 
-        // Mapeo flexible
         if (filter.includes('instalacion')) categoryMatch = group.includes('instalacion');
         else if (filter.includes('confeccion')) categoryMatch = group.includes('confeccion');
         else if (filter.includes('tapiceria')) categoryMatch = group.includes('tapiceria');
-        // Fallback genérico para otros grupos
         else categoryMatch = group.includes(filter);
-
-        if (!categoryMatch && filter.includes('instalacion')) {
-          // Debug why mismatch
-          // console.log('Mismatch:', { rawGroup, group, filter });
-        }
       }
 
-      let dateMatch = true;
-      if (selectedDate) {
-        if (!task.start_date) {
-          dateMatch = true;
-        } else {
-          // Mejorado: Normalizar fecha para comparación robusta
-          const dateStr = (task.start_date || '').replace(' ', 'T');
-          const taskDate = dateStr ? new Date(dateStr) : null;
-          dateMatch = taskDate && !isNaN(taskDate.getTime()) ? isSameDay(taskDate, selectedDate) : false;
+      // IMPORTANTE: Las tareas pendientes NO se filtran por fecha
+      // Se muestran TODAS las tareas no archivadas, independientemente de su fecha
+      // El administrador/manager debe archivarlas manualmente cuando ya no sean relevantes
 
-          // if (!dateMatch) console.log('Date mismatch:', { taskDate, selectedDate });
-        }
+      if (categoryMatch) {
+        console.log('[DEBUG] Matched Task:', task.id, task.screen_group);
       }
-
-      return categoryMatch && dateMatch;
+      return categoryMatch;
     });
-  }, [pendingTasks, taskFilter, selectedDate]);
+  }, [pendingTasks, taskFilter]);
 
   const sortedTasks = useMemo(() => {
     return filteredTasks
@@ -908,17 +897,17 @@ export default function AdminPage() {
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full ring-2 ring-slate-800 hover:ring-slate-700">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full ring-2 ring-border/60 hover:ring-border/80">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={currentUser?.avatar_url} alt={currentUser?.full_name} />
-                  <AvatarFallback className="bg-slate-900 text-slate-200">
+                  <AvatarFallback className="bg-card text-foreground">
                     {currentUser?.full_name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-slate-900 border-slate-800 text-slate-200" align="end" forceMount>
-              <DropdownMenuItem onClick={handleLogout} className="hover:bg-slate-800 focus:bg-slate-800 cursor-pointer">
+            <DropdownMenuContent className="w-56 bg-card border-border/60 text-foreground" align="end" forceMount>
+              <DropdownMenuItem onClick={handleLogout} className="hover:bg-muted/60 focus:bg-muted/60 cursor-pointer">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar sesión</span>
               </DropdownMenuItem>
@@ -931,7 +920,7 @@ export default function AdminPage() {
       <div className="space-y-6">
         {/* Metrics Cards - Responsive Grid Estándar */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+          <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-slate-400">Tareas Totales</CardTitle>
               <CalendarCheck className="h-4 w-4 text-white" />
@@ -939,7 +928,7 @@ export default function AdminPage() {
             <CardContent>
               <div className="text-2xl font-bold text-white">
                 {statsLoading ? (
-                  <div className="animate-pulse bg-slate-800 h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-muted/60 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.total_tasks || 0
                 )}
@@ -948,7 +937,7 @@ export default function AdminPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+          <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-slate-400">Usuarios Activos</CardTitle>
               <Users className="h-4 w-4 text-white" />
@@ -956,7 +945,7 @@ export default function AdminPage() {
             <CardContent>
               <div className="text-2xl font-bold text-white">
                 {statsLoading ? (
-                  <div className="animate-pulse bg-slate-800 h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-muted/60 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.active_users || 0
                 )}
@@ -965,7 +954,7 @@ export default function AdminPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+          <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-slate-400">Vehículos</CardTitle>
               <Car className="h-4 w-4 text-white" />
@@ -973,7 +962,7 @@ export default function AdminPage() {
             <CardContent>
               <div className="text-2xl font-bold text-white">
                 {statsLoading ? (
-                  <div className="animate-pulse bg-slate-800 h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-muted/60 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.active_vehicles || 0
                 )}
@@ -982,7 +971,7 @@ export default function AdminPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+          <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-slate-400">Pendientes</CardTitle>
               <ClipboardList className="h-4 w-4 text-white" />
@@ -990,7 +979,7 @@ export default function AdminPage() {
             <CardContent>
               <div className="text-2xl font-bold text-white">
                 {statsLoading ? (
-                  <div className="animate-pulse bg-slate-800 h-8 w-12 rounded"></div>
+                  <div className="animate-pulse bg-muted/60 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.pending_tasks || 0
                 )}
@@ -1005,15 +994,16 @@ export default function AdminPage() {
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
           isMobile={isMobile}
+          mode="commercial"
         />
 
         {/* Main Content - Row with 3 Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Data Shortcuts Card */}
-          <Card className="flex-1 bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+          <Card className="flex-1 bg-card border-border/60 backdrop-blur-sm shadow-xl">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2 text-white">
-                <Database className="h-4 w-4 text-blue-400" />
+                <Database className="h-4 w-4 text-primary" />
                 Accesos Gestión de Datos
               </CardTitle>
               <CardDescription className="text-slate-500">
@@ -1027,12 +1017,12 @@ export default function AdminPage() {
                     <Button
                       key={screen.id}
                       variant="outline"
-                      className="w-full justify-between border-slate-700 bg-slate-800/50 hover:bg-slate-700 text-slate-300"
+                      className="w-full justify-between border-border/60 bg-muted/40 hover:bg-muted/60 text-slate-300"
                       onClick={() => handleOpenDataShortcut(screen.id)}
                     >
                       <span className="truncate text-left">{screen.name}</span>
                       {screen.screen_group ? (
-                        <Badge variant="secondary" className="ml-2 whitespace-nowrap bg-slate-900 text-slate-400">
+                        <Badge variant="secondary" className="ml-2 whitespace-nowrap bg-card text-muted-foreground">
                           {screen.screen_group}
                         </Badge>
                       ) : null}
@@ -1045,7 +1035,7 @@ export default function AdminPage() {
                   <p className="text-sm">Añade accesos desde Gestión de Tablas de Datos.</p>
                   <Button
                     variant="link"
-                    className="mt-2 text-blue-400"
+                    className="mt-2 text-primary"
                     onClick={() => navigate("/admin/data")}
                   >
                     Abrir Gestión de Datos
@@ -1056,10 +1046,10 @@ export default function AdminPage() {
           </Card>
 
           {/* Confección Card */}
-          <Card className="flex-1 bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+          <Card className="flex-1 bg-card border-border/60 backdrop-blur-sm shadow-xl">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2 text-white">
-                <div className="w-3 h-3 bg-blue-500 rounded-full shadow-lg shadow-blue-500/50"></div>
+                <div className="w-3 h-3 bg-primary rounded-full shadow-lg shadow-primary/40"></div>
                 Confección
               </CardTitle>
             </CardHeader>
@@ -1068,9 +1058,9 @@ export default function AdminPage() {
                 <div className="space-y-2">
                   {Array.from({ length: 2 }).map((_, i) => (
                     <div key={i} className="grid grid-cols-3 gap-4">
-                      <div className="animate-pulse bg-slate-800 h-6 rounded" />
-                      <div className="animate-pulse bg-slate-800 h-6 rounded" />
-                      <div className="animate-pulse bg-slate-800 h-6 rounded" />
+                      <div className="animate-pulse bg-muted/60 h-6 rounded" />
+                      <div className="animate-pulse bg-muted/60 h-6 rounded" />
+                      <div className="animate-pulse bg-muted/60 h-6 rounded" />
                     </div>
                   ))}
                 </div>
@@ -1083,7 +1073,7 @@ export default function AdminPage() {
                   <div className="overflow-x-auto">
                     <Table className="min-w-full">
                       <TableHeader>
-                        <TableRow className="border-slate-800 hover:bg-slate-800/50">
+                        <TableRow className="border-border/60 hover:bg-muted/60">
                           <TableHead className="text-sm text-slate-400">Nº Orden</TableHead>
                           <TableHead className="text-sm text-slate-400">Obra</TableHead>
                           <TableHead className="text-sm text-slate-400">Estado</TableHead>
@@ -1093,7 +1083,7 @@ export default function AdminPage() {
                         {confeccionTasks.slice(0, 2).map((task) => {
                           const statusColor = getStateBadgeClasses(task.state);
                           return (
-                            <TableRow key={task.id} className="border-slate-800 hover:bg-slate-800/50">
+                            <TableRow key={task.id} className="border-border/60 hover:bg-muted/60">
                               <TableCell className="text-sm font-medium text-slate-200">
                                 {getOrderNumberLabel(task)}
                               </TableCell>
@@ -1111,13 +1101,13 @@ export default function AdminPage() {
                   </div>
                   {confeccionTasks.length > 2 && (
                     <div className="overflow-x-auto">
-                      <div className="max-h-48 overflow-y-auto rounded-md border border-slate-800 custom-scrollbar">
+                      <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 custom-scrollbar">
                         <Table className="min-w-full">
                           <TableBody>
                             {confeccionTasks.slice(2).map((task) => {
                               const statusColor = getStateBadgeClasses(task.state);
                               return (
-                                <TableRow key={task.id} className="border-slate-800 hover:bg-slate-800/50">
+                                <TableRow key={task.id} className="border-border/60 hover:bg-muted/60">
                                   <TableCell className="text-sm font-medium text-slate-200">
                                     {getOrderNumberLabel(task)}
                                   </TableCell>
@@ -1141,7 +1131,7 @@ export default function AdminPage() {
           </Card>
 
           {/* Tapicería Card */}
-          <Card className="flex-1 bg-slate-900/50 border-slate-800 backdrop-blur-sm shadow-xl">
+          <Card className="flex-1 bg-card border-border/60 backdrop-blur-sm shadow-xl">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2 text-white">
                 <div className="w-3 h-3 bg-purple-500 rounded-full shadow-lg shadow-purple-500/50"></div>
@@ -1152,7 +1142,7 @@ export default function AdminPage() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-800 hover:bg-slate-800/50">
+                    <TableRow className="border-border/60 hover:bg-muted/60">
                       <TableHead className="text-sm text-slate-400">Nº Orden</TableHead>
                       <TableHead className="text-sm text-slate-400">Gestor</TableHead>
                       <TableHead className="text-sm text-slate-400">Estado</TableHead>
@@ -1162,13 +1152,13 @@ export default function AdminPage() {
                     {tasksLoading ? (
                       Array.from({ length: 3 }).map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell><div className="animate-pulse bg-slate-800 h-4 w-8 rounded"></div></TableCell>
-                          <TableCell><div className="animate-pulse bg-slate-800 h-4 w-16 rounded"></div></TableCell>
-                          <TableCell><div className="animate-pulse bg-slate-800 h-4 w-20 rounded"></div></TableCell>
+                          <TableCell><div className="animate-pulse bg-muted/60 h-4 w-8 rounded"></div></TableCell>
+                          <TableCell><div className="animate-pulse bg-muted/60 h-4 w-16 rounded"></div></TableCell>
+                          <TableCell><div className="animate-pulse bg-muted/60 h-4 w-20 rounded"></div></TableCell>
                         </TableRow>
                       ))
                     ) : tapiceriaTasks.length === 0 ? (
-                      <TableRow className="border-slate-800 hover:bg-slate-800/50">
+                      <TableRow className="border-border/60 hover:bg-muted/60">
                         <TableCell colSpan={3} className="text-center text-slate-500 py-8">
                           No hay tareas de tapicería
                         </TableCell>
@@ -1178,7 +1168,7 @@ export default function AdminPage() {
                         const statusColor = getStateBadgeClasses(task.state);
 
                         return (
-                          <TableRow key={task.id} className="border-slate-800 hover:bg-slate-800/50">
+                          <TableRow key={task.id} className="border-border/60 hover:bg-muted/60">
                             <TableCell className="text-sm font-medium text-slate-200">{getOrderNumberLabel(task)}</TableCell>
                             <TableCell className="text-sm text-slate-300">{getTapiceriaGestorLabel(task)}</TableCell>
                             <TableCell>
@@ -1360,14 +1350,14 @@ export default function AdminPage() {
                                     )
                                 ).length;
 
-                                const bgColor = 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200';
+                                const bgColor = 'bg-muted/60 text-foreground border border-border/60';
 
                                 return (
                                   <div key={profile.id} className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${bgColor}`}>
                                     <User className="h-3 w-3 flex-shrink-0" />
                                     <span className="truncate max-w-[80px]">{profile.full_name}</span>
                                     {taskCount > 1 && (
-                                      <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-xs text-blue-800 dark:text-blue-200">
+                                      <Badge variant="secondary" className="h-4 w-4 p-0 flex items-center justify-center text-xs text-foreground bg-muted/60">
                                         {taskCount}
                                       </Badge>
                                     )}
@@ -1427,7 +1417,7 @@ export default function AdminPage() {
                             <TaskStateBadge state={task.state} />
                             {isTerminated && (
                               <div className="flex items-center gap-1">
-                                <Badge className="flex items-center gap-1 bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-200">
+                                <Badge className="flex items-center gap-1 bg-muted/60 text-foreground border border-border/60">
                                   <CheckCircle className="h-3 w-3" />
                                   Verificado
                                 </Badge>

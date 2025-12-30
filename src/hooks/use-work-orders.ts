@@ -1,35 +1,60 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseProductivity } from '@/integrations/supabase/dual-client';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabaseProductivity as supabase } from "@/integrations/supabase/dual-client";
+import { WorkOrder, WorkOrderStatus, WorkOrderWithDetails } from "@/types/production";
+import { toast } from "sonner";
 
-export type WorkOrderStatus = 'PENDIENTE' | 'CORTE' | 'CONFECCION' | 'TAPICERIA' | 'CONTROL_CALIDAD' | 'LISTO_ENVIO' | 'CANCELADO';
+// Hook para obtener todas las work orders
+export const useWorkOrders = () => {
+    return useQuery({
+        queryKey: ['work-orders'],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('produccion_work_orders')
+                .select(`
+                    *,
+                    comercial_orders!inner(
+                        customer_name,
+                        delivery_date,
+                        fabric
+                    )
+                `)
+                .order('created_at', { ascending: false });
 
-export interface WorkOrder {
-    id: string;
-    order_id: string | null;
-    order_number: string;
-    status: WorkOrderStatus;
-    priority: number;
-    assigned_technician_id: string | null;
-    start_date: string | null;
-    end_date: string | null;
-    technical_specs: any;
-    quality_check_status: string | null;
-    notes: string | null;
-    created_at: string;
-    updated_at: string;
-}
+            if (error) {
+                console.error("Error fetching work orders:", error);
+                throw error;
+            }
 
-export const useWorkOrders = (status?: WorkOrderStatus) => {
+            // Flatten the data
+            const workOrders: WorkOrderWithDetails[] = (data || []).map(wo => ({
+                ...wo,
+                customer_name: wo.comercial_orders?.customer_name,
+                delivery_date: wo.comercial_orders?.delivery_date,
+                fabric: wo.comercial_orders?.fabric,
+            }));
+
+            return workOrders;
+        },
+    });
+};
+
+// Hook para obtener work orders filtradas por estado
+export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
     return useQuery({
         queryKey: ['work-orders', status],
         queryFn: async () => {
-            let query = supabaseProductivity
-                .schema('produccion')
-                .from('work_orders')
-                .select('*')
+            let query = supabase
+                .from('produccion_work_orders')
+                .select(`
+                    *,
+                    comercial_orders!inner(
+                        customer_name,
+                        delivery_date,
+                        fabric
+                    )
+                `)
                 .order('priority', { ascending: false })
-                .order('created_at', { ascending: true });
+                .order('created_at', { ascending: false });
 
             if (status) {
                 query = query.eq('status', status);
@@ -38,58 +63,95 @@ export const useWorkOrders = (status?: WorkOrderStatus) => {
             const { data, error } = await query;
 
             if (error) {
-                console.error('Error fetching work orders:', error);
+                console.error("Error fetching work orders:", error);
                 throw error;
             }
 
-            return data as WorkOrder[];
+            const workOrders: WorkOrderWithDetails[] = (data || []).map(wo => ({
+                ...wo,
+                customer_name: wo.comercial_orders?.customer_name,
+                delivery_date: wo.comercial_orders?.delivery_date,
+                fabric: wo.comercial_orders?.fabric,
+            }));
+
+            return workOrders;
         },
     });
 };
 
+// Hook para obtener una work order específica
+export const useWorkOrder = (id: string) => {
+    return useQuery({
+        queryKey: ['work-order', id],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('produccion_work_orders')
+                .select(`
+                    *,
+                    comercial_orders!inner(
+                        customer_name,
+                        delivery_date,
+                        fabric,
+                        lines
+                    )
+                `)
+                .eq('id', id)
+                .single();
+
+            if (error) {
+                console.error("Error fetching work order:", error);
+                throw error;
+            }
+
+            const workOrder: WorkOrderWithDetails = {
+                ...data,
+                customer_name: data.comercial_orders?.customer_name,
+                delivery_date: data.comercial_orders?.delivery_date,
+                fabric: data.comercial_orders?.fabric,
+            };
+
+            return workOrder;
+        },
+        enabled: !!id,
+    });
+};
+
+// Hook para actualizar estado de work order
 export const useUpdateWorkOrderStatus = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, status, notes }: { id: string, status: WorkOrderStatus, notes?: string }) => {
-            const { data: currentOrder, error: fetchError } = await supabaseProductivity
-                .schema('produccion')
-                .from('work_orders')
-                .select('status')
-                .eq('id', id)
-                .single();
-
-            if (fetchError) throw fetchError;
-
-            const { error: updateError } = await supabaseProductivity
-                .schema('produccion')
-                .from('work_orders')
+        mutationFn: async ({
+            workOrderId,
+            status,
+            notes
+        }: {
+            workOrderId: string;
+            status: WorkOrderStatus;
+            notes?: string;
+        }) => {
+            const { data, error } = await supabase
+                .from('produccion_work_orders')
                 .update({
                     status,
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', id);
+                .eq('id', workOrderId)
+                .select()
+                .single();
 
-            if (updateError) throw updateError;
+            if (error) {
+                console.error("Error updating work order status:", error);
+                throw error;
+            }
 
-            // Registrar actividad
-            const { error: activityError } = await supabaseProductivity
-                .schema('produccion')
-                .from('production_activity')
-                .insert({
-                    work_order_id: id,
-                    previous_status: currentOrder.status,
-                    new_status: status,
-                    notes: notes || `Cambio de estado a ${status}`
-                });
+            // El trigger log_work_order_status_change se encargará del log automáticamente
 
-            if (activityError) console.error('Error logging activity:', activityError);
-
-            return { id, status };
+            return data as WorkOrder;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-            toast.success('Estado de orden actualizado');
+            toast.success("Estado actualizado exitosamente");
         },
         onError: (error: any) => {
             toast.error(`Error al actualizar estado: ${error.message}`);
@@ -97,58 +159,127 @@ export const useUpdateWorkOrderStatus = () => {
     });
 };
 
-export const useWorkOrderById = (id: string | null) => {
-    return useQuery({
-        queryKey: ['work-order', id],
-        queryFn: async () => {
-            if (!id) return null;
-            const { data, error } = await supabaseProductivity
-                .schema('produccion')
-                .from('work_orders')
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            if (error) throw error;
-            return data as WorkOrder;
-        },
-        enabled: !!id
-    });
-};
-
-export const useCreateWorkOrder = () => {
+// Hook para asignar operario
+export const useAssignTechnician = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (orderData: {
-            order_id: string,
-            order_number: string,
-            notes?: string,
-            technical_specs?: any
+        mutationFn: async ({
+            workOrderId,
+            technicianId
+        }: {
+            workOrderId: string;
+            technicianId: string | null;
         }) => {
-            const { data, error } = await supabaseProductivity
-                .schema('produccion')
-                .from('work_orders')
-                .insert({
-                    order_id: orderData.order_id,
-                    order_number: orderData.order_number,
-                    status: 'PENDIENTE',
-                    priority: 0,
-                    notes: orderData.notes,
-                    technical_specs: orderData.technical_specs || {}
+            const { data, error } = await supabase
+                .from('produccion_work_orders')
+                .update({
+                    assigned_technician_id: technicianId,
+                    updated_at: new Date().toISOString()
                 })
+                .eq('id', workOrderId)
                 .select()
                 .single();
 
-            if (error) throw error;
-            return data;
+            if (error) {
+                console.error("Error assigning technician:", error);
+                throw error;
+            }
+
+            return data as WorkOrder;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-            toast.success('Pedido lanzado a producción con éxito');
+            toast.success("Operario asignado exitosamente");
         },
         onError: (error: any) => {
-            toast.error(`Error al lanzar a producción: ${error.message}`);
+            toast.error(`Error al asignar operario: ${error.message}`);
+        }
+    });
+};
+
+// Hook para actualizar prioridad
+export const useUpdateWorkOrderPriority = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            workOrderId,
+            priority
+        }: {
+            workOrderId: string;
+            priority: number;
+        }) => {
+            const { data, error } = await supabase
+                .from('produccion_work_orders')
+                .update({
+                    priority,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', workOrderId)
+                .select()
+                .single();
+
+            if (error) {
+                console.error("Error updating priority:", error);
+                throw error;
+            }
+
+            return data as WorkOrder;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+            toast.success("Prioridad actualizada");
+        },
+        onError: (error: any) => {
+            toast.error(`Error al actualizar prioridad: ${error.message}`);
+        }
+    });
+};
+
+// Hook para actualizar estado de control de calidad
+export const useUpdateQualityCheck = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({
+            workOrderId,
+            qualityStatus,
+            notes
+        }: {
+            workOrderId: string;
+            qualityStatus: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+            notes?: string;
+        }) => {
+            const updates: any = {
+                quality_check_status: qualityStatus,
+                updated_at: new Date().toISOString()
+            };
+
+            if (notes) {
+                updates.notes = notes;
+            }
+
+            const { data, error } = await supabase
+                .from('produccion_work_orders')
+                .update(updates)
+                .eq('id', workOrderId)
+                .select()
+                .single();
+
+            if (error) {
+                console.error("Error updating quality check:", error);
+                throw error;
+            }
+
+            return data as WorkOrder;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+            toast.success("Control de calidad actualizado");
+        },
+        onError: (error: any) => {
+            toast.error(`Error al actualizar QC: ${error.message}`);
         }
     });
 };

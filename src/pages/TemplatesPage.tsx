@@ -1,9 +1,13 @@
 import { TemplateList } from "@/components/templates/TemplateList";
+import PageShell from "@/components/layout/PageShell";
 
 export default function TemplatesPage() {
   return (
-    <div className="container mx-auto p-6">
+    <PageShell
+      title="Plantillas"
+      description="Biblioteca de plantillas para estandarizar procesos."
+    >
       <TemplateList />
-    </div>
+    </PageShell>
   );
 }

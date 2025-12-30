@@ -1,0 +1,243 @@
+import React, { useState } from 'react';
+import { Plus, Search, Edit, Trash2, Package, Upload, Download } from 'lucide-react';
+import { useMaterials, useDeleteMaterial, useCreateMaterial } from '@/hooks/use-materials';
+import { Material } from '@/types/almacen';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { MaterialDialog } from './MaterialDialog';
+import { toast } from 'sonner';
+
+export const MaterialsSection: React.FC = () => {
+    const { data: materials, isLoading } = useMaterials();
+    const deleteMaterial = useDeleteMaterial();
+    const createMaterial = useCreateMaterial();
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const filteredMaterials = materials?.filter(m =>
+        m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.reference?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const handleEdit = (material: Material) => {
+        setSelectedMaterial(material);
+        setIsDialogOpen(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (confirm('¿Estás seguro de eliminar este material?')) {
+            await deleteMaterial.mutateAsync(id);
+        }
+    };
+
+    const handleCloseDialog = () => {
+        setIsDialogOpen(false);
+        setSelectedMaterial(null);
+    };
+
+    const handleImportCSV = () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = async (e: any) => {
+            const file = e.target?.files?.[0];
+            if (!file) return;
+
+            const text = await file.text();
+            const lines = text.split('\n').slice(1); // Skip header
+
+            let imported = 0;
+            for (const line of lines) {
+                const [name, reference, color, stock, unit, notes] = line.split(',');
+                if (name?.trim()) {
+                    try {
+                        await createMaterial.mutateAsync({
+                            name: name.trim(),
+                            reference: reference?.trim() || '',
+                            color: color?.trim() || '',
+                            stock: parseInt(stock) || 0,
+                            unit: unit?.trim() || 'metros',
+                            notes: notes?.trim() || '',
+                            is_active: true
+                        });
+                        imported++;
+                    } catch (err) {
+                        console.error('Error importing:', name, err);
+                    }
+                }
+            }
+            toast.success(`${imported} materiales importados`);
+        };
+        input.click();
+    };
+
+    const handleExportCSV = () => {
+        if (!materials || materials.length === 0) {
+            toast.error('No hay materiales para exportar');
+            return;
+        }
+
+        const csv = [
+            ['Nombre', 'Referencia', 'Color', 'Stock', 'Unidad', 'Notas'].join(','),
+            ...materials.map(m => [
+                m.name,
+                m.reference || '',
+                m.color || '',
+                m.stock,
+                m.unit,
+                m.notes || ''
+            ].join(','))
+        ].join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `materiales_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    return (
+        <div className="space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Package className="w-5 h-5 text-[#14CC7F]" />
+                    <h2 className="text-xl font-bold text-white">Materiales</h2>
+                    <Badge variant="outline" className="ml-2">
+                        {materials?.length || 0} materiales
+                    </Badge>
+                </div>
+                <div className="flex gap-2">
+                    <Button
+                        onClick={handleImportCSV}
+                        variant="outline"
+                        className="border-[#45474A] text-[#8B8D90] hover:text-white"
+                    >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Importar CSV
+                    </Button>
+                    <Button
+                        onClick={handleExportCSV}
+                        variant="outline"
+                        className="border-[#45474A] text-[#8B8D90] hover:text-white"
+                    >
+                        <Download className="w-4 h-4 mr-2" />
+                        Exportar CSV
+                    </Button>
+                    <Button
+                        onClick={() => setIsDialogOpen(true)}
+                        className="bg-[#14CC7F] hover:bg-[#11A366] text-white"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Añadir Material
+                    </Button>
+                </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#8B8D90]" />
+                <Input
+                    placeholder="Buscar por nombre o referencia..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 bg-[#1A1D1F] border-[#45474A] text-white"
+                />
+            </div>
+
+            {/* Materials Table */}
+            {isLoading ? (
+                <div className="text-center py-12 text-[#8B8D90]">Cargando materiales...</div>
+            ) : filteredMaterials && filteredMaterials.length > 0 ? (
+                <div className="bg-[#323438] rounded-xl border border-[#45474A] overflow-hidden">
+                    <table className="w-full">
+                        <thead className="bg-[#1A1D1F]">
+                            <tr className="text-xs text-[#8B8D90] uppercase">
+                                <th className="p-3 text-left">Nombre</th>
+                                <th className="p-3 text-left">Referencia</th>
+                                <th className="p-3 text-left">Color</th>
+                                <th className="p-3 text-right">Stock</th>
+                                <th className="p-3 text-left">Unidad</th>
+                                <th className="p-3 text-left">Notas</th>
+                                <th className="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#45474A]">
+                            {filteredMaterials.map((material) => (
+                                <tr key={material.id} className="hover:bg-[#45474A]/30 transition-colors">
+                                    <td className="p-3">
+                                        <span className="font-bold text-white">{material.name}</span>
+                                    </td>
+                                    <td className="p-3">
+                                        <span className="text-[#8B8D90] font-mono text-xs">
+                                            {material.reference || '---'}
+                                        </span>
+                                    </td>
+                                    <td className="p-3">
+                                        {material.color ? (
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className="w-4 h-4 rounded border border-[#45474A]"
+                                                    style={{ backgroundColor: material.color.toLowerCase() }}
+                                                />
+                                                <span className="text-[#8B8D90] text-sm">{material.color}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[#8B8D90]">---</span>
+                                        )}
+                                    </td>
+                                    <td className="p-3 text-right">
+                                        <span className="text-white font-bold">{material.stock}</span>
+                                    </td>
+                                    <td className="p-3">
+                                        <span className="text-[#8B8D90] text-sm">{material.unit}</span>
+                                    </td>
+                                    <td className="p-3">
+                                        <span className="text-[#8B8D90] text-sm truncate max-w-xs block">
+                                            {material.notes || '---'}
+                                        </span>
+                                    </td>
+                                    <td className="p-3">
+                                        <div className="flex gap-1 justify-end">
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => handleEdit(material)}
+                                                className="h-8 w-8 p-0 hover:bg-[#45474A]"
+                                            >
+                                                <Edit className="w-4 h-4 text-[#8B8D90]" />
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => handleDelete(material.id)}
+                                                className="h-8 w-8 p-0 hover:bg-red-500/10"
+                                            >
+                                                <Trash2 className="w-4 h-4 text-red-500" />
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <div className="text-center py-12 text-[#8B8D90]">
+                    {searchTerm ? 'No se encontraron materiales' : 'No hay materiales registrados'}
+                </div>
+            )}
+
+            {/* Dialog */}
+            <MaterialDialog
+                material={selectedMaterial}
+                open={isDialogOpen}
+                onClose={handleCloseDialog}
+            />
+        </div>
+    );
+};

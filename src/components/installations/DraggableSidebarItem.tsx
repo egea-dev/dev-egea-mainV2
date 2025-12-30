@@ -29,7 +29,7 @@ export const DraggableSidebarItem = ({ item, children, className }: DraggableSid
   });
 
   const statusClasses = cn({
-    'text-blue-500': isUser && item.status === 'vacaciones',
+    'text-amber-500': isUser && item.status === 'vacaciones',
     'text-muted-foreground line-through opacity-50': isUser && item.status === 'baja',
     'cursor-grab': !isDisabled,
     'cursor-not-allowed opacity-60': isDisabled,

@@ -178,7 +178,7 @@ export function TaskDetailsDialog({
                   task.assigned_users.map((user) => (
                     <div
                       key={user.id}
-                      className="rounded-md bg-blue-50/70 px-3 py-1.5 text-sm text-blue-700 ring-1 ring-blue-500/30 dark:bg-blue-950/20 dark:text-blue-200"
+                      className="rounded-md bg-muted/60 px-3 py-1.5 text-sm text-foreground ring-1 ring-border/60"
                     >
                       {user.full_name}
                     </div>
@@ -196,10 +196,10 @@ export function TaskDetailsDialog({
                   task.assigned_vehicles.map((vehicle) => {
                     const type = vehicle.type?.toLowerCase() ?? "";
                     const style = type.includes("jumper")
-                      ? "bg-blue-50/50 text-blue-600 ring-blue-500/20 dark:bg-blue-950/10 dark:text-blue-400"
+                      ? "bg-muted/60 text-foreground ring-border/60"
                       : type.includes("camión") || type.includes("camion")
-                      ? "bg-yellow-50/50 text-yellow-600 ring-yellow-500/20 dark:bg-yellow-950/10 dark:text-yellow-400"
-                      : "bg-gray-50/50 text-gray-600 ring-gray-500/20 dark:bg-gray-950/10 dark:text-gray-400";
+                      ? "bg-amber-500/10 text-amber-300 ring-amber-500/30"
+                      : "bg-muted/40 text-muted-foreground ring-border/60";
 
                     return (
                       <div

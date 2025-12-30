@@ -28,6 +28,12 @@ import MyTasksPage from "./pages/MyTasksPage";
 import WorkdayPage from "./pages/WorkdayPage";
 import KioskPage from "./pages/KioskPage";
 import WarehousePage from "./pages/WarehousePage";
+import { ProductionPage } from "./pages/ProductionPage";
+import GlobalCalendarPage from "./pages/GlobalCalendarPage";
+import ManagementPage from "./pages/ManagementPage";
+import SlaConfigPage from "./pages/SlaConfigPage";
+import SystemLogPage from "./pages/SystemLogPage";
+import ShippingScanPage from "./pages/ShippingScanPage";
 
 // --- LAYOUTS Y COMPONENTES PRINCIPALES ---
 import AdminLayout from "./pages/AdminLayout";
@@ -73,14 +79,20 @@ const App = () => (
                 path="communications"
                 element={<CommunicationsPage />}
               />
+              <Route path="calendario-global" element={<GlobalCalendarPage />} />
+              <Route path="gestion" element={<ManagementPage />} />
               <Route path="workday" element={<WorkdayPage />} />
               <Route path="settings" element={<PermissionGuardEnhanced resource="admin" action="view"><SettingsPage /></PermissionGuardEnhanced>} />
+              <Route path="sla-config" element={<PermissionGuardEnhanced resource="admin" action="view"><SlaConfigPage /></PermissionGuardEnhanced>} />
+              <Route path="system-log" element={<PermissionGuardEnhanced resource="admin" action="view"><SystemLogPage /></PermissionGuardEnhanced>} />
               <Route path="archive" element={<PermissionGuardEnhanced resource="admin" action="view"><ArchivePage /></PermissionGuardEnhanced>} />
               <Route path="data" element={<PermissionGuardEnhanced resource="admin" action="view"><DataManagement /></PermissionGuardEnhanced>} />
               <Route path="screens" element={<PermissionGuardEnhanced resource="admin" action="view"><ScreenList /></PermissionGuardEnhanced>} />
               <Route path="templates" element={<PermissionGuardEnhanced resource="admin" action="view"><TemplateList /></PermissionGuardEnhanced>} />
+              <Route path="production" element={<ProductionPage />} />
               <Route path="kiosk" element={<KioskPage />} />
               <Route path="warehouse" element={<WarehousePage />} />
+              <Route path="envios" element={<ShippingScanPage />} />
             </Route>
 
             <Route path="/data-entry/:id" element={<AuthGuard><DataEntryPage /></AuthGuard>} />

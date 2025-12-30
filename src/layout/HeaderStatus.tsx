@@ -53,7 +53,7 @@ export const HeaderStatus = ({ role }: HeaderStatusProps) => {
 
       // Test PRODUCTIVITY
       try {
-        const { error } = await supabaseProductivity.schema('comercial').from("orders").select("id").limit(1);
+        const { error } = await supabaseProductivity.from("comercial_orders").select("id").limit(1);
         if (error) throw error;
         setProductivityConnected(true);
       } catch (err) {

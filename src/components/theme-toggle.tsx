@@ -1,6 +1,7 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +11,7 @@ import {
 
 export function ThemeToggle() {
   const { setTheme } = useTheme();
+  const isMobile = useIsMobile();
 
   return (
     <DropdownMenu>
@@ -21,14 +23,19 @@ export function ThemeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          Claro
-        </DropdownMenuItem>
+        {isMobile && (
+          <DropdownMenuItem onClick={() => setTheme("light")}>
+            Claro
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={() => setTheme("dark")}>
           Oscuro
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme("system")}>
           Sistema
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("egea")}>
+          Egea
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

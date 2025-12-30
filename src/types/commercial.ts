@@ -5,6 +5,7 @@ export interface OrderLine {
     width: string;
     height: string;
     material: string;
+    color?: string; // NEW: Color column
     quantity: number;
     notes?: string;
 }
@@ -21,8 +22,23 @@ export interface Order {
     id: string;
     order_number: string;
     admin_code?: string;
-    customer_name: string;
-    region?: Region;
+
+    // Customer Data (from reference modal)
+    customer_name: string; // NOMBRE COMPLETO
+    customer_code?: string; // CÓDIGO SOLICITUD INTERESADO
+    customer_company?: string; // CLIENTE / RAZÓN SOCIAL
+    contact_name?: string; // NOMBRE CONTACTO
+    phone?: string; // TELÉFONO
+    email?: string; // EMAIL
+
+    // Delivery Data
+    delivery_region?: Region; // REGIÓN (PENINSULA, BALEARES, CANARIAS)
+    delivery_address?: string; // DIRECCIÓN DE ENTREGA
+    delivery_location_url?: string; // UBICACIÓN (MAPS)
+    delivery_date?: string;
+    delivery_city?: string;
+
+    // Order Status
     status: OrderStatus;
 
     // Technical Data
@@ -34,9 +50,25 @@ export interface Order {
     lines: OrderLine[];
     documents: OrderDocument[];
 
+    // Notes
+    internal_notes?: string; // NOTAS INTERNAS
+
+    // Shipping / Warehouse
+    packages_count?: number;
+    scanned_packages?: number;
+    tracking_number?: string;
+    needs_shipping_validation?: boolean;
+    shipping_date?: string;
+    quantity_shipped?: number;
+
+    // QR
+    qr_generated_at?: string;
+
     // Meta
     created_at: string;
     updated_at: string;
-    delivery_date?: string;
-    delivery_city?: string;
+    created_by?: string;
+
+    // Legacy compatibility
+    region?: Region; // Deprecated, use delivery_region
 }

@@ -44,6 +44,7 @@ const fetchWithRetry = async (
   }
 };
 
+// MAIN Supabase client
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
@@ -68,6 +69,29 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     schema: 'public'
   }
 });
+
+// PRODUCTIVITY Supabase client
+export const supabaseProductivity = createClient<Database>(
+  import.meta.env.VITE_SUPABASE_PRODUCTIVITY_URL,
+  import.meta.env.VITE_SUPABASE_PRODUCTIVITY_ANON_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storage: null // Explicitly disable storage to prevent conflict
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'egea-productivity-db'
+      },
+      fetch: fetchWithRetry
+    },
+    db: {
+      schema: 'public'
+    }
+  }
+);
 
 export type SupabaseClient = SupabaseClientType<Database>;
 

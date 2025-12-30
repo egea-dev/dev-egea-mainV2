@@ -157,7 +157,7 @@ export const TaskCard = ({ task, isOverlay, onEdit }: TaskCardProps) => {
                             (task.assigned_vehicles as any[]).map((vehicle: any) => (
                                 <div
                                     key={vehicle.id}
-                                    className="bg-indigo-950/30 text-indigo-300 text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 border border-indigo-900/30"
+                                    className="bg-muted/60 text-muted-foreground text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 border border-border/60"
                                     title={vehicle.name}
                                 >
                                     <span className="truncate max-w-[80px]">{vehicle.name}</span>

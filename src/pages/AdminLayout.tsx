@@ -25,9 +25,15 @@ function AdminLayout() {
   const isLoading = isLoadingUsers || isLoadingVehicles || isLoadingProfile;
 
   useEffect(() => {
-    if (!isLoading && useCompactLayout && location.pathname === '/admin') {
-      navigate('/admin/workday', { replace: true });
+    if (isLoading || location.pathname !== '/admin') {
+      return;
     }
+
+    if (!useCompactLayout) {
+      return;
+    }
+
+    navigate('/admin/workday', { replace: true });
   }, [isLoading, useCompactLayout, location.pathname, navigate]);
 
   if (isLoading) {

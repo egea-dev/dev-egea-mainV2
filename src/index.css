@@ -6,94 +6,109 @@
 
 @layer base {
   :root {
-    /* Fondo de la aplicación: gris muy claro */
-    --background: 220 14% 96%;
-    --foreground: 224 71.4% 4.1%;
+    /* Base clara inspirada en la referencia */
+    --background: 0 0% 94%;
+    --foreground: 222 18% 18%;
 
-    /* Fondo de las tarjetas: blanco puro */
     --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
+    --card-foreground: 222 18% 18%;
 
-    /* Popovers y dropdowns */
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
+    --popover-foreground: 222 18% 18%;
 
-    /* Color primario: Verde Esmeralda Industrial (#14CC7F) - 155 81% 44% */
-    --primary: 155 81% 44%;
+    /* Burdeos */
+    --primary: 346 71% 29%;
     --primary-foreground: 0 0% 100%;
 
-    /* Color secundario */
-    --secondary: 220 14.3% 95.9%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 222 18% 18%;
 
-    /* Muted (para texto y fondos deshabilitados) */
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
+    --muted: 210 16% 94%;
+    --muted-foreground: 215 10% 40%;
 
-    /* Tonos de feedback adicionales */
-    --info: 199 94% 76%;
+    --info: 204 80% 75%;
     --info-foreground: 210 24% 32%;
-    --warning: 43 96% 56%;
+    --warning: 38 92% 56%;
     --warning-foreground: 24 32% 18%;
 
-    /* Accent */
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 210 18% 92%;
+    --accent-foreground: 222 18% 18%;
 
-    /* Destructive (errores) */
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 78% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Bordes e inputs */
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 155 81% 44%;
+    --border: 214 12% 88%;
+    --input: 214 12% 88%;
+    --ring: 346 71% 29%;
 
-    /* Radio de bordes más redondeado */
-    --radius: 0.75rem;
+    --radius: 1rem;
     
     font-family: 'Inter', sans-serif;
   }
 
   .dark {
-    /* Industrial Dark Mode Palette 
-       Bg App: #1A1D1F -> 210 9% 11%
-       Surface: #323438 -> 220 6% 21%
-       Border: #45474A -> 216 3% 28%
-       Primary: #14CC7F -> 155 81% 44%
-    */
-    --background: 210 9% 11%;
-    --foreground: 0 0% 100%; /* #FFFFFF Title text */
+    --background: 20 10% 10%;
+    --foreground: 0 0% 98%;
     
-    --card: 220 6% 21%;
-    --card-foreground: 210 2% 72%; /* #B5B8BA Body text equivalent */
+    --card: 20 10% 14%;
+    --card-foreground: 0 0% 98%;
     
-    --popover: 220 6% 21%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 20 10% 14%;
+    --popover-foreground: 0 0% 98%;
     
-    --primary: 155 81% 44%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 24 94% 54%;
+    --primary-foreground: 20 10% 10%;
     
-    --secondary: 216 3% 28%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 20 8% 20%;
+    --secondary-foreground: 0 0% 98%;
     
-    --muted: 220 6% 21%;
-    --muted-foreground: 210 2% 55%; /* #8B8D90 Meta text */
+    --muted: 20 8% 18%;
+    --muted-foreground: 24 8% 62%;
     
-    --accent: 220 6% 26%; /* Un poco más claro que card para hover */
-    --accent-foreground: 0 0% 100%;
+    --accent: 20 10% 22%;
+    --accent-foreground: 0 0% 98%;
     
-    --destructive: 0 62% 30%;
+    --destructive: 0 62% 38%;
     --destructive-foreground: 0 0% 100%;
     
-    --border: 216 3% 28%;
-    --input: 216 3% 28%;
-    --ring: 155 81% 44%;
+    --border: 20 8% 22%;
+    --input: 20 8% 22%;
+    --ring: 24 94% 54%;
     
-    --info: 199 92% 62%;
+    --info: 204 92% 62%;
     --info-foreground: 210 32% 92%;
-    --warning: 43 100% 62%;
-    --warning-foreground: 220 22% 14%;
+    --warning: 38 100% 62%;
+    --warning-foreground: 24 32% 18%;
+  }
+
+  .egea {
+    --background: 345 18% 8%;
+    --foreground: 0 0% 96%;
+
+    --card: 345 18% 12%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 345 18% 12%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: 346 70% 45%;
+    --primary-foreground: 345 18% 10%;
+
+    --secondary: 345 12% 18%;
+    --secondary-foreground: 0 0% 96%;
+
+    --muted: 345 10% 16%;
+    --muted-foreground: 0 0% 70%;
+
+    --accent: 345 12% 20%;
+    --accent-foreground: 0 0% 96%;
+
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 345 12% 22%;
+    --input: 345 12% 22%;
+    --ring: 346 70% 45%;
   }
 }
 
@@ -107,7 +122,6 @@
 }
 
 @layer components {
-  /* Aumentar espaciado general para un diseño más limpio y aireado */
   .card-spacing {
     @apply p-6;
   }
@@ -116,8 +130,6 @@
     @apply space-y-6;
   }
 
-  /* Mejorar sombras de tarjetas para más profundidad */
-  /* Estilos para tablas con mejor espaciado */
   .table-spacing td,
   .table-spacing th {
     @apply px-4 py-3;
@@ -158,7 +170,6 @@
     background-color: hsl(var(--primary) / 0.18);
   }
 
-  /* Enhanced calendar styling */
   .rdp {
     --rdp-accent-color: hsl(var(--primary));
     --rdp-outline: 2px solid hsl(var(--primary));
@@ -192,7 +203,6 @@
     font-weight: 700;
   }
 
-  /* Estilos para el calendario embebido */
   .rdp-month {
     width: 100%;
   }
@@ -240,7 +250,6 @@
     background-color: hsl(14 100% 58%);
   }
 
-  /* Mobile responsive */
   @media (max-width: 640px) {
     .rdp-months {
       flex-direction: column;
@@ -264,6 +273,11 @@
   }
 }
 @layer utilities {
+  :where([class*="bg-blue-"], [class*="bg-sky-"], [class*="bg-indigo-"])
+    :not(button):not(a):not(input):not(select):not(textarea) {
+    background-color: hsl(var(--card)) !important;
+  }
+
   .bg-pulse-neutral {
     background-color: hsl(var(--card));
     color: hsl(var(--foreground));

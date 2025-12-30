@@ -18,8 +18,9 @@ import "dayjs/locale/es";
 import { es } from "date-fns/locale";
 import { format, parseISO, subDays, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { Task, Profile, Vehicle, DetailedTask } from "@/integrations/supabase/types"; // Updated Types import
+import { Profile, Vehicle, DetailedTask } from "@/integrations/supabase/types"; // Updated Types import
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -54,6 +55,7 @@ export default function InstallationsPage() {
   const { users, vehicles, fetchData: refreshAdminData } = useAdminData();
   const isMobile = useIsMobile();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   // State for Date Navigation (Weekly)
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -162,6 +164,7 @@ export default function InstallationsPage() {
         type: type
       });
       toast.success(`Asignado ${resource.name} a tarea`);
+      queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
       fetchTasks(); // Refresh
       return;
     }
@@ -193,7 +196,7 @@ export default function InstallationsPage() {
       setTasks(updatedTasks);
 
       const { error } = await supabase
-        .from('detailed_tasks')
+        .from('screen_data')
         .update(updates)
         .eq('id', task.id);
 
@@ -202,6 +205,7 @@ export default function InstallationsPage() {
         fetchTasks(); // Revert
       } else {
         toast.success("Tarea reagendada");
+        queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
       }
     }
   };
@@ -296,7 +300,7 @@ export default function InstallationsPage() {
                 {filteredVehicles.map(vehicle => (
                   <DraggableSidebarItem key={vehicle.id} item={{ ...vehicle, type: 'vehicle' }}>
                     <div className="flex items-center gap-2 p-2 rounded hover:bg-slate-800/50 cursor-grab active:cursor-grabbing border border-transparent hover:border-slate-700">
-                      <Car className="w-3 h-3 text-indigo-400" />
+                      <Car className="w-3 h-3 text-muted-foreground" />
                       <span className="text-sm text-slate-300 truncate">{vehicle.name}</span>
                     </div>
                   </DraggableSidebarItem>
