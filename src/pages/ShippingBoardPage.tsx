@@ -26,6 +26,7 @@ interface ShippingOrder {
     isUrgent: boolean;
     isRecentShipment: boolean;
     daysElapsed: number;
+    due_date?: string | null;
 }
 
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
@@ -152,10 +153,11 @@ export default function ShippingBoardPage() {
             {/* TABLE HEADER */}
             <div className="px-8 py-4 bg-[#111] grid grid-cols-12 gap-4 text-gray-500 font-bold text-sm uppercase tracking-wider border-b border-white/5">
                 <div className="col-span-2">PEDIDO / REF</div>
-                <div className="col-span-3">CLIENTE / DESTINO</div>
-                <div className="col-span-3">MATERIAL / BULTOS</div>
-                <div className="col-span-2">TRACKING</div>
-                <div className="col-span-2 text-right">ESTADO</div>
+                <div className="col-span-2">CLIENTE / DESTINO</div>
+                <div className="col-span-2">MATERIAL</div>
+                <div className="col-span-2">BULTOS</div>
+                <div className="col-span-1">TRACKING</div>
+                <div className="col-span-3 text-right">ESTADO</div>
             </div>
 
             {/* BODY / SCROLL AREA */}
@@ -168,11 +170,20 @@ export default function ShippingBoardPage() {
                 ) : (
                     orders.map((order) => {
                         const statusBadge = getStatusBadge(order);
+
+                        // Border color logic based on due_date
+                        const getBorderColor = () => {
+                            if (!order.due_date) return 'border-l-gray-600';
+                            const days = Math.ceil((new Date(order.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                            if (days <= 0) return 'border-l-red-500'; // Vencido
+                            if (days <= 2) return 'border-l-amber-500'; // Urgente
+                            return 'border-l-[#D4AF37]'; // Normal (Egea Gold)
+                        };
+
                         return (
                             <div
                                 key={order.id}
-                                className={`grid grid-cols-12 gap-4 items-center bg-[#1A1D1F] p-4 rounded-lg shadow-lg animate-in fade-in duration-500 ${order.isUrgent ? "border-l-4 border-l-amber-500" : "border-l-4 border-l-[#D4AF37]"
-                                    }`}
+                                className={`grid grid-cols-12 gap-4 items-center bg-[#1A1D1F] p-4 rounded-lg shadow-lg animate-in fade-in duration-500 border-l-4 ${getBorderColor()}`}
                             >
                                 {/* COL 1: REF */}
                                 <div className="col-span-2">
@@ -181,63 +192,73 @@ export default function ShippingBoardPage() {
                                 </div>
 
                                 {/* COL 2: CLIENTE / DESTINO */}
-                                <div className="col-span-3">
-                                    <div className="text-white font-bold text-lg truncate w-[90%]">{order.customer_name}</div>
+                                <div className="col-span-2">
+                                    <div className="text-white font-bold text-base truncate">{order.customer_name}</div>
                                     <div className="text-xs text-gray-500 uppercase tracking-wider font-bold mt-1">{order.region}</div>
-                                    {order.delivery_address && (
-                                        <div className="text-xs text-gray-600 truncate w-[90%] mt-0.5">{order.delivery_address}</div>
-                                    )}
                                 </div>
 
-                                {/* COL 3: MATERIAL / BULTOS */}
-                                <div className="col-span-3">
-                                    <div className="text-gray-300 font-medium">{order.fabric}</div>
-                                    <div className="text-sm text-gray-500 mb-2">{order.color}</div>
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-xs text-gray-400 font-bold">
-                                            <span>BULTOS</span>
-                                            <span>
-                                                {order.scanned_packages}/{order.packages_count}
-                                            </span>
-                                        </div>
-                                        <Progress
-                                            value={order.packageProgress}
-                                            className="h-2 bg-black/50"
-                                            indicatorClassName={order.packageProgress === 100 ? "bg-emerald-500" : "bg-amber-500"}
-                                        />
+                                {/* COL 3: MATERIAL (2 cols) */}
+                                <div className="col-span-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-gray-300 font-bold text-base">{order.fabric}</span>
+                                        <span className="text-gray-600">·</span>
+                                        <span className="text-gray-400 text-sm">{order.color}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-600 mt-1">
+                                        {order.quantity_total} uds
                                     </div>
                                 </div>
 
-                                {/* COL 4: TRACKING */}
+                                {/* COL 4: BULTOS - SEPARATE & LARGE (2 cols) */}
                                 <div className="col-span-2">
+                                    <div className="flex items-center gap-3">
+                                        <Package className={`w-6 h-6 ${order.packageProgress === 100 ? 'text-emerald-500' :
+                                            order.packageProgress >= 50 ? 'text-blue-400' :
+                                                'text-amber-500'
+                                            }`} />
+                                        <div className="flex-1">
+                                            <div className="text-base font-black text-white mb-1">
+                                                {order.scanned_packages}/{order.packages_count}
+                                            </div>
+                                            <Progress
+                                                value={order.packageProgress}
+                                                className="h-2.5 bg-black/50"
+                                                indicatorClassName={order.packageProgress === 100 ? "bg-emerald-500" : order.packageProgress >= 50 ? "bg-blue-500" : "bg-amber-500"}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* COL 5: TRACKING - COMPACT (1 col) */}
+                                <div className="col-span-1">
                                     {order.tracking_number ? (
-                                        <>
-                                            <div className="text-white font-mono font-bold text-sm">{order.tracking_number}</div>
-                                            {order.shipping_date && (
-                                                <div className="text-xs text-gray-500 mt-1">
-                                                    {format(new Date(order.shipping_date), "dd/MM/yyyy HH:mm")}
-                                                </div>
-                                            )}
-                                        </>
+                                        <div className="text-white font-mono text-xs">{order.tracking_number}</div>
                                     ) : (
-                                        <div className="text-gray-600 text-sm italic">Sin tracking</div>
+                                        <div className="text-gray-600 text-xs italic">-</div>
                                     )}
                                 </div>
 
-                                {/* COL 5: ESTADO */}
-                                <div className="col-span-2 flex flex-col items-end gap-2">
+                                {/* COL 6: ESTADO - WITH TEXT & DAYS (3 cols) */}
+                                <div className="col-span-3 flex items-center justify-end gap-3">
+                                    {/* Urgency Badge */}
                                     {order.isUrgent && (
-                                        <div className="flex items-center gap-1 bg-amber-900/20 border border-amber-500/30 px-2 py-1 rounded-full">
-                                            <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                            <span className="text-xs font-bold text-amber-400 uppercase">URGENTE</span>
+                                        <div className="flex items-center gap-1 bg-amber-900/30 border border-amber-500/50 px-2 py-1 rounded-lg">
+                                            <AlertTriangle className="w-3 h-3 text-amber-500 animate-pulse" />
                                         </div>
                                     )}
-                                    <div className={`px-3 py-1 rounded-full border text-xs font-bold uppercase ${statusBadge.color}`}>
+
+                                    {/* Status Badge with Icon AND Text */}
+                                    <div className={`px-3 py-1.5 rounded-lg border-2 text-sm font-black uppercase flex items-center gap-2 ${statusBadge.color}`}>
+                                        {order.status === "ENVIADO" && <CheckCircle2 className="w-4 h-4" />}
+                                        {order.status === "LISTO_ENVIO" && <Truck className="w-4 h-4" />}
+                                        {order.status === "PTE_ENVIO" && <Clock className="w-4 h-4" />}
                                         {statusBadge.label}
                                     </div>
-                                    <div className="text-center">
-                                        <span className="text-2xl font-bold text-white tracking-tighter">{order.daysElapsed}</span>
-                                        <span className="text-xs text-gray-500 uppercase font-bold ml-1">días</span>
+
+                                    {/* Days Elapsed */}
+                                    <div className="text-center bg-[#0F1113] border border-[#45474A]/60 rounded-lg px-3 py-1.5">
+                                        <span className="text-2xl font-black text-white tracking-tighter">{order.daysElapsed}</span>
+                                        <span className="text-xs text-gray-500 uppercase font-bold ml-1">{order.daysElapsed === 1 ? 'día' : 'días'}</span>
                                     </div>
                                 </div>
                             </div>
