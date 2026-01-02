@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Monitor, Clock } from "lucide-react";
+import { Monitor, Clock, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -206,7 +207,7 @@ export default function DisplayPage({
       {/* HEADER PREMIUM */}
       <header className="px-8 py-6 flex items-center justify-between bg-black border-b border-white/10 shrink-0">
         <div className="flex items-center gap-6">
-          <img src="/img/Egea- Evolucio Gold.png" alt="Egea Gold" className="h-12 w-auto object-contain" />
+          <img src="/egea-logo.png" alt="Egea Logo" className="h-12 w-auto object-contain" />
           <div className="flex flex-col border-l border-white/10 pl-6 h-10 justify-center">
             <h1 className="text-2xl font-black tracking-wider text-white uppercase leading-none">
               {screen.name}
@@ -217,17 +218,37 @@ export default function DisplayPage({
           </div>
         </div>
 
-        <div className="text-right flex items-center gap-8">
-          <div className="hidden xl:block">
-            <div className="text-right text-[10px] text-gray-600 uppercase font-bold tracking-widest mb-1">Última Sincro</div>
-            <div className="font-mono text-emerald-500 font-bold">{lastUpdate.toLocaleTimeString()}</div>
+        <div className="flex items-center gap-6">
+          {/* Connection Status & Manual Refresh */}
+          <div className="flex items-center gap-3">
+            <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white px-3 py-1.5">
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse mr-2"></span>
+              CONECTADO
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadData()}
+              className="border-white/20 hover:bg-white/10 hover:text-white text-gray-400"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Actualizar
+            </Button>
           </div>
-          <div>
-            <div className="text-6xl font-mono font-bold tracking-tight leading-none text-white tabular-nums">
-              {format(currentTime, "HH:mm")}
+
+          {/* Last Update & Clock */}
+          <div className="text-right flex items-center gap-6 border-l border-white/10 pl-6">
+            <div className="hidden xl:block">
+              <div className="text-right text-[10px] text-gray-600 uppercase font-bold tracking-widest mb-1">Última Sincro</div>
+              <div className="font-mono text-emerald-500 font-bold">{lastUpdate.toLocaleTimeString()}</div>
             </div>
-            <div className="text-lg text-gray-400 font-medium uppercase tracking-widest mt-1 text-right">
-              {format(currentTime, "d 'de' MMMM, yyyy", { locale: es })}
+            <div>
+              <div className="text-6xl font-mono font-bold tracking-tight leading-none text-white tabular-nums">
+                {format(currentTime, "HH:mm")}
+              </div>
+              <div className="text-lg text-gray-400 font-medium uppercase tracking-widest mt-1 text-right">
+                {format(currentTime, "d 'de' MMMM, yyyy", { locale: es })}
+              </div>
             </div>
           </div>
         </div>

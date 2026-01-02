@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -13,6 +14,8 @@ import { useScreenData, useScreens } from "@/hooks/use-supabase";
 import { TaskStateBadge, StatusBadge } from "@/components/badges";
 import { Loader2, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 type PreparedColumn = {
   key: string;
@@ -20,10 +23,24 @@ type PreparedColumn = {
   source: "data" | "row";
 };
 
-const ScreenDisplay = () => {
+type ScreenDisplayProps = {
+  screenId?: string;
+  groupMode?: boolean;
+  countdown?: number | null;
+  currentScreen?: number;
+  totalScreens?: number;
+};
+
+const ScreenDisplay = ({
+  screenId: propScreenId,
+  groupMode = false,
+  countdown = null,
+  currentScreen,
+  totalScreens
+}: ScreenDisplayProps = {}) => {
   const { screenId: routeScreenId } = useParams<{ screenId: string }>();
   const navigate = useNavigate();
-  const screenId = routeScreenId ?? null;
+  const screenId = propScreenId || routeScreenId || null;
 
   const {
     data: screenInfo,
@@ -35,6 +52,14 @@ const ScreenDisplay = () => {
 
   const { data: allScreens = [] } = useScreens();
   const isOnline = !isError;
+
+  // Clock state
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const screen = screenInfo?.screen ?? null;
   const dataList = screenInfo?.dataList;
@@ -189,60 +214,63 @@ const ScreenDisplay = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1115] text-white font-sans selection:bg-blue-500/30">
-      <header className="border-b border-slate-800/50 bg-slate-950/50 backdrop-blur-md sticky top-0 z-20">
-        <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="bg-slate-900 p-2 rounded-xl border border-slate-800">
-              <Loader2 className={cn("h-6 w-6 text-blue-400", isRefreshing ? "animate-spin" : "")} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                {screen.name || "Pantalla de Datos"}
-              </h1>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">
-                VISUALIZACIÓN DETALLADA
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span
-              className={cn(
-                "flex items-center gap-2 text-xs font-medium uppercase tracking-wider",
-                isOnline ? "text-emerald-500" : "text-red-500",
-              )}
-            >
-              {isOnline ? (
-                <>
-                  <Wifi className="h-4 w-4" />
-                  <span>Conectado</span>
-                </>
+    <div className="min-h-screen bg-black text-white font-sans overflow-hidden flex flex-col selection:bg-[#D4AF37] selection:text-black">
+      {/* HEADER PREMIUM */}
+      <header className="px-8 py-6 flex items-center justify-between bg-black border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-6">
+          <img src="/egea-logo.png" alt="Egea Logo" className="h-12 w-auto object-contain" />
+          <div className="flex flex-col border-l border-white/10 pl-6 h-10 justify-center">
+            <h1 className="text-2xl font-black tracking-wider text-white uppercase leading-none">
+              {screen.name || "Pantalla de Datos"}
+            </h1>
+            <span className="text-xs text-[#D4AF37] font-bold uppercase tracking-[0.2em] mt-1">
+              {groupMode && countdown !== null ? (
+                <span className="flex items-center gap-2">
+                  <span className="text-emerald-400">{countdown}s</span>
+                  {currentScreen && totalScreens && (
+                    <>
+                      <span className="text-gray-600">•</span>
+                      <span className="text-gray-400">Pantalla {currentScreen}/{totalScreens}</span>
+                    </>
+                  )}
+                </span>
               ) : (
-                <>
-                  <WifiOff className="h-4 w-4" />
-                  <span>Sin conexión</span>
-                </>
+                "MAIN"
               )}
             </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-6">
+          {/* Connection Status & Manual Refresh */}
+          <div className="flex items-center gap-3">
+            <Badge className={cn(
+              "px-3 py-1.5",
+              isOnline ? "bg-emerald-600 hover:bg-emerald-600" : "bg-red-600 hover:bg-red-600"
+            )}>
+              <span className="w-2 h-2 bg-white rounded-full animate-pulse mr-2"></span>
+              {isOnline ? "CONECTADO" : "DESCONECTADO"}
+            </Badge>
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
               disabled={isRefreshing}
-              className="border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+              className="border-white/20 hover:bg-white/10 hover:text-white text-gray-400"
             >
-              <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+              <RefreshCw className={cn("w-4 h-4 mr-2", isRefreshing && "animate-spin")} />
               Actualizar
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/admin/screens")}
-              className="text-slate-500 hover:text-white"
-            >
-              Volver
-            </Button>
+          </div>
+
+          {/* Clock */}
+          <div className="text-right border-l border-white/10 pl-6">
+            <div className="text-6xl font-mono font-bold tracking-tight leading-none text-white tabular-nums">
+              {format(currentTime, "HH:mm")}
+            </div>
+            <div className="text-lg text-gray-400 font-medium uppercase tracking-widest mt-1 text-right">
+              {format(currentTime, "d 'de' MMMM, yyyy", { locale: es })}
+            </div>
           </div>
         </div>
       </header>

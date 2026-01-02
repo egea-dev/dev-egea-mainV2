@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 import { Monitor } from 'lucide-react';
-import DisplayPage from './Display';
+import ScreenDisplay from './ScreenDisplay';
 
 type Screen = {
   id: string;
@@ -29,7 +29,10 @@ export default function GroupDisplayPage() {
   const [loading, setLoading] = useState(true);
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const [advanceSignals, setAdvanceSignals] = useState<Record<string, number>>({});
+  const [countdown, setCountdown] = useState(30);
+  const [currentScreenIndex, setCurrentScreenIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const shownScreensRef = useRef<Record<string, boolean>>({});
 
   const clearTimer = useCallback(() => {
@@ -54,7 +57,9 @@ export default function GroupDisplayPage() {
       }
 
       const selectedIndex = api.selectedScrollSnap();
+      setCurrentScreenIndex(selectedIndex);
       const currentScreen = currentScreens[selectedIndex];
+
       if (currentScreen) {
         if (shownScreensRef.current[currentScreen.id]) {
           triggerAdvance(currentScreen.id);
@@ -64,7 +69,26 @@ export default function GroupDisplayPage() {
       }
 
       const rawDelay = currentScreen?.refresh_interval_sec ?? 30;
-      const delayMs = Math.max(rawDelay || 30, 5) * 1000;
+      const delaySeconds = Math.max(rawDelay || 30, 5);
+      const delayMs = delaySeconds * 1000;
+
+      // Reset countdown
+      setCountdown(delaySeconds);
+
+      // Clear existing countdown interval
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+
+      // Start countdown
+      countdownIntervalRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            return delaySeconds;
+          }
+          return prev - 1;
+        });
+      }, 1000);
 
       clearTimer();
       timerRef.current = setTimeout(() => {
@@ -131,33 +155,60 @@ export default function GroupDisplayPage() {
   useEffect(() => {
     return () => {
       clearTimer();
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
     };
   }, [clearTimer]);
 
   if (!groupName) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center bg-[#0f1115] text-slate-400">
-        <Monitor className="h-16 w-16 mb-4 opacity-20" />
-        <div className="text-xl font-medium">No se especificó un grupo visual.</div>
+      <div className="flex flex-col h-screen items-center justify-center bg-[#0F1113] text-slate-400">
+        <div className="bg-[#1A1D1F] border border-white/10 rounded-2xl p-12 max-w-md text-center shadow-2xl">
+          <Monitor className="h-20 w-20 mb-6 mx-auto text-gray-600" />
+          <div className="text-2xl font-bold text-white mb-2">Sin Grupo Especificado</div>
+          <div className="text-sm text-gray-500">No se especificó un grupo visual para mostrar.</div>
+        </div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center bg-[#0f1115] text-slate-400">
-        <div className="w-12 h-12 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin mb-6"></div>
-        <div className="text-xl font-medium animate-pulse">Cargando visualización de grupo...</div>
+      <div className="flex flex-col h-screen items-center justify-center bg-[#0F1113]">
+        <div className="bg-[#1A1D1F] border border-white/10 rounded-2xl p-12 max-w-md text-center shadow-2xl">
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 border-4 border-slate-800 border-t-emerald-500 rounded-full animate-spin"></div>
+            <Monitor className="absolute inset-0 m-auto h-10 w-10 text-emerald-500/50" />
+          </div>
+          <div className="text-xl font-bold text-white mb-2 animate-pulse">Cargando Grupo</div>
+          <div className="text-sm text-gray-500">"{decodeURIComponent(groupName)}"</div>
+        </div>
       </div>
     );
   }
 
   if (screens.length === 0) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center bg-[#0f1115] text-slate-400">
-        <Monitor className="h-16 w-16 mb-4 text-amber-500/50" />
-        <div className="text-xl font-medium text-white">Grupo "{groupName}" sin pantallas activas</div>
-        <p className="text-slate-600 mt-2">Verifique la configuración en el Panel de Admin.</p>
+      <div className="flex flex-col h-screen items-center justify-center bg-[#0F1113]">
+        <div className="bg-[#1A1D1F] border border-amber-500/20 rounded-2xl p-12 max-w-lg text-center shadow-2xl">
+          <div className="bg-amber-900/20 border border-amber-500/30 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+            <Monitor className="h-12 w-12 text-amber-500" />
+          </div>
+          <div className="text-2xl font-bold text-white mb-3">Grupo Sin Pantallas</div>
+          <div className="text-lg text-amber-400 mb-4">"{decodeURIComponent(groupName)}"</div>
+          <div className="text-sm text-gray-500 mb-6">
+            No hay pantallas activas configuradas para este grupo.
+          </div>
+          <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 text-left">
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Solución:</div>
+            <ul className="text-sm text-slate-500 space-y-1">
+              <li>• Verifica la configuración en el Panel de Admin</li>
+              <li>• Asegúrate de que las pantallas estén activas</li>
+              <li>• Comprueba que el nombre del grupo coincida exactamente</li>
+            </ul>
+          </div>
+        </div>
       </div>
     );
   }
@@ -166,19 +217,18 @@ export default function GroupDisplayPage() {
     <Carousel
       opts={{ loop: true }}
       setApi={setCarouselApi}
+      className="h-screen w-screen"
     >
       <CarouselContent>
-        {screens.map((screen) => (
+        {screens.map((screen, index) => (
           <CarouselItem key={screen.id} className="h-screen w-screen">
-            <div className="flex h-full w-full items-center justify-center bg-background">
-              <div className="h-full w-full">
-                <DisplayPage
-                  screenId={screen.id}
-                  fullWidth
-                  advanceSignal={advanceSignals[screen.id]}
-                />
-              </div>
-            </div>
+            <ScreenDisplay
+              screenId={screen.id}
+              groupMode={true}
+              countdown={index === currentScreenIndex ? countdown : null}
+              currentScreen={index + 1}
+              totalScreens={screens.length}
+            />
           </CarouselItem>
         ))}
       </CarouselContent>

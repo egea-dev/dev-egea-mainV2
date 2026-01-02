@@ -163,6 +163,29 @@ const KioskPage = () => {
   });
 
   // --- Helpers ---
+  const getDaysElapsed = (createdAt: string | null) => {
+    if (!createdAt) return 0;
+    return Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getBorderColor = (kioskType: string | null) => {
+    switch (kioskType) {
+      case 'MONITOR': return 'border-l-orange-500';
+      case 'TERMINAL': return 'border-l-indigo-500';
+      case 'TABLET': return 'border-l-blue-500';
+      default: return 'border-l-gray-600';
+    }
+  };
+
+  const getDestinationLabel = (kioskType: string | null) => {
+    switch (kioskType) {
+      case 'MONITOR': return 'PlantBoard';
+      case 'TERMINAL': return 'ShippingBoard';
+      case 'TABLET': return 'Scanner';
+      default: return 'Kiosk';
+    }
+  };
+
   const handleCopyUrl = async (url: string) => {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -282,165 +305,206 @@ const KioskPage = () => {
           )}
         </div>
 
-        <TabsContent value="production">
-          <Card className="bg-[#1A1D1F] border-white/5">
-            <CardHeader className="border-b border-white/5 pb-4">
-              <div className="flex items-center gap-2">
-                <Monitor className="text-emerald-500 w-5 h-5" />
-                <CardTitle className="text-lg font-medium text-white">Dispositivos de Producción</CardTitle>
-              </div>
-              <CardDescription>Gestión de pantallas conectadas a <b>Productivity DB</b></CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-black/20">
-                  <TableRow className="border-white/5 hover:bg-transparent">
-                    <TableHead className="text-gray-400 font-medium">Nombre / Ubicación</TableHead>
-                    <TableHead className="text-gray-400 font-medium">Tipo</TableHead>
-                    <TableHead className="text-gray-400 font-medium">Destino</TableHead>
-                    <TableHead className="text-gray-400 font-medium">URL</TableHead>
-                    <TableHead className="text-right text-gray-400 font-medium">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoadingProduction ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-gray-500">Cargando dispositivos...</TableCell>
-                    </TableRow>
-                  ) : productionScreens?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-gray-500">No hay pantallas configuradas</TableCell>
-                    </TableRow>
-                  ) : (
-                    productionScreens?.map((screen) => {
-                      const typeConfig = KIOSK_TYPES[screen.kiosk_type || 'MONITOR'] || KIOSK_TYPES.MONITOR;
-                      const url = getProductionUrl(screen);
+        <TabsContent value="production" className="space-y-4">
+          {/* HEADER */}
+          <div className="px-8 py-4 bg-[#111] rounded-t-lg grid grid-cols-12 gap-4 text-gray-500 font-bold text-sm uppercase tracking-wider border-b border-white/5">
+            <div className="col-span-3">Nombre / Ubicación</div>
+            <div className="col-span-2">Tipo</div>
+            <div className="col-span-4">URL</div>
+            <div className="col-span-2">Estado</div>
+            <div className="col-span-1 text-right">Acciones</div>
+          </div>
 
-                      return (
-                        <TableRow key={screen.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-white">{screen.name}</span>
-                              <span className="text-xs text-gray-500">{screen.location || 'Sin ubicación'}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={`${typeConfig.color} font-bold tracking-wider uppercase text-[10px]`}>
-                              {typeConfig.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-gray-400 font-mono">
-                              {screen.kiosk_type === 'MONITOR' ? 'PlantBoard' : 'Scanner'}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2 bg-black/20 p-1.5 rounded border border-white/5 max-w-[250px]">
-                              <span className="text-xs text-gray-500 truncate flex-1 font-mono">
-                                {url}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-white/10 hover:text-white"
-                                onClick={() => handleCopyUrl(url)}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-900/20"
-                              onClick={() => {
-                                if (confirm('¿Seguro que quieres eliminar esta pantalla?')) {
-                                  deleteMutation.mutate(screen.id);
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          {/* BODY */}
+          <div className="space-y-3 px-4">
+            {isLoadingProduction ? (
+              <div className="text-center py-12 text-gray-500">
+                <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin" />
+                <p>Cargando dispositivos...</p>
+              </div>
+            ) : productionScreens?.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Monitor className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No hay pantallas configuradas</p>
+              </div>
+            ) : (
+              productionScreens?.map((screen) => {
+                const typeConfig = KIOSK_TYPES[screen.kiosk_type || 'MONITOR'] || KIOSK_TYPES.MONITOR;
+                const url = getProductionUrl(screen);
+                const daysElapsed = getDaysElapsed(screen.created_at);
+                const borderColor = getBorderColor(screen.kiosk_type);
+                const destination = getDestinationLabel(screen.kiosk_type);
+
+                return (
+                  <div
+                    key={screen.id}
+                    className={`grid grid-cols-12 gap-4 items-center bg-[#1A1D1F] p-4 rounded-lg border-l-4 ${borderColor} shadow-lg hover:bg-[#1F2225] transition-colors`}
+                  >
+                    {/* COL 1: NOMBRE / UBICACIÓN */}
+                    <div className="col-span-3">
+                      <div className="text-white font-bold text-base">{screen.name}</div>
+                      <div className="text-xs text-gray-500 mt-1">{screen.location || 'Sin ubicación'}</div>
+                    </div>
+
+                    {/* COL 2: TIPO */}
+                    <div className="col-span-2">
+                      <div className="flex items-center gap-3">
+                        <typeConfig.icon className="w-6 h-6 text-emerald-500" />
+                        <div>
+                          <div className="text-sm font-bold text-white">{typeConfig.label}</div>
+                          <div className="text-xs text-gray-500">{destination}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* COL 3: URL */}
+                    <div className="col-span-4">
+                      <div className="flex items-center gap-2 bg-black/20 p-2 rounded border border-white/5">
+                        <span className="text-xs text-gray-500 truncate flex-1 font-mono">{url}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-white/10 hover:text-white flex-shrink-0"
+                          onClick={() => handleCopyUrl(url)}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-emerald-600/20 hover:text-emerald-400 flex-shrink-0"
+                          onClick={() => window.open(url, '_blank')}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* COL 4: ESTADO */}
+                    <div className="col-span-2 flex items-center justify-end gap-2">
+                      <Badge variant="outline" className={screen.is_active ? "bg-emerald-900/40 text-emerald-200 border-emerald-700/50" : "bg-gray-900/40 text-gray-400 border-gray-700/50"}>
+                        {screen.is_active ? 'ACTIVA' : 'INACTIVA'}
+                      </Badge>
+                      <div className="text-center bg-[#0F1113] border border-[#45474A]/60 rounded-lg px-2 py-1">
+                        <span className="text-lg font-black text-white tracking-tighter">{daysElapsed}</span>
+                        <span className="text-xs text-gray-500 uppercase font-bold ml-1">{daysElapsed === 1 ? 'día' : 'días'}</span>
+                      </div>
+                    </div>
+
+                    {/* COL 5: ACCIONES */}
+                    <div className="col-span-1 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-900/20"
+                        onClick={() => {
+                          if (confirm('¿Seguro que quieres eliminar esta pantalla?')) {
+                            deleteMutation.mutate(screen.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </TabsContent>
 
-        <TabsContent value="general">
-          <Card className="bg-[#1A1D1F] border-white/5">
-            <CardHeader className="border-b border-white/5 pb-4">
-              <div className="flex items-center gap-2">
-                <Info className="text-blue-500 w-5 h-5" />
-                <CardTitle className="text-lg font-medium text-white">Dispositivos Generales</CardTitle>
+        <TabsContent value="general" className="space-y-4">
+          {/* HEADER */}
+          <div className="px-8 py-4 bg-[#111] rounded-t-lg grid grid-cols-12 gap-4 text-gray-500 font-bold text-sm uppercase tracking-wider border-b border-white/5">
+            <div className="col-span-3">Nombre</div>
+            <div className="col-span-2">Tipo</div>
+            <div className="col-span-5">URL</div>
+            <div className="col-span-1">Refresh</div>
+            <div className="col-span-1">Días</div>
+          </div>
+
+          {/* BODY */}
+          <div className="space-y-3 px-4">
+            {isLoadingGeneral ? (
+              <div className="text-center py-12 text-gray-500">
+                <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin" />
+                <p>Cargando pantallas generales...</p>
               </div>
-              <CardDescription>Gestión de pantallas de información general (KPIs) conectadas a <b>Main DB</b></CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-black/20">
-                  <TableRow className="border-white/5 hover:bg-transparent">
-                    <TableHead className="text-gray-400 font-medium">Nombre</TableHead>
-                    <TableHead className="text-gray-400 font-medium">Tipo</TableHead>
-                    <TableHead className="text-gray-400 font-medium">Refresco</TableHead>
-                    <TableHead className="text-gray-400 font-medium">URL</TableHead>
-                    {/* General screens management (CRUD) is assumed to be elsewhere or read-only here for now as preserving existing logic */}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoadingGeneral ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-gray-500">Cargando pantallas generales...</TableCell>
-                    </TableRow>
-                  ) : generalScreens?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-gray-500">No hay pantallas generales</TableCell>
-                    </TableRow>
-                  ) : (
-                    generalScreens?.map((screen) => {
-                      const url = getGeneralUrl(screen);
-                      return (
-                        <TableRow key={screen.id} className="border-white/5 hover:bg-white/5 transition-colors">
-                          <TableCell>
-                            <span className="font-semibold text-white">{screen.name}</span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="bg-slate-800 text-slate-300 border-slate-700 font-bold tracking-wider uppercase text-[10px]">
-                              {screen.screen_type || 'GENERAL'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-blue-400 font-mono">{screen.refresh_interval_sec}s</span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2 bg-black/20 p-1.5 rounded border border-white/5 max-w-[250px]">
-                              <span className="text-xs text-gray-500 truncate flex-1 font-mono">
-                                {url}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-white/10 hover:text-white"
-                                onClick={() => handleCopyUrl(url)}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+            ) : generalScreens?.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Info className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No hay pantallas generales</p>
+              </div>
+            ) : (
+              generalScreens?.map((screen) => {
+                const url = getGeneralUrl(screen);
+                const daysElapsed = getDaysElapsed(screen.created_at);
+
+                return (
+                  <div
+                    key={screen.id}
+                    className="grid grid-cols-12 gap-4 items-center bg-[#1A1D1F] p-4 rounded-lg border-l-4 border-l-slate-500 shadow-lg hover:bg-[#1F2225] transition-colors"
+                  >
+                    {/* COL 1: NOMBRE */}
+                    <div className="col-span-3">
+                      <div className="text-white font-bold text-base">{screen.name}</div>
+                      <div className="text-xs text-gray-500 mt-1">Info General</div>
+                    </div>
+
+                    {/* COL 2: TIPO */}
+                    <div className="col-span-2">
+                      <div className="flex items-center gap-3">
+                        <LayoutDashboard className="w-6 h-6 text-blue-500" />
+                        <div>
+                          <div className="text-sm font-bold text-white">{screen.screen_type || 'GENERAL'}</div>
+                          <div className="text-xs text-gray-500">DisplayPage</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* COL 3: URL */}
+                    <div className="col-span-5">
+                      <div className="flex items-center gap-2 bg-black/20 p-2 rounded border border-white/5">
+                        <span className="text-xs text-gray-500 truncate flex-1 font-mono">{url}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-white/10 hover:text-white flex-shrink-0"
+                          onClick={() => handleCopyUrl(url)}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-blue-600/20 hover:text-blue-400 flex-shrink-0"
+                          onClick={() => window.open(url, '_blank')}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* COL 4: REFRESH */}
+                    <div className="col-span-1">
+                      <div className="flex items-center gap-1 justify-center">
+                        <RefreshCw className="w-3 h-3 text-blue-400" />
+                        <span className="text-xs text-blue-400 font-mono font-bold">{screen.refresh_interval_sec}s</span>
+                      </div>
+                    </div>
+
+                    {/* COL 5: DÍAS */}
+                    <div className="col-span-1 flex justify-center">
+                      <div className="text-center bg-[#0F1113] border border-[#45474A]/60 rounded-lg px-2 py-1">
+                        <span className="text-lg font-black text-white tracking-tighter">{daysElapsed}</span>
+                        <span className="text-xs text-gray-500 uppercase font-bold ml-1">{daysElapsed === 1 ? 'd' : 'd'}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </PageShell>
