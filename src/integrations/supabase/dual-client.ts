@@ -33,7 +33,7 @@ export const supabaseMain = createClient<MainDatabase>(MAIN_URL, MAIN_ANON_KEY, 
 export const supabaseProductivity = createClient<ProductivityDatabase>(PRODUCTIVITY_URL, PRODUCTIVITY_ANON_KEY, {
   auth: {
     persistSession: true,
-    autoRefreshToken: true,
+    autoRefreshToken: false, // Desactivado para evitar conflictos de múltiples clientes actualizando el mismo token
     detectSessionInUrl: false,
     storageKey: 'supabase.main.auth.token', // Usa el mismo token que MAIN
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,

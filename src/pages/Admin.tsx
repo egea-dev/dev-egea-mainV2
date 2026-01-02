@@ -44,6 +44,7 @@ import { Badge } from "@/components/ui/badge";
 import { buildMapsSearchUrl } from "@/utils/maps";
 import { normalizeTaskLocation } from "@/utils/task";
 import type { Profile, Task, Vehicle } from "@/types";
+import { getTaskStateColor } from "@/lib/constants";
 
 const SCREEN_FIELD_MAP: Record<string, { site: string[]; description: string[] }> = {
   Instalaciones: {
@@ -629,22 +630,10 @@ export default function AdminPage() {
     return task.responsible_name || 'Sin gestor';
   }, [buildTemplateCandidates]);
 
-  const getStateBadgeClasses = useCallback((state: string | null) => {
-    switch (state?.toLowerCase()) {
-      case 'urgente':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'en fabricacion':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-      case 'a la espera':
-        return 'bg-muted/60 text-foreground border border-border/60';
-      case 'terminado':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'pendiente':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-    }
-  }, []);
+  const getStateBadgeClasses = useCallback(
+    (state: string | null) => getTaskStateColor(state),
+    []
+  );
 
   const getTaskDescriptionLabel = useCallback((task: DetailedTask) => {
     const candidates = getCandidateFields(task, 'description');
@@ -994,7 +983,7 @@ export default function AdminPage() {
           selectedDate={selectedDate}
           onDateSelect={setSelectedDate}
           isMobile={isMobile}
-          mode="commercial"
+          mode="installations"
         />
 
         {/* Main Content - Row with 3 Columns */}

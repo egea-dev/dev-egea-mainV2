@@ -15,10 +15,10 @@ export const INSTALLATION_STATES = {
 export type InstallationState = typeof INSTALLATION_STATES[keyof typeof INSTALLATION_STATES];
 
 export const INSTALLATION_STATE_COLORS: Record<InstallationState, string> = {
-  [INSTALLATION_STATES.URGENTE]: 'bg-red-500 hover:bg-red-600 text-white border-red-600',
-  [INSTALLATION_STATES.EN_FABRICACION]: 'bg-orange-500 hover:bg-orange-600 text-white border-orange-600',
-  [INSTALLATION_STATES.A_LA_ESPERA]: 'bg-muted/60 hover:bg-muted/60 text-foreground border-border/60',
-  [INSTALLATION_STATES.TERMINADO]: 'bg-green-500 hover:bg-green-600 text-white border-green-600',
+  [INSTALLATION_STATES.URGENTE]: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
+  [INSTALLATION_STATES.EN_FABRICACION]: 'bg-blue-500/15 text-blue-300 border-blue-500/40',
+  [INSTALLATION_STATES.A_LA_ESPERA]: 'bg-purple-500/15 text-purple-300 border-purple-500/40',
+  [INSTALLATION_STATES.TERMINADO]: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
 };
 
 export const INSTALLATION_STATE_LABELS: Record<InstallationState, string> = {
@@ -39,8 +39,8 @@ export const UPHOLSTERY_STATES = {
 export type UpholsteryState = typeof UPHOLSTERY_STATES[keyof typeof UPHOLSTERY_STATES];
 
 export const UPHOLSTERY_STATE_COLORS: Record<UpholsteryState, string> = {
-  [UPHOLSTERY_STATES.EN_FABRICACION]: 'bg-purple-500 hover:bg-purple-600 text-white border-purple-600',
-  [UPHOLSTERY_STATES.A_LA_ESPERA]: 'bg-yellow-500 hover:bg-yellow-600 text-black border-yellow-600',
+  [UPHOLSTERY_STATES.EN_FABRICACION]: 'bg-blue-500/15 text-blue-300 border-blue-500/40',
+  [UPHOLSTERY_STATES.A_LA_ESPERA]: 'bg-purple-500/15 text-purple-300 border-purple-500/40',
 };
 
 export const UPHOLSTERY_STATE_LABELS: Record<UpholsteryState, string> = {
@@ -64,13 +64,13 @@ export const TASK_STATES = {
 export type TaskState = typeof TASK_STATES[keyof typeof TASK_STATES];
 
 export const TASK_STATE_COLORS: Record<TaskState, string> = {
-  [TASK_STATES.URGENTE]: 'bg-red-500 hover:bg-red-600 text-white border-red-600',
-  [TASK_STATES.PENDIENTE]: 'bg-orange-500 hover:bg-orange-600 text-white border-orange-600',
-  [TASK_STATES.A_LA_ESPERA]: 'bg-muted/60 hover:bg-muted/60 text-foreground border-border/60',
-  [TASK_STATES.EN_FABRICACION]: 'bg-purple-500 hover:bg-purple-600 text-white border-purple-600',
-  [TASK_STATES.TERMINADO]: 'bg-green-500 hover:bg-green-600 text-white border-green-600',
-  [TASK_STATES.INCIDENTE]: 'bg-destructive hover:bg-destructive/90 text-destructive-foreground border-destructive',
-  [TASK_STATES.ARREGLO]: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600',
+  [TASK_STATES.URGENTE]: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
+  [TASK_STATES.PENDIENTE]: 'bg-slate-500/15 text-slate-300 border-slate-500/40',
+  [TASK_STATES.A_LA_ESPERA]: 'bg-purple-500/15 text-purple-300 border-purple-500/40',
+  [TASK_STATES.EN_FABRICACION]: 'bg-blue-500/15 text-blue-300 border-blue-500/40',
+  [TASK_STATES.TERMINADO]: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
+  [TASK_STATES.INCIDENTE]: 'bg-red-500/15 text-red-300 border-red-500/40',
+  [TASK_STATES.ARREGLO]: 'bg-orange-500/15 text-orange-300 border-orange-500/40',
 };
 
 export const TASK_STATE_LABELS: Record<TaskState, string> = {

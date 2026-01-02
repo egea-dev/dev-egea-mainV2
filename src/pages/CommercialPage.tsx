@@ -9,6 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { OrderStatusBadge } from "@/components/badges";
 import { Package, Eye, Plus, LayoutList, History } from "lucide-react";
 import { useOrders, useCreateOrder, useUpdateOrderStatus, useDeleteOrder } from "@/hooks/use-orders";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,7 +20,6 @@ import { OrderStatus } from "@/types/commercial";
 import { toast } from "sonner";
 import PageShell from "@/components/layout/PageShell";
 import { useProfile } from "@/hooks/use-supabase";
-import { ORDER_STATUS_BADGES } from "@/lib/order-status";
 
 export default function CommercialPage() {
   const { data: orders = [], isLoading } = useOrders();
@@ -35,16 +35,9 @@ export default function CommercialPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const canDeleteOrders = profile?.role === "admin" || profile?.role === "manager";
-  const resolveStatusBadge = (status: string) =>
-    ORDER_STATUS_BADGES[status as OrderStatus] ||
-    (status === "EN_PRODUCCION"
-      ? ORDER_STATUS_BADGES.EN_PROCESO
-      : status === "LISTO_ENVIO"
-      ? ORDER_STATUS_BADGES.PTE_ENVIO
-      : "bg-muted/50 text-muted-foreground border-border/60");
 
-  const activeOrders = orders.filter((o) => o.status !== "ENVIADO" && o.status !== "CANCELADO");
-  const archivedOrders = orders.filter((o) => o.status === "ENVIADO" || o.status === "CANCELADO");
+  const activeOrders = orders.filter((o) => o.status !== "ENTREGADO" && o.status !== "CANCELADO");
+  const archivedOrders = orders.filter((o) => o.status === "ENTREGADO" || o.status === "CANCELADO");
   const displayedOrders = viewMode === "ACTIVE" ? activeOrders : archivedOrders;
 
   const validateOrderReadyForProduction = (order: any): { valid: boolean; error?: string } => {
@@ -263,12 +256,7 @@ export default function CommercialPage() {
                         {order.admin_code || "FALTA REF. ADMIN"}
                       </CardDescription>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className={cn("text-[10px] font-bold px-2 py-0.5", resolveStatusBadge(order.status))}
-                    >
-                      {order.status.replace("_", " ")}
-                    </Badge>
+                    <OrderStatusBadge status={order.status} />
                   </div>
                 </CardHeader>
                 <CardContent className="pb-3">

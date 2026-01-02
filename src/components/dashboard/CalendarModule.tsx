@@ -35,6 +35,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { getTaskStateColor } from '@/lib/constants';
+import { getOrderStatusLabel } from '@/lib/order-status';
 import { useDashboardCalendarData, CalendarMode } from '@/hooks/use-dashboard-data';
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from '@/integrations/supabase/client';
@@ -54,25 +56,35 @@ interface CalendarModuleProps {
 const getOrderColor = (status: string) => {
     switch (status) {
         case 'PENDIENTE_PAGO':
-            return { bg: 'bg-card/80', text: 'text-amber-300', border: 'border-amber-500/40', badge: 'bg-amber-400' };
+            return { bg: 'bg-card/90', text: 'text-slate-200', border: 'border-slate-500/50', badge: 'bg-slate-400' };
         case 'PAGADO':
-            return { bg: 'bg-card/80', text: 'text-emerald-300', border: 'border-emerald-500/40', badge: 'bg-emerald-400' };
+            return { bg: 'bg-card/90', text: 'text-emerald-300', border: 'border-emerald-500/50', badge: 'bg-emerald-400' };
         case 'EN_PROCESO':
         case 'EN_PRODUCCION':
-            return { bg: 'bg-card/80', text: 'text-violet-300', border: 'border-violet-500/40', badge: 'bg-violet-400' };
+            return { bg: 'bg-card/90', text: 'text-amber-300', border: 'border-amber-500/50', badge: 'bg-amber-400' };
         case 'PTE_ENVIO':
         case 'LISTO_ENVIO':
-            return { bg: 'bg-card/80', text: 'text-orange-300', border: 'border-orange-500/40', badge: 'bg-orange-400' };
+            return { bg: 'bg-card/90', text: 'text-blue-300', border: 'border-blue-500/50', badge: 'bg-blue-400' };
         case 'ENVIADO':
-            return { bg: 'bg-card/80', text: 'text-slate-300', border: 'border-slate-500/40', badge: 'bg-slate-400' };
+            return { bg: 'bg-card/90', text: 'text-emerald-300', border: 'border-emerald-400/50', badge: 'bg-emerald-400' };
         case 'ENTREGADO':
-            return { bg: 'bg-card/80', text: 'text-emerald-300', border: 'border-emerald-500/40', badge: 'bg-emerald-500' };
+            return { bg: 'bg-card/90', text: 'text-emerald-300', border: 'border-emerald-500/50', badge: 'bg-emerald-500' };
         case 'CANCELADO':
-            return { bg: 'bg-card/80', text: 'text-red-300', border: 'border-red-500/40', badge: 'bg-red-500' };
+            return { bg: 'bg-card/90', text: 'text-red-300', border: 'border-red-500/50', badge: 'bg-red-500' };
         default:
-            return { bg: 'bg-card/80', text: 'text-muted-foreground', border: 'border-border/60', badge: 'bg-muted-foreground' };
+            return { bg: 'bg-card/90', text: 'text-muted-foreground', border: 'border-border/60', badge: 'bg-muted-foreground' };
     }
 };
+
+const ORDER_STATUS_LEGEND = [
+    'PENDIENTE_PAGO',
+    'PAGADO',
+    'EN_PROCESO',
+    'PTE_ENVIO',
+    'ENVIADO',
+    'ENTREGADO',
+    'CANCELADO'
+] as const;
 
 export const CalendarModule = ({
     className,
@@ -96,7 +108,7 @@ export const CalendarModule = ({
     const { data: allOrders = [], isLoading: ordersLoading } = useOrders();
     const activeOrders = useMemo(() => {
         if (!allOrders) return [];
-        return allOrders.filter(o => o.status !== 'ENVIADO' && o.status !== 'CANCELADO');
+        return allOrders.filter(o => o.status !== 'ENTREGADO' && o.status !== 'CANCELADO');
     }, [allOrders]);
 
     const selectedDate = propSelectedDate !== undefined ? propSelectedDate : internalSelectedDate;
@@ -487,10 +499,19 @@ export const CalendarModule = ({
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-border/60">
                     {mode === 'commercial' ? (
                         <>
-                            <Badge variant="outline" className="border-border/60 bg-card text-muted-foreground py-1 px-2.5 rounded-lg text-[10px]"><div className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-2" />Pendiente Pago</Badge>
-                            <Badge variant="outline" className="border-border/60 bg-card text-muted-foreground py-1 px-2.5 rounded-lg text-[10px]"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-2" />Pagado</Badge>
-                            <Badge variant="outline" className="border-border/60 bg-card text-muted-foreground py-1 px-2.5 rounded-lg text-[10px]"><div className="w-1.5 h-1.5 rounded-full bg-violet-400 mr-2" />En proceso</Badge>
-                            <Badge variant="outline" className="border-border/60 bg-card text-muted-foreground py-1 px-2.5 rounded-lg text-[10px]"><div className="w-1.5 h-1.5 rounded-full bg-orange-400 mr-2" />Pendiente envio</Badge>
+                            {ORDER_STATUS_LEGEND.map((status) => {
+                                const style = getOrderColor(status);
+                                return (
+                                    <Badge
+                                        key={status}
+                                        variant="outline"
+                                        className="border-border/60 bg-card text-muted-foreground py-1 px-2.5 rounded-lg text-[10px]"
+                                    >
+                                        <div className={cn("w-1.5 h-1.5 rounded-full mr-2", style.badge)} />
+                                        {getOrderStatusLabel(status)}
+                                    </Badge>
+                                );
+                            })}
                         </>
                     ) : (
                         <>
@@ -585,18 +606,8 @@ export const CalendarModule = ({
                                                     );
                                                 } else {
                                                     const isUrgent = item.state === 'urgente';
-                                                    const isTerminated = item.state === 'terminado';
-
-                                                    let bgClass = "bg-muted/60 border-border/60 text-slate-300";
-                                                    let dotClass = "bg-slate-500";
-
-                                                    if (isUrgent) {
-                                                        bgClass = "bg-red-950/30 border-red-900/30 text-red-300";
-                                                        dotClass = "bg-red-500";
-                                                    } else if (isTerminated) {
-                                                        bgClass = "bg-emerald-950/30 border-emerald-900/30 text-emerald-300";
-                                                        dotClass = "bg-emerald-500";
-                                                    }
+                                                    const stateClass = getTaskStateColor(item.state);
+                                                    const dotClass = isUrgent ? "bg-amber-400" : "bg-slate-400";
 
                                                     return (
                                                         <div
@@ -605,12 +616,15 @@ export const CalendarModule = ({
                                                             onDragStart={(e) => handleDragStart(e, item)}
                                                             onDragEnd={handleDragEnd}
                                                             className={cn(
-                                                                "text-[10px] px-2 py-1 rounded-md border truncate flex items-center gap-1.5 transition-all hover:scale-[1.02] cursor-move",
-                                                                bgClass
+                                                                "text-[11px] px-2.5 py-1.5 rounded-md border-2 truncate flex items-center gap-2 transition-all hover:scale-[1.02] cursor-move shadow-sm shadow-black/30",
+                                                                "ring-1 ring-inset ring-white/5",
+                                                                "border-l-4",
+                                                                stateClass,
+                                                                isUrgent && "shadow-amber-500/30"
                                                             )}
                                                         >
                                                             <GripVertical className="w-2 h-2 opacity-50 flex-shrink-0" />
-                                                            <div className={cn("w-1 h-1 rounded-full flex-shrink-0", dotClass)} />
+                                                            <div className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", dotClass)} />
                                                             <span className="truncate flex-1 font-medium">
                                                                 {item.data?.site || item.description || item.client?.full_name || "Sin título"}
                                                             </span>

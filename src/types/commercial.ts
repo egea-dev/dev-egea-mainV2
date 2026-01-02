@@ -37,6 +37,9 @@ export interface Order {
     delivery_location_url?: string; // UBICACIÓN (MAPS)
     delivery_date?: string;
     delivery_city?: string;
+    production_start_date?: string;
+    shipped_date?: string;
+    delivered_date?: string;
 
     // Order Status
     status: OrderStatus;

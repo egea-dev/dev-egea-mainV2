@@ -141,7 +141,7 @@ const SidebarContentComponent = ({
             )}
           </Avatar>
           <div className={cn("flex flex-col", isCollapsed && "hidden")}>
-            <span className="text-sm font-semibold text-foreground">Envios</span>
+            <span className="text-[11px] font-semibold text-foreground">Envios</span>
             <span className="text-xs text-muted-foreground capitalize">{profile?.role ?? "usuario"}</span>
           </div>
         </div>

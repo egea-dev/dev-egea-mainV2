@@ -10,14 +10,7 @@ export const useWorkOrders = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('produccion_work_orders')
-                .select(`
-                    *,
-                    comercial_orders!inner(
-                        customer_name,
-                        delivery_date,
-                        fabric
-                    )
-                `)
+                .select('*')
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -25,15 +18,7 @@ export const useWorkOrders = () => {
                 throw error;
             }
 
-            // Flatten the data
-            const workOrders: WorkOrderWithDetails[] = (data || []).map(wo => ({
-                ...wo,
-                customer_name: wo.comercial_orders?.customer_name,
-                delivery_date: wo.comercial_orders?.delivery_date,
-                fabric: wo.comercial_orders?.fabric,
-            }));
-
-            return workOrders;
+            return (data || []) as WorkOrderWithDetails[];
         },
     });
 };
@@ -45,14 +30,7 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
         queryFn: async () => {
             let query = supabase
                 .from('produccion_work_orders')
-                .select(`
-                    *,
-                    comercial_orders!inner(
-                        customer_name,
-                        delivery_date,
-                        fabric
-                    )
-                `)
+                .select('*')
                 .order('priority', { ascending: false })
                 .order('created_at', { ascending: false });
 
@@ -67,14 +45,7 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
                 throw error;
             }
 
-            const workOrders: WorkOrderWithDetails[] = (data || []).map(wo => ({
-                ...wo,
-                customer_name: wo.comercial_orders?.customer_name,
-                delivery_date: wo.comercial_orders?.delivery_date,
-                fabric: wo.comercial_orders?.fabric,
-            }));
-
-            return workOrders;
+            return (data || []) as WorkOrderWithDetails[];
         },
     });
 };
@@ -86,15 +57,7 @@ export const useWorkOrder = (id: string) => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('produccion_work_orders')
-                .select(`
-                    *,
-                    comercial_orders!inner(
-                        customer_name,
-                        delivery_date,
-                        fabric,
-                        lines
-                    )
-                `)
+                .select('*')
                 .eq('id', id)
                 .single();
 
@@ -103,14 +66,7 @@ export const useWorkOrder = (id: string) => {
                 throw error;
             }
 
-            const workOrder: WorkOrderWithDetails = {
-                ...data,
-                customer_name: data.comercial_orders?.customer_name,
-                delivery_date: data.comercial_orders?.delivery_date,
-                fabric: data.comercial_orders?.fabric,
-            };
-
-            return workOrder;
+            return data as WorkOrderWithDetails;
         },
         enabled: !!id,
     });
@@ -135,7 +91,7 @@ export const useUpdateWorkOrderStatus = () => {
                 .update({
                     status,
                     updated_at: new Date().toISOString()
-                })
+                } as any)
                 .eq('id', workOrderId)
                 .select()
                 .single();
@@ -144,8 +100,6 @@ export const useUpdateWorkOrderStatus = () => {
                 console.error("Error updating work order status:", error);
                 throw error;
             }
-
-            // El trigger log_work_order_status_change se encargará del log automáticamente
 
             return data as WorkOrder;
         },
@@ -176,7 +130,7 @@ export const useAssignTechnician = () => {
                 .update({
                     assigned_technician_id: technicianId,
                     updated_at: new Date().toISOString()
-                })
+                } as any)
                 .eq('id', workOrderId)
                 .select()
                 .single();
@@ -215,7 +169,7 @@ export const useUpdateWorkOrderPriority = () => {
                 .update({
                     priority,
                     updated_at: new Date().toISOString()
-                })
+                } as any)
                 .eq('id', workOrderId)
                 .select()
                 .single();

@@ -7,8 +7,8 @@ import { es } from 'date-fns/locale';
 import { Search, Download, Calendar as CalendarIcon, MapPin, User, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ORDER_STATUS_BADGES } from '@/lib/order-status';
-import type { OrderStatus } from '@/types/commercial';
+import { getOrderStatusBadge, getOrderStatusLabel } from '@/lib/order-status';
+import { getTaskStateColor, getTaskStateLabel } from '@/lib/constants';
 
 interface TaskListViewProps {
     tasks: any[];
@@ -80,27 +80,16 @@ export const TaskListView = ({ tasks, mode, className }: TaskListViewProps) => {
 
     const getStatusBadge = (status: string) => {
         if (mode === 'commercial') {
-            const colors: Record<string, string> = {
-                ...ORDER_STATUS_BADGES,
-                EN_PRODUCCION: ORDER_STATUS_BADGES.EN_PROCESO,
-                LISTO_ENVIO: ORDER_STATUS_BADGES.PTE_ENVIO,
-            };
             return (
-                <Badge variant="outline" className={cn("border", colors[status as OrderStatus] || 'bg-muted/50 text-muted-foreground border-border/60')}>
-                    {status.replace(/_/g, ' ')}
+                <Badge variant="outline" className={cn("border", getOrderStatusBadge(status))}>
+                    {getOrderStatusLabel(status).replace(/_/g, ' ')}
                 </Badge>
             );
         } else {
-            const colors: Record<string, string> = {
-                'pendiente': 'bg-slate-500/20 text-slate-300 border-slate-600',
-                'curso': 'bg-primary/15 text-primary border-primary/40',
-                'terminado': 'bg-emerald-500/20 text-emerald-300 border-emerald-600',
-                'urgente': 'bg-red-500/20 text-red-300 border-red-600',
-                'incidente': 'bg-orange-500/20 text-orange-300 border-orange-600',
-            };
+            const normalized = status?.toLowerCase() || '';
             return (
-                <Badge variant="outline" className={cn("border capitalize", colors[status?.toLowerCase()] || 'bg-slate-800 text-slate-400')}>
-                    {status}
+                <Badge variant="outline" className={cn("border capitalize", getTaskStateColor(normalized) || 'bg-slate-800 text-slate-400')}>
+                    {getTaskStateLabel(normalized)}
                 </Badge>
             );
         }

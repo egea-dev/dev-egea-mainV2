@@ -106,7 +106,7 @@ export const MaterialsSection: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Package className="w-5 h-5 text-[#14CC7F]" />
-                    <h2 className="text-xl font-bold text-white">Materiales</h2>
+                    <h2 className="text-lg font-semibold text-white">Materiales</h2>
                     <Badge variant="outline" className="ml-2">
                         {materials?.length || 0} materiales
                     </Badge>
@@ -154,60 +154,60 @@ export const MaterialsSection: React.FC = () => {
                 <div className="text-center py-12 text-[#8B8D90]">Cargando materiales...</div>
             ) : filteredMaterials && filteredMaterials.length > 0 ? (
                 <div className="bg-[#323438] rounded-xl border border-[#45474A] overflow-hidden">
-                    <table className="w-full">
+                    <table className="w-full text-[11px]">
                         <thead className="bg-[#1A1D1F]">
-                            <tr className="text-xs text-[#8B8D90] uppercase">
-                                <th className="p-3 text-left">Nombre</th>
-                                <th className="p-3 text-left">Referencia</th>
-                                <th className="p-3 text-left">Color</th>
-                                <th className="p-3 text-right">Stock</th>
-                                <th className="p-3 text-left">Unidad</th>
-                                <th className="p-3 text-left">Notas</th>
-                                <th className="p-3 text-right">Acciones</th>
+                            <tr className="text-[10px] text-[#8B8D90] uppercase">
+                                <th className="p-2 text-left">Nombre</th>
+                                <th className="p-2 text-left">Referencia</th>
+                                <th className="p-2 text-left">Color</th>
+                                <th className="p-2 text-right">Stock</th>
+                                <th className="p-2 text-left">Unidad</th>
+                                <th className="p-2 text-left">Notas</th>
+                                <th className="p-2 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#45474A]">
                             {filteredMaterials.map((material) => (
                                 <tr key={material.id} className="hover:bg-[#45474A]/30 transition-colors">
-                                    <td className="p-3">
-                                        <span className="font-bold text-white">{material.name}</span>
+                                    <td className="p-2">
+                                        <span className="font-semibold text-white">{material.name}</span>
                                     </td>
-                                    <td className="p-3">
-                                        <span className="text-[#8B8D90] font-mono text-xs">
+                                    <td className="p-2">
+                                        <span className="text-[#8B8D90] font-mono text-[10px]">
                                             {material.reference || '---'}
                                         </span>
                                     </td>
-                                    <td className="p-3">
+                                    <td className="p-2">
                                         {material.color ? (
                                             <div className="flex items-center gap-2">
                                                 <div
-                                                    className="w-4 h-4 rounded border border-[#45474A]"
+                                                    className="w-3.5 h-3.5 rounded border border-[#45474A]"
                                                     style={{ backgroundColor: material.color.toLowerCase() }}
                                                 />
-                                                <span className="text-[#8B8D90] text-sm">{material.color}</span>
+                                                <span className="text-[#8B8D90] text-[11px]">{material.color}</span>
                                             </div>
                                         ) : (
                                             <span className="text-[#8B8D90]">---</span>
                                         )}
                                     </td>
-                                    <td className="p-3 text-right">
-                                        <span className="text-white font-bold">{material.stock}</span>
+                                    <td className="p-2 text-right">
+                                        <span className="text-white font-semibold">{material.stock}</span>
                                     </td>
-                                    <td className="p-3">
-                                        <span className="text-[#8B8D90] text-sm">{material.unit}</span>
+                                    <td className="p-2">
+                                        <span className="text-[#8B8D90] text-[11px]">{material.unit}</span>
                                     </td>
-                                    <td className="p-3">
-                                        <span className="text-[#8B8D90] text-sm truncate max-w-xs block">
+                                    <td className="p-2">
+                                        <span className="text-[#8B8D90] text-[11px] truncate max-w-xs block">
                                             {material.notes || '---'}
                                         </span>
                                     </td>
-                                    <td className="p-3">
+                                    <td className="p-2">
                                         <div className="flex gap-1 justify-end">
                                             <Button
                                                 size="sm"
                                                 variant="ghost"
                                                 onClick={() => handleEdit(material)}
-                                                className="h-8 w-8 p-0 hover:bg-[#45474A]"
+                                                className="h-7 w-7 p-0 hover:bg-[#45474A]"
                                             >
                                                 <Edit className="w-4 h-4 text-[#8B8D90]" />
                                             </Button>
@@ -215,7 +215,7 @@ export const MaterialsSection: React.FC = () => {
                                                 size="sm"
                                                 variant="ghost"
                                                 onClick={() => handleDelete(material.id)}
-                                                className="h-8 w-8 p-0 hover:bg-red-500/10"
+                                                className="h-7 w-7 p-0 hover:bg-red-500/10"
                                             >
                                                 <Trash2 className="w-4 h-4 text-red-500" />
                                             </Button>

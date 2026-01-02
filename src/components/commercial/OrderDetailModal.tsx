@@ -6,6 +6,7 @@ import { Order, OrderLine, OrderDocument, OrderStatus } from '@/types/commercial
 import { supabaseProductivity as supabase } from '@/integrations/supabase/dual-client';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { OrderStatusBadge } from '@/components/badges';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +17,6 @@ import { useUploadOrderDocument, type DocumentType } from '@/hooks/use-order-doc
 import { SLAIndicator } from '@/components/commercial/SLAIndicator';
 import { useMaterials } from '@/hooks/use-materials';
 import { DoubleConfirmDialog } from '@/components/ui/double-confirm-dialog';
-import { ORDER_STATUS_BADGES } from '@/lib/order-status';
 
 // --- Types & Constants ---
 
@@ -229,27 +229,15 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
     const isValidForPDF = () => validation.isValid;
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-            <div className="bg-[#323438] rounded-2xl shadow-2xl border border-[#45474A] w-full max-w-[98%] h-[95vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md backdrop-brightness-50 flex items-start justify-center z-50 px-4 pb-4 animate-in fade-in duration-200">
+            <div className="bg-card/95 rounded-2xl shadow-2xl border border-border/60 w-full max-w-[98%] h-[95vh] overflow-hidden flex flex-col">
 
                 {/* Header */}
-                <div className="flex justify-between items-center p-6 border-b border-[#45474A] bg-[#323438] shrink-0">
+                <div className="flex justify-between items-center p-6 border-b border-border/60 bg-card/95 shrink-0">
                     <div>
                         <div className="flex items-center gap-3">
                             <h3 className="text-2xl font-bold text-white">Pedido {formData.order_number || 'NUEVO'}</h3>
-                            <Badge
-                                className={cn(
-                                    "border",
-                                    ORDER_STATUS_BADGES[formData.status || 'PENDIENTE_PAGO'] ||
-                                        (formData.status === "EN_PRODUCCION"
-                                            ? ORDER_STATUS_BADGES.EN_PROCESO
-                                            : formData.status === "LISTO_ENVIO"
-                                            ? ORDER_STATUS_BADGES.PTE_ENVIO
-                                            : ORDER_STATUS_BADGES.PENDIENTE_PAGO)
-                                )}
-                            >
-                                {formData.status || 'BORRADOR'}
-                            </Badge>
+                            <OrderStatusBadge status={formData.status} size="md" />
                         </div>
                         <p className="text-sm text-[#8B8D90] mt-1">Ref. Admin: {formData.admin_code || '---'}</p>
                     </div>
@@ -275,7 +263,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                 </div>
 
                 {/* Scrollable Content */}
-                <div className="overflow-y-auto p-6 bg-[#1A1D1F] custom-scrollbar flex-1">
+                <div className="overflow-y-auto p-6 bg-background/80 custom-scrollbar flex-1">
                     {/* Validation Alert Banner */}
                     {!validation.isValid && (
                         <div className="mb-6 bg-red-900/20 border border-red-500/50 rounded-xl p-4">
@@ -302,7 +290,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
                         {/* COLUMN 1: CLIENT DATA */}
                         <div className="w-full xl:w-[25%] flex flex-col gap-6">
-                            <div className="bg-[#323438] p-5 rounded-xl border border-[#45474A] shadow-sm flex flex-col gap-4">
+                            <div className="bg-card/80 p-5 rounded-xl border border-border/60 shadow-sm flex flex-col gap-4">
                                 {/* Header with Copy Button */}
                                 <div className="flex items-center justify-between">
                                     <h4 className="font-bold text-white flex items-center">
@@ -332,7 +320,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             onChange={handleChange}
                                             disabled={!isEditing}
                                             placeholder=""
-                                            className="bg-[#1A1D1F] border-[#45474A] text-white"
+                                            className="bg-muted/30 border-border/60 text-foreground"
                                         />
                                     </div>
 
@@ -345,7 +333,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             onChange={handleChange}
                                             disabled={!isEditing}
                                             placeholder=""
-                                            className="bg-[#1A1D1F] border-[#45474A] text-white"
+                                            className="bg-muted/30 border-border/60 text-foreground"
                                         />
                                     </div>
 
@@ -358,7 +346,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             onChange={handleChange}
                                             disabled={!isEditing}
                                             placeholder="Cliente Nuevo"
-                                            className="bg-[#1A1D1F] border-[#45474A] text-white"
+                                            className="bg-muted/30 border-border/60 text-foreground"
                                         />
                                     </div>
 
@@ -371,7 +359,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                 value={formData.delivery_region || formData.region}
                                                 onValueChange={(v) => handleSelectChange('delivery_region', v)}
                                             >
-                                                <SelectTrigger className="bg-[#1A1D1F] border-[#45474A] text-white">
+                                                <SelectTrigger className="bg-muted/30 border-border/60 text-foreground">
                                                     <SelectValue placeholder="Selecciona" />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -389,7 +377,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                 onChange={handleChange}
                                                 disabled={!isEditing}
                                                 placeholder=""
-                                                className="bg-[#1A1D1F] border-[#45474A] text-white"
+                                                className="bg-muted/30 border-border/60 text-foreground"
                                             />
                                         </div>
                                     </div>
@@ -403,7 +391,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             onChange={handleChange}
                                             disabled={!isEditing}
                                             placeholder=""
-                                            className="bg-[#1A1D1F] border-[#45474A] text-white"
+                                            className="bg-muted/30 border-border/60 text-foreground"
                                         />
                                     </div>
 
@@ -417,7 +405,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             disabled={!isEditing}
                                             placeholder=""
                                             rows={3}
-                                            className="bg-[#1A1D1F] border-[#45474A] text-white resize-none"
+                                            className="bg-muted/30 border-border/60 text-foreground resize-none"
                                         />
                                     </div>
 
@@ -431,7 +419,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                 onChange={handleChange}
                                                 disabled={!isEditing}
                                                 placeholder="https://maps.google..."
-                                                className="bg-[#1A1D1F] border-[#45474A] text-white flex-1"
+                                            className="bg-muted/30 border-border/60 text-foreground flex-1"
                                             />
                                             {formData.delivery_location_url && (
                                                 <Button
@@ -439,7 +427,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={() => window.open(formData.delivery_location_url, '_blank')}
-                                                    className="border-[#45474A] hover:bg-[#45474A]"
+                                                    className="border-border/60 hover:bg-muted/50"
                                                 >
                                                     <MapPin className="w-4 h-4" />
                                                 </Button>
@@ -456,7 +444,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             value={formData.delivery_date || ''}
                                             onChange={handleChange}
                                             disabled={!isEditing}
-                                            className="bg-[#1A1D1F] border-[#45474A] text-white"
+                                            className="bg-muted/30 border-border/60 text-foreground"
                                         />
                                     </div>
 
@@ -471,7 +459,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     )}
 
                                     {/* TOTAL UNIDADES - Redesigned like reference */}
-                                    <div className="bg-[#1A1D1F] rounded-lg p-4 border border-[#45474A]">
+                                    <div className="bg-muted/30 rounded-lg p-4 border border-border/60">
                                         <div className="text-xs text-[#8B8D90] uppercase font-bold text-center mb-2">
                                             Total Unidades
                                         </div>
@@ -483,7 +471,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                             </div>
 
                             {/* NOTAS INTERNAS */}
-                            <div className="bg-[#323438] p-5 rounded-xl border border-[#45474A] shadow-sm flex flex-col gap-4">
+                            <div className="bg-card/80 p-5 rounded-xl border border-border/60 shadow-sm flex flex-col gap-4">
                                 <h4 className="font-bold text-white flex items-center">
                                     <FileText className="w-4 h-4 mr-2 text-[#14CC7F]" /> Notas Internas
                                 </h4>
@@ -494,7 +482,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     disabled={!isEditing}
                                     placeholder="Escribe notas solo para el equipo..."
                                     rows={5}
-                                    className="bg-[#1A1D1F] border-[#45474A] text-white resize-none"
+                                    className="bg-muted/30 border-border/60 text-foreground resize-none"
                                 />
                             </div>
                         </div>
@@ -502,7 +490,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                         {/* COLUMN 2: MATERIALS & LINES */}
                         <div className="w-full xl:w-[50%] flex flex-col gap-6">
                             {/* Lines Table */}
-                            <div className="bg-[#323438] p-5 rounded-xl border border-[#45474A] shadow-sm flex flex-col flex-1 min-h-[300px]">
+                            <div className="bg-card/80 p-5 rounded-xl border border-border/60 shadow-sm flex flex-col flex-1 min-h-[300px]">
                                 <div className="flex justify-between items-center mb-4">
                                     <h4 className="font-bold text-white flex items-center">
                                         <FileText className="w-4 h-4 mr-2 text-[#14CC7F]" /> Desglose
@@ -513,9 +501,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                         </Button>
                                     )}
                                 </div>
-                                <div className="overflow-x-auto rounded-lg border border-[#45474A]">
+                                <div className="overflow-x-auto rounded-lg border border-border/60">
                                     <table className="w-full text-sm">
-                                        <thead className="bg-[#1A1D1F]">
+                                        <thead className="bg-muted/40">
                                             <tr className="text-xs text-[#8B8D90] uppercase">
                                                 <th className="p-2 text-left">Cant.</th>
                                                 <th className="p-2 text-left">Ancho</th>
@@ -526,16 +514,16 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                 {isEditing && <th className="p-2"></th>}
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-[#45474A]">
+                                        <tbody className="divide-y divide-border/60">
                                             {(formData.lines || []).map((line, idx) => (
-                                                <tr key={idx} className="hover:bg-[#45474A]/30">
+                                                <tr key={idx} className="hover:bg-muted/50">
                                                     <td className="p-2">
                                                         <Input
                                                             type="number"
                                                             value={line.quantity}
                                                             onChange={(e) => handleLineChange(idx, 'quantity', parseInt(e.target.value))}
                                                             disabled={!isEditing}
-                                                            className="w-16 bg-[#1A1D1F] border-[#45474A] text-white h-8"
+                                                            className="w-16 bg-muted/30 border-border/60 text-foreground h-8"
                                                         />
                                                     </td>
                                                     <td className="p-2">
@@ -543,7 +531,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                             value={line.width}
                                                             onChange={(e) => handleLineChange(idx, 'width', e.target.value)}
                                                             disabled={!isEditing}
-                                                            className="w-20 bg-[#1A1D1F] border-[#45474A] text-white h-8"
+                                                            className="w-20 bg-muted/30 border-border/60 text-foreground h-8"
                                                         />
                                                     </td>
                                                     <td className="p-2">
@@ -551,7 +539,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                             value={line.height}
                                                             onChange={(e) => handleLineChange(idx, 'height', e.target.value)}
                                                             disabled={!isEditing}
-                                                            className="w-20 bg-[#1A1D1F] border-[#45474A] text-white h-8"
+                                                            className="w-20 bg-muted/30 border-border/60 text-foreground h-8"
                                                         />
                                                     </td>
                                                     <td className="p-2">
@@ -560,15 +548,15 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                             onValueChange={(value) => handleLineChange(idx, 'material', value)}
                                                             disabled={!isEditing}
                                                         >
-                                                            <SelectTrigger className="w-32 bg-[#1A1D1F] border-[#45474A] text-white h-8">
+                                                            <SelectTrigger className="w-32 bg-muted/30 border-border/60 text-foreground h-8">
                                                                 <SelectValue placeholder="Material" />
                                                             </SelectTrigger>
-                                                            <SelectContent className="bg-[#1A1D1F] border-[#45474A]">
+                                                            <SelectContent className="bg-popover/95 border-border/60">
                                                                 {materials?.map((mat) => (
                                                                     <SelectItem
                                                                         key={mat.id}
                                                                         value={mat.name}
-                                                                        className="text-white hover:bg-[#323438]"
+                                                                        className="text-foreground hover:bg-muted/60"
                                                                     >
                                                                         {mat.name} {mat.reference && `(${mat.reference})`}
                                                                     </SelectItem>
@@ -582,7 +570,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                             onChange={(e) => handleLineChange(idx, 'color', e.target.value)}
                                                             disabled={!isEditing}
                                                             placeholder=""
-                                                            className="w-24 bg-[#1A1D1F] border-[#45474A] text-white h-8"
+                                                            className="w-24 bg-muted/30 border-border/60 text-foreground h-8"
                                                         />
                                                     </td>
                                                     <td className="p-2">
@@ -591,7 +579,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                             onChange={(e) => handleLineChange(idx, 'notes', e.target.value)}
                                                             disabled={!isEditing}
                                                             placeholder=""
-                                                            className="w-32 bg-[#1A1D1F] border-[#45474A] text-white h-8"
+                                                            className="w-32 bg-muted/30 border-border/60 text-foreground h-8"
                                                         />
                                                     </td>
                                                     {isEditing && (
@@ -621,7 +609,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
                         {/* COLUMN 3: DOCS & ACTIONS */}
                         <div className="w-full xl:w-[25%] flex flex-col gap-6">
-                            <div className="bg-[#34363A] p-6 rounded-2xl border border-[#3F4247] shadow-sm">
+                            <div className="bg-card/80 p-6 rounded-2xl border border-border/60 shadow-sm">
                                 <div className="flex items-center gap-2 mb-2">
                                     <UploadCloud className="w-4 h-4 text-purple-300" />
                                     <h4 className="font-bold text-white">Documentacion obligatoria - PDFs</h4>
@@ -641,9 +629,13 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                     <span>{DOC_LABELS[type]}</span>
                                                 </div>
                                                 {exists ? (
-                                                    <Badge className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 text-[10px]">OK</Badge>
+                                                    <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide bg-emerald-500/15 text-emerald-300 border-emerald-500/40">
+                                                        OK
+                                                    </Badge>
                                                 ) : (
-                                                    <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/40 text-[10px]">PENDIENTE</Badge>
+                                                    <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide bg-amber-500/15 text-amber-300 border-amber-500/40">
+                                                        Pendiente
+                                                    </Badge>
                                                 )}
                                             </div>
                                             {!exists && (
@@ -668,7 +660,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="w-full border-[#3F4247] bg-[#1F2225] text-[#B5B8BA] hover:bg-[#2C2F34]"
+                                                        className="w-full border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted/60"
                                                         onClick={() => window.open(doc.url, '_blank')}
                                                     >
                                                         Ver PDF
@@ -682,7 +674,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
                             {/* QR Code Section */}
                             {/* QR CODE SECTION - Matching Image 2 */}
-                            <div className="bg-[#34363A] p-6 rounded-2xl border border-[#3F4247]">
+                            <div className="bg-card/80 p-6 rounded-2xl border border-border/60">
                                 <div className="flex items-center gap-2 mb-4">
                                     <BoxSelect className="w-4 h-4 text-[#14CC7F]" />
                                     <h4 className="font-bold text-white">Etiqueta de Produccion</h4>
@@ -693,7 +685,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                         <QRCodeGenerator order={formData} />
                                     </div>
 
-                                    <div className="w-full bg-[#1F2225] rounded-xl border border-[#3F4247] p-3 space-y-2">
+                                    <div className="w-full bg-muted/40 rounded-xl border border-border/60 p-3 space-y-2">
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-[#8B8D90] flex items-center gap-2">
                                                 Entrada:
@@ -712,7 +704,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                         </div>
                                     </div>
 
-                                    <div className="w-full bg-[#1F2225] rounded-xl border border-[#3F4247] p-3">
+                                    <div className="w-full bg-muted/40 rounded-xl border border-border/60 p-3">
                                         <p className="text-xs text-[#B5B8BA] text-center font-mono break-all">
                                             {`${formData.order_number || 'INT-XXXX'}|${formData.customer_name || 'Cliente'}|${formData.delivery_region || 'Region'}|${formData.delivery_date ? new Date(formData.delivery_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : '--/--'}|${formData.lines?.reduce((acc, l) => acc + (l.material || ''), '') || 'Material'}|${formData.status || 'PENDIENTE'}`}
                                         </p>
@@ -720,7 +712,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
                                     <Button
                                         disabled={!isValidForPDF()}
-                                        className="w-full bg-[#1F2225] hover:bg-[#2C2F34] text-white border border-[#3F4247] disabled:opacity-50"
+                                        className="w-full bg-muted/40 hover:bg-muted/60 text-foreground border border-border/60 disabled:opacity-50"
                                     >
                                         <FileText className="w-4 h-4 mr-2" />
                                         GENERAR ORDEN PDF
@@ -730,6 +722,17 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             Completa la informacion obligatoria para habilitar la orden.
                                         </p>
                                     )}
+                                </div>
+                            </div>
+
+                            <div className="bg-card/80 p-4 rounded-2xl border border-border/60">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-[#B5B8BA]">Estado SLA</span>
+                                    <SLAIndicator deliveryDate={formData.delivery_date} size="sm" />
+                                </div>
+                                <div className="bg-muted/40 rounded-xl border border-border/60 p-4 text-center">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8B8D90]">Total Unidades</p>
+                                    <p className="text-3xl font-bold text-white mt-1">{formData.quantity_total || 0}</p>
                                 </div>
                             </div>
                         </div>
@@ -742,7 +745,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                             <h4 className="font-bold text-white mb-4 flex items-center">
                                 <FileText className="w-4 h-4 mr-2 text-[#14CC7F]" /> Email Presupuesto
                             </h4>
-                            <div className="bg-[#1F2225] rounded-xl p-4 mb-4 max-h-48 overflow-y-auto custom-scrollbar border border-[#3B3D41]">
+                            <div className="bg-[#1F2225] rounded-xl p-4 mb-4 border border-[#3B3D41]">
                                 <pre className="text-xs text-[#8B8D90] font-mono whitespace-pre-wrap">
                                     {`<HTML>
 <HEAD>
@@ -786,7 +789,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                             <h4 className="font-bold text-white mb-4 flex items-center">
                                 <FileText className="w-4 h-4 mr-2 text-[#14CC7F]" /> Email Inicio Producción
                             </h4>
-                            <div className="bg-[#1F2225] rounded-xl p-4 mb-4 max-h-48 overflow-y-auto custom-scrollbar border border-[#3B3D41]">
+                            <div className="bg-[#1F2225] rounded-xl p-4 mb-4 border border-[#3B3D41]">
                                 <pre className="text-xs text-[#8B8D90] font-mono whitespace-pre-wrap">
                                     {`<HTML>
 <HEAD>

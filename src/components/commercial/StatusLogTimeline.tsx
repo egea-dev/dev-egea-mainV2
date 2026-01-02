@@ -1,32 +1,13 @@
 import React from 'react';
 import { Clock, User } from 'lucide-react';
 import { useOrderStatusLog } from '@/hooks/use-order-status-log';
-import { ORDER_STATUS_LABELS, ORDER_STATUS_TEXT } from '@/lib/order-status';
-import type { OrderStatus } from '@/types/commercial';
+import { getOrderStatusLabel, getOrderStatusText } from '@/lib/order-status';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface StatusLogTimelineProps {
     orderId: string;
 }
-
-const STATUS_LABELS: Record<string, string> = {
-    ...ORDER_STATUS_LABELS,
-    EN_PRODUCCION: "En produccion",
-    LISTO_ENVIO: "Listo para envio",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-    PENDIENTE_PAGO: ORDER_STATUS_TEXT.PENDIENTE_PAGO,
-    PAGADO: ORDER_STATUS_TEXT.PAGADO,
-    EN_PROCESO: ORDER_STATUS_TEXT.EN_PROCESO,
-    PTE_ENVIO: ORDER_STATUS_TEXT.PTE_ENVIO,
-    ENVIADO: ORDER_STATUS_TEXT.ENVIADO,
-    ENTREGADO: ORDER_STATUS_TEXT.ENTREGADO,
-    CANCELADO: ORDER_STATUS_TEXT.CANCELADO,
-    EN_PRODUCCION: ORDER_STATUS_TEXT.EN_PROCESO,
-    LISTO_ENVIO: ORDER_STATUS_TEXT.PTE_ENVIO,
-};
 
 export const StatusLogTimeline: React.FC<StatusLogTimelineProps> = ({ orderId }) => {
     const { data: logs = [], isLoading } = useOrderStatusLog(orderId);
@@ -57,7 +38,7 @@ export const StatusLogTimeline: React.FC<StatusLogTimelineProps> = ({ orderId })
                     )}
 
                     {/* Timeline dot */}
-                    <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-2 border-border bg-muted flex items-center justify-center ${STATUS_COLORS[log.new_status as OrderStatus] || 'text-muted-foreground'}`}>
+                    <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-2 border-border bg-muted flex items-center justify-center ${getOrderStatusText(log.new_status)}`}>
                         <div className="w-2 h-2 rounded-full bg-current"></div>
                     </div>
 
@@ -68,14 +49,14 @@ export const StatusLogTimeline: React.FC<StatusLogTimelineProps> = ({ orderId })
                                 <div className="flex items-center gap-2 mb-1">
                                     {log.old_status && (
                                         <>
-                                            <span className={`text-sm font-medium ${STATUS_COLORS[log.old_status as OrderStatus] || "text-muted-foreground"}`}>
-                                                {STATUS_LABELS[log.old_status] || log.old_status}
+                                            <span className={`text-sm font-medium ${getOrderStatusText(log.old_status)}`}>
+                                                {getOrderStatusLabel(log.old_status)}
                                             </span>
                                             <span className="text-muted-foreground">-></span>
                                         </>
                                     )}
-                                    <span className={`text-sm font-bold ${STATUS_COLORS[log.new_status as OrderStatus] || "text-muted-foreground"}`}>
-                                        {STATUS_LABELS[log.new_status] || log.new_status}
+                                    <span className={`text-sm font-bold ${getOrderStatusText(log.new_status)}`}>
+                                        {getOrderStatusLabel(log.new_status)}
                                     </span>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-2">{log.comment}</p>

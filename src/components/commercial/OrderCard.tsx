@@ -1,10 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { OrderStatusBadge } from "@/components/badges";
 import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ORDER_STATUS_BADGES } from "@/lib/order-status";
-import type { OrderStatus } from "@/types/commercial";
 
 interface OrderCardProps {
     order: {
@@ -19,14 +17,6 @@ interface OrderCardProps {
     };
     onViewDetails?: (order: any) => void;
 }
-
-const getStatusBadge = (status: string) => {
-    const resolved = ORDER_STATUS_BADGES[status as OrderStatus];
-    if (resolved) return resolved;
-    if (status === "EN_PRODUCCION") return ORDER_STATUS_BADGES.EN_PROCESO;
-    if (status === "LISTO_ENVIO") return ORDER_STATUS_BADGES.PTE_ENVIO;
-    return "bg-muted/50 text-muted-foreground border-border/60";
-};
 
 export function OrderCard({ order, onViewDetails }: OrderCardProps) {
     return (
@@ -46,15 +36,7 @@ export function OrderCard({ order, onViewDetails }: OrderCardProps) {
                                 {order.admin_code || 'FALTA REF. ADMIN'}
                             </p>
                         </div>
-                        <Badge
-                            variant="outline"
-                            className={cn(
-                                "text-[10px] font-bold px-2 py-0.5",
-                                getStatusBadge(order.status)
-                            )}
-                        >
-                            {order.status.replace('_', ' ')}
-                        </Badge>
+                        <OrderStatusBadge status={order.status} />
                     </div>
 
                     {/* Content */}

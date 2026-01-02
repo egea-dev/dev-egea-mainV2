@@ -11,7 +11,40 @@ export type Json =
 
 export interface Database {
     public: {
-        Tables: {};
+        Tables: {
+            kiosk_screens: {
+                Row: {
+                    id: string
+                    name: string
+                    location: string | null
+                    kiosk_type: 'MONITOR' | 'TABLET' | 'TERMINAL' | null
+                    config: Json | null
+                    is_active: boolean | null
+                    last_ping: string | null
+                    created_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    name: string
+                    location?: string | null
+                    kiosk_type?: 'MONITOR' | 'TABLET' | 'TERMINAL' | null
+                    config?: Json | null
+                    is_active?: boolean | null
+                    last_ping?: string | null
+                    created_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    name?: string
+                    location?: string | null
+                    kiosk_type?: 'MONITOR' | 'TABLET' | 'TERMINAL' | null
+                    config?: Json | null
+                    is_active?: boolean | null
+                    last_ping?: string | null
+                    created_at?: string | null
+                }
+            }
+        };
         Views: {};
     };
     comercial: {

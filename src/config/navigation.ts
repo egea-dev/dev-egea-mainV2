@@ -46,7 +46,7 @@ const consultasItems: AppNavItem[] = [
   { type: "item", path: "/admin/templates", label: "Plantillas", icon: FileText },
   { type: "item", path: "/admin/production", label: "Produccion", icon: Factory },
   { type: "item", path: "/admin/envios", label: "Envios", icon: Package },
-  { type: "item", path: "/admin/warehouse", label: "Inventario", icon: Package },
+  { type: "item", path: "/admin/warehouse", label: "Almacen", icon: Package },
 ];
 
 const actividadItems: AppNavItem[] = [

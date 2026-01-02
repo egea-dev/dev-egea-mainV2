@@ -34,6 +34,9 @@ import ManagementPage from "./pages/ManagementPage";
 import SlaConfigPage from "./pages/SlaConfigPage";
 import SystemLogPage from "./pages/SystemLogPage";
 import ShippingScanPage from "./pages/ShippingScanPage";
+import KioskDisplayPage from "./pages/KioskDisplayPage";
+import PlantBoardPage from "./pages/PlantBoardPage";
+import ShippingBoardPage from "./pages/ShippingBoardPage";
 
 // --- LAYOUTS Y COMPONENTES PRINCIPALES ---
 import AdminLayout from "./pages/AdminLayout";
@@ -57,6 +60,9 @@ const App = () => (
             <Route path="/" element={<IndexPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/share/plan/:token" element={<SharedPlanPage />} />
+            <Route path="/kiosk" element={<KioskDisplayPage />} />
+            <Route path="/kiosk/board" element={<PlantBoardPage />} />
+            <Route path="/kiosk/shipping" element={<ShippingBoardPage />} />
             <Route path="/display/:id" element={<DisplayPage />} />
             <Route path="/group/:groupName" element={<GroupDisplayPage />} />
             <Route path="/screen/:screenId" element={<ScreenDisplay />} />

@@ -69,13 +69,9 @@ export const useDashboardCalendarData = (
         queryKey: ['dashboard-tasks', startStr, endStr],
         queryFn: async () => {
             let query = supabase
-                .from('screen_data')
-                .select(`
-                    *,
-                    screens!inner(id, name, screen_group, screen_type),
-                    assigned_profiles:task_profiles(profile_id, profiles(id, full_name)),
-                    assigned_vehicles:task_vehicles(vehicle_id, vehicles(id, name))
-                `);
+                .from('detailed_tasks')
+                .select('*')
+                .eq('screen_group', 'Instalaciones');
 
             // Logic: Fetch ALL non-terminated tasks (Active)
             // PLUS terminated tasks that are within the current date range.
@@ -95,23 +91,7 @@ export const useDashboardCalendarData = (
                 throw error;
             }
 
-            // Transformar datos para DetailedTask
-            return (data ?? []).map((item: any) => {
-                const screen = item.screens || {};
-
-                // Map assignments from joins
-                const profiles = (item.assigned_profiles || []).map((p: any) => p.profiles).filter(Boolean);
-                const vehicles = (item.assigned_vehicles || []).map((v: any) => v.vehicles).filter(Boolean);
-
-                return {
-                    ...item,
-                    screen_group: screen.screen_group || null,
-                    screen_name: screen.name || null,
-                    screen_type: screen.screen_type || null,
-                    assigned_profiles: profiles,
-                    assigned_vehicles: vehicles
-                };
-            }) as DetailedTask[];
+            return (data ?? []) as DetailedTask[];
         },
         enabled: mode === 'installations',
     });
