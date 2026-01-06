@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Menu, LogOut, MessageCircle, ChevronDown } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useDirectMessages } from "@/hooks/use-direct-messages";
+// DESHABILITADO: Problema de conversaciones pausado
+// import { useDirectMessages } from "@/hooks/use-direct-messages";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,10 @@ export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProp
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { unreadCount } = useDirectMessages();
+
+  // DESHABILITADO: Problema de conversaciones pausado
+  // const { unreadCount } = useDirectMessages();
+  const unreadCount = 0;
 
   const role = resolveRole(currentUser?.role);
   const entries = navItems ?? getNavItemsForRole(role);

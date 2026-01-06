@@ -14,6 +14,7 @@ import {
   Search,
   ClipboardList,
   Clock,
+  UserCircle,
   TvMinimal,
   ShieldCheck,
   ScrollText,
@@ -165,9 +166,10 @@ export const getNavItemsForRole = (role: string | null | undefined): AppNavEntry
       });
 
     case 'operario':
-      // Operarios solo tienen acceso a su jornada personal
+      // Operarios tienen acceso a su jornada personal y perfil
       return [
         { type: "item", path: "/user/workday", label: "Mi Jornada", icon: Clock },
+        { type: "item", path: "/admin/profile", label: "Perfil", icon: UserCircle },
       ];
 
 

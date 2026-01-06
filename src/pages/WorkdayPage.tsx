@@ -5,91 +5,76 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
-import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { useProfile, useTasksByDate } from "@/hooks/use-supabase";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { Task } from "@/types";
 import { useWorkSession } from "@/hooks/use-work-session";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { WorkSession } from "@/types";
-import { Clock, MapPin, CheckCircle2, AlertTriangle, Loader2, MessageCircle } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Clock, MapPin, AlertTriangle, Info } from "lucide-react";
 import { buildMapsSearchUrl } from "@/utils/maps";
+import { WeeklyCalendar } from "@/components/calendar/WeeklyCalendar";
 
 dayjs.extend(relativeTime);
 dayjs.locale("es");
-
-type WorkdayIncident = {
-  id: string;
-  created_at: string;
-  message?: string | null;
-  status?: string | null;
-  metadata?: Record<string, unknown> | null;
-  incident_type?: string | null;
-  severity?: string | null;
-  description?: string | null;
-};
-
-type WorkdayLocation = {
-  id: string;
-  created_at: string;
-  location?: Record<string, unknown> | null;
-  note?: string | null;
-  metadata?: Record<string, unknown> | null;
-  acknowledged_at?: string | null;
-};
-
-const formatTaskWindow = (task: Task) => {
-  const start = task.start_date ? dayjs(task.start_date).format("HH:mm") : "00:00";
-  const end = task.end_date ? dayjs(task.end_date).format("HH:mm") : "00:00";
-  return `${start} - ${end}`;
-};
 
 export default function WorkdayPage() {
   const { data: profile } = useProfile();
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  // Obtener TODAS las tareas del operario (no solo del día seleccionado)
   const { data: allTasks = [] } = useTasksByDate(selectedDate);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
   const [detailsTask, setDetailsTask] = useState<Task | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [calendarTaskDays, setCalendarTaskDays] = useState<Date[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Filtrar tareas del usuario actual
+  // Filtrar tareas del usuario actual - TODAS las tareas pendientes
   const tasksForUser = useMemo(() => {
     if (!profile?.id) return [];
-    return allTasks.filter((task) => {
+
+    // Filtrar por usuario asignado
+    const userTasks = allTasks.filter((task) => {
       if (task.responsible_profile_id === profile.id) return true;
       const assigned = task.assigned_users ?? [];
       return assigned.some((user) => user.id === profile.id);
     });
+
+    // Mostrar TODAS las tareas no terminadas:
+    // - No realizadas de días anteriores
+    // - Pendientes
+    // - Pendientes de validar
+    // - Próximas
+    return userTasks.filter((task) => {
+      // Incluir todas las tareas que NO estén terminadas
+      return task.state !== "terminado" && task.status !== "acabado";
+    });
   }, [allTasks, profile?.id]);
 
-  // Tarea activa
+  // Tarea activa (la primera pendiente o en curso)
   const activeTask = useMemo(() => {
     if (tasksForUser.length === 0) return null;
-    if (selectedTaskId) {
-      const selected = tasksForUser.find((t) => t.id === selectedTaskId);
-      if (selected) return selected;
-    }
     const now = dayjs();
+
+    // Buscar tarea en curso (dentro del rango de fechas)
     const current = tasksForUser.find((task) => {
-      if (!task.start_date || !task.end_date) return task.state !== "terminado";
+      if (!task.start_date || !task.end_date) return false;
       const start = dayjs(task.start_date);
       const end = dayjs(task.end_date);
-      return now.isAfter(start) && now.isBefore(end) && task.state !== "terminado";
+      return now.isAfter(start) && now.isBefore(end);
     });
-    return current ?? tasksForUser[0];
-  }, [tasksForUser, selectedTaskId]);
 
-  // Próximas tareas
+    // Si no hay tarea en curso, tomar la primera pendiente
+    return current ?? tasksForUser[0];
+  }, [tasksForUser]);
+
+  // Próximas tareas (todas menos la activa)
   const upcomingTasks = useMemo(() => {
     if (!activeTask) return tasksForUser;
     return tasksForUser.filter((task) => task.id !== activeTask.id && task.state !== "terminado");
@@ -97,7 +82,6 @@ export default function WorkdayPage() {
 
   // Hook de sesión de trabajo
   const {
-    session,
     isActive: isSessionActive,
     startSession,
     endSession,
@@ -150,19 +134,6 @@ export default function WorkdayPage() {
     fetchCalendar();
   }, [profile?.id]);
 
-  // Seleccionar automáticamente la primera tarea
-  useEffect(() => {
-    if (!tasksForUser.length) {
-      setSelectedTaskId(null);
-      return;
-    }
-    if (selectedTaskId && tasksForUser.some((task) => task.id === selectedTaskId)) {
-      return;
-    }
-    const preferred = activeTask ?? tasksForUser[0];
-    setSelectedTaskId(preferred?.id ?? null);
-  }, [tasksForUser, activeTask, selectedTaskId]);
-
   // Saludo basado en la hora
   const greeting = useMemo(() => {
     const hour = currentTime.getHours();
@@ -176,88 +147,66 @@ export default function WorkdayPage() {
     return dayjs(currentTime).format("dddd D [de] MMMM - HH:mm:ss").toUpperCase();
   }, [currentTime]);
 
-  // Marcar tarea como completada
-  const markTaskCompleted = useCallback(
-    async (taskId: string | null | undefined) => {
-      if (!taskId) return;
-
-      const { error } = await supabase
-        .from("screen_data")
-        .update({
-          state: "terminado",
-          status: "acabado",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", taskId);
-
-      if (error) {
-        toast.error("No se pudo marcar la tarea como completada");
-        return;
-      }
-
-      toast.success("Tarea completada");
-      queryClient.invalidateQueries({ queryKey: ["tasks"], exact: false });
-    },
-    [queryClient]
-  );
-
-  // Registrar llegada/salida
-  const handleSessionToggle = async () => {
+  // Registrar llegada/salida para una tarea específica
+  const handleSessionToggle = async (task: Task) => {
     if (isSessionBusy) return;
 
     try {
       if (isSessionActive) {
-        const finished = await endSession();
-        if (finished?.task_id) {
-          await markTaskCompleted(finished.task_id);
-        }
+        // REGISTRAR SALIDA - NO cierra la tarea, solo finaliza sesión
+        await endSession();
+        toast.success("Salida registrada correctamente");
       } else {
-        if (!selectedTaskId) {
-          toast.error("Selecciona una tarea antes de registrar la llegada");
-          return;
-        }
-        await startSession({ taskId: selectedTaskId });
+        // REGISTRAR LLEGADA
+        await startSession({ taskId: task.id });
+        toast.success("Llegada registrada correctamente");
       }
+      queryClient.invalidateQueries({ queryKey: ["tasks"], exact: false });
     } catch (error) {
       console.error("Error toggling work session", error);
+      toast.error("Error al registrar llegada/salida");
     }
   };
 
   // Reportar incidencia
-  const handleReportIncident = async () => {
+  const handleReportIncident = async (task: Task) => {
     if (!profile?.id) return;
 
-    const { error } = await supabase.from("communication_logs").insert({
-      type: "incidencia",
-      recipient: "panel-admin",
-      subject: null,
-      message: `Incidencia reportada por ${profile.full_name ?? "operario"}`,
-      status: "pending",
-      metadata: {
-        profile_id: profile.id,
-        source: "workday",
-        task_id: activeTask?.id ?? null,
-        reported_at: new Date().toISOString(),
-      },
-      created_by: profile.id,
-    });
+    try {
+      // Crear log de comunicación para incidencia
+      const { error } = await supabase.from("communication_logs").insert({
+        type: "incidencia",
+        recipient: "panel-admin",
+        subject: `Incidencia en ${task.data?.site ?? task.data?.location ?? "tarea"}`,
+        message: `El operario ${profile.full_name ?? "usuario"} ha reportado una incidencia`,
+        status: "pending",
+        metadata: {
+          profile_id: profile.id,
+          profile_name: profile.full_name ?? "usuario",
+          task_id: task.id,
+          task_site: String(task.data?.site ?? task.data?.location ?? "N/A"),
+          task_location: String(task.data?.location ?? "N/A"),
+          source: "workday",
+          reported_at: new Date().toISOString(),
+        },
+        created_by: profile.id,
+      });
 
-    if (error) {
-      toast.error("No se pudo reportar la incidencia");
-    } else {
-      toast.success("Incidencia enviada al administrador");
+      if (error) {
+        console.error("Error reporting incident:", error);
+        toast.error("No se pudo reportar la incidencia");
+      } else {
+        toast.success("Incidencia reportada al administrador");
+      }
+    } catch (error) {
+      console.error("Error reporting incident:", error);
+      toast.error("Error al reportar incidencia");
     }
   };
 
   // Abrir ubicación en Maps
-  const openMapsForTask = useCallback((task: Task | null) => {
-    if (!task) return;
-
-    const candidate =
-      task.data?.address ??
-      task.data?.location ??
-      task.data?.site ??
-      "";
+  const openMapsForTask = useCallback((task: Task) => {
+    const candidate = task.data?.address ?? task.data?.location ?? task.data?.site ?? "";
 
     if (!candidate) {
       toast.error("Esta tarea no tiene una dirección asociada");
@@ -268,87 +217,149 @@ export default function WorkdayPage() {
     window.open(url, "_blank", "noopener");
   }, []);
 
-  const selectedTask = tasksForUser.find((t) => t.id === selectedTaskId);
+  // Componente de tarjeta de tarea con botones
+  const TaskCard = ({ task, isActive = false }: { task: Task; isActive?: boolean }) => {
+    const formatTaskWindow = (t: Task) => {
+      const start = t.start_date ? dayjs(t.start_date).format("HH:mm") : "00:00";
+      const end = t.end_date ? dayjs(t.end_date).format("HH:mm") : "00:00";
+      return `${start} - ${end}`;
+    };
+
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="p-4 space-y-4">
+          {/* Header de la tarea */}
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-semibold text-base">
+                {task.data?.site ?? task.data?.location ?? "Tarea asignada"}
+              </h3>
+              <Badge
+                variant={task.state === "terminado" ? "secondary" : "default"}
+                className="uppercase text-xs shrink-0"
+              >
+                {task.state ?? "pendiente"}
+              </Badge>
+            </div>
+
+            <div className="space-y-1 text-sm text-muted-foreground">
+              <p>Ubicación: {task.data?.location ?? "Por confirmar"}</p>
+              <p>
+                Montaje: {task.data?.installation_date
+                  ? dayjs(task.data.installation_date).format("DD/MM/YYYY")
+                  : dayjs(task.start_date).format("DD/MM/YYYY")}
+              </p>
+            </div>
+          </div>
+
+          {/* Información de horario y duración */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>{formatTaskWindow(task)}</span>
+            {task.responsible?.full_name && (
+              <>
+                <span>|</span>
+                <span>Responsable: {task.responsible.full_name}</span>
+              </>
+            )}
+          </div>
+
+          {isActive && (
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <p>Duración: <span className="font-semibold text-foreground">{durationLabel}</span></p>
+              <p>Estado: <span className="capitalize">{stateLabel}</span></p>
+            </div>
+          )}
+
+          {/* Descripción */}
+          {task.data?.description && (
+            <p className="text-sm text-muted-foreground">{String(task.data.description)}</p>
+          )}
+
+          {/* Botones de acción */}
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              variant={isSessionActive ? "destructive" : "default"}
+              className="w-full gap-2"
+              onClick={() => handleSessionToggle(task)}
+              disabled={isSessionBusy}
+            >
+              <Clock className="h-4 w-4" />
+              {isSessionActive ? "Registrar salida" : "Registrar llegada"}
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full gap-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+              onClick={() => openMapsForTask(task)}
+            >
+              <MapPin className="h-4 w-4" />
+              Ver en Maps
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full gap-2 border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+              onClick={() => {
+                setDetailsTask(task);
+                setDetailsOpen(true);
+              }}
+            >
+              <Info className="h-4 w-4" />
+              Ver detalles
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full gap-2 border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+              onClick={() => handleReportIncident(task)}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Reportar incidencia
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4 pb-24 md:pb-6">
       {/* Banner de avisos */}
-      {(isSessionActive || tasksForUser.some((t) => t.state !== "terminado")) && (
+      {tasksForUser.length > 0 && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
           <ul className="list-disc space-y-1 pl-4">
-            {tasksForUser.filter((t) => t.state !== "terminado").length > 0 && (
-              <li>
-                Tienes {tasksForUser.filter((t) => t.state !== "terminado").length} tarea
-                {tasksForUser.filter((t) => t.state !== "terminado").length > 1 ? "s" : ""} sin completar.
-                Se mantendrán en tu agenda hasta que marques la salida.
-              </li>
-            )}
+            <li>
+              Tienes {tasksForUser.length} tarea{tasksForUser.length > 1 ? "s" : ""} pendiente{tasksForUser.length > 1 ? "s" : ""}.
+              Aquí se muestran todas tus tareas: no realizadas de días anteriores, pendientes, pendientes de validar y próximas.
+            </li>
           </ul>
         </div>
       )}
 
       {/* Carta de saludo y estado */}
-      <div className="rounded-2xl border bg-card shadow-sm">
-        <div className="flex flex-col gap-4 p-4 sm:p-6">
-          <div className="flex flex-col gap-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              {formattedDateTime}
-            </span>
+      <Card className="border bg-card shadow-sm">
+        <CardContent className="p-4 sm:p-6 space-y-3">
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            {formattedDateTime}
+          </span>
 
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold leading-tight">
-                {greeting}, {profile?.full_name ?? "usuario"}
-              </h1>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold leading-tight">
+              {greeting}, {profile?.full_name ?? "usuario"}
+            </h1>
 
-              <p className="text-sm text-muted-foreground">
-                Estado actual: <span className="font-semibold text-primary capitalize">{stateLabel}</span>.
-                {lastEventLabel && ` ${lastEventLabel}.`}
-              </p>
+            <p className="text-sm text-muted-foreground">
+              Estado actual: <span className="font-semibold text-primary capitalize">{stateLabel}</span>.
+              {lastEventLabel && ` ${lastEventLabel}.`}
+            </p>
 
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                DURACIÓN: <span className="text-foreground">{durationLabel}</span>
-              </p>
-            </div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              DURACIÓN: <span className="text-foreground">{durationLabel}</span>
+            </p>
           </div>
-
-          <div className="flex flex-col gap-2">
-            <Button
-              variant={isSessionActive ? "destructive" : "default"}
-              className="w-full gap-2"
-              onClick={handleSessionToggle}
-              disabled={isSessionBusy || !profile?.id || tasksForUser.length === 0}
-            >
-              {isSessionBusy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Clock className="h-4 w-4" />
-              )}
-              {isSessionActive ? "Registrar salida" : "Registrar llegada"}
-            </Button>
-
-            {activeTask && (
-              <Button variant="outline" className="w-full gap-2" onClick={() => openMapsForTask(activeTask)}>
-                <MapPin className="h-4 w-4" />
-                Ver en Maps
-              </Button>
-            )}
-
-            <Button variant="outline" className="w-full gap-2" onClick={() => {
-              if (activeTask) {
-                setDetailsTask(activeTask);
-                setDetailsOpen(true);
-              }
-            }}>
-              Ver detalles
-            </Button>
-
-            <Button variant="outline" className="w-full gap-2" onClick={handleReportIncident}>
-              <AlertTriangle className="h-4 w-4" />
-              Reportar incidencia
-            </Button>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Calendario personal */}
       <Card>
@@ -358,71 +369,32 @@ export default function WorkdayPage() {
             Selecciona el día que quieres revisar. Tus tareas se actualizarán automáticamente.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex justify-center px-2 sm:px-4">
-          <div className="w-full max-w-[320px]">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(value) => value && setSelectedDate(value)}
-              numberOfMonths={1}
-              className="w-full rounded-md border shadow-sm"
-              modifiers={{
-                hasTasks: calendarTaskDays,
-              }}
-              modifiersClassNames={{
-                hasTasks: "rdp-day_hasTasks",
-              }}
-            />
-          </div>
+        <CardContent className="px-4">
+          <WeeklyCalendar
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            daysWithTasks={calendarTaskDays}
+          />
         </CardContent>
       </Card>
 
       {/* Tarea en curso */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Tarea en curso</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Tarea en curso</h2>
+        </div>
 
         {activeTask ? (
-          <Card className="overflow-hidden">
-            <CardHeader className="flex flex-col gap-2">
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-base">{activeTask.data?.site ?? "Tarea asignada"}</CardTitle>
-                <Badge variant="default" className="uppercase text-xs">
-                  {activeTask.state ?? "pendiente"}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Ubicación: {activeTask.data?.location ?? "Por confirmar"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Montaje: {activeTask.data?.installation_date ? dayjs(activeTask.data.installation_date).format("DD/MM/YYYY") : "05/01/2026"}
-              </p>
-            </CardHeader>
+          <div className="space-y-3">
+            <div className="flex items-start gap-2">
+              <Checkbox id="checklist" className="mt-0.5" />
+              <label htmlFor="checklist" className="text-sm font-medium cursor-pointer">
+                Completar checklist
+              </label>
+            </div>
 
-            <CardContent className="space-y-4">
-              <div className="flex items-start gap-2">
-                <Checkbox id="checklist" className="mt-0.5" />
-                <label htmlFor="checklist" className="text-sm font-medium cursor-pointer">
-                  Completar checklist
-                </label>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
-                {formatTaskWindow(activeTask)} | Responsable: {activeTask.responsible?.full_name ?? ""}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <span>
-                  Duración: <span className="font-semibold text-foreground">{durationLabel}</span>
-                </span>
-                <span>Estado: {stateLabel}</span>
-              </div>
-
-              {activeTask.data?.description && (
-                <p className="text-sm text-muted-foreground">{activeTask.data.description}</p>
-              )}
-            </CardContent>
-          </Card>
+            <TaskCard task={activeTask} isActive={true} />
+          </div>
         ) : (
           <Card>
             <CardContent className="p-6 text-center text-sm text-muted-foreground">
@@ -435,57 +407,25 @@ export default function WorkdayPage() {
       {/* Próximas tareas */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Próximas tareas</h2>
-          <Button variant="link" size="sm" className="text-primary">
+          <h2 className="text-lg font-semibold">Todas tus tareas pendientes</h2>
+          <Button variant="link" size="sm" className="text-primary h-auto p-0">
             Ver agenda completa
           </Button>
         </div>
 
         <div className="grid gap-3">
           {upcomingTasks.length > 0 ? (
-            upcomingTasks.slice(0, 3).map((task) => (
-              <Card key={task.id} className="overflow-hidden">
-                <CardContent className="flex items-start justify-between p-4">
-                  <div className="min-w-0 space-y-1">
-                    <p className="font-medium text-sm">
-                      {task.data?.site ?? task.data?.location ?? "Tarea asignada"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatTaskWindow(task)} | {task.data?.location ?? "Lugar por confirmar"}
-                    </p>
-                  </div>
-
-                  <Badge variant="secondary" className="uppercase text-xs ml-2">
-                    {task.state ?? "pendiente"}
-                  </Badge>
-                </CardContent>
-              </Card>
+            upcomingTasks.map((task) => (
+              <TaskCard key={task.id} task={task} />
             ))
           ) : (
             <Card>
               <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                No tienes más tareas programadas para esta fecha.
+                No tienes más tareas pendientes.
               </CardContent>
             </Card>
           )}
         </div>
-      </section>
-
-      {/* Centro de comunicaciones */}
-      <section className="space-y-3">
-        <Card>
-          <CardHeader className="pb-3">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <MessageCircle className="h-5 w-5" />
-              Centro de comunicaciones
-            </h2>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Próximamente verás aquí tus mensajes y notificaciones compartidas con el administrador.
-            </p>
-          </CardContent>
-        </Card>
       </section>
 
       {/* Modal de detalles */}
@@ -507,21 +447,25 @@ export default function WorkdayPage() {
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Fecha de inicio</p>
-                <p className="text-sm">{detailsTask?.start_date ? dayjs(detailsTask.start_date).format("DD/MM/YYYY") : "05/01/2026"}</p>
+                <p className="text-sm">
+                  {detailsTask?.start_date ? dayjs(detailsTask.start_date).format("DD/MM/YYYY") : "N/A"}
+                </p>
               </div>
 
               <Separator />
 
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Fecha de cierre</p>
-                <p className="text-sm">{detailsTask?.end_date ? dayjs(detailsTask.end_date).format("DD/MM/YYYY") : "05/01/2026"}</p>
+                <p className="text-sm">
+                  {detailsTask?.end_date ? dayjs(detailsTask.end_date).format("DD/MM/YYYY") : "N/A"}
+                </p>
               </div>
 
               <Separator />
 
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Sitio</p>
-                <p className="text-sm">{detailsTask?.data?.site ?? detailsTask?.data?.location ?? "Almacen central"}</p>
+                <p className="text-sm">{String(detailsTask?.data?.site ?? detailsTask?.data?.location ?? "N/A")}</p>
               </div>
 
               <Separator />
@@ -538,7 +482,7 @@ export default function WorkdayPage() {
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Descripción</p>
                 <p className="text-sm text-muted-foreground">
-                  {detailsTask?.data?.description ?? "sdgasdf"}
+                  {String(detailsTask?.data?.description ?? "Sin descripción")}
                 </p>
               </div>
 
@@ -547,12 +491,12 @@ export default function WorkdayPage() {
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Ubicación</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-sm">{detailsTask?.data?.location ?? "Almacen central"}</p>
+                  <p className="text-sm">{String(detailsTask?.data?.location ?? "N/A")}</p>
                   <Button
                     size="sm"
                     variant="outline"
                     className="gap-2"
-                    onClick={() => openMapsForTask(detailsTask)}
+                    onClick={() => detailsTask && openMapsForTask(detailsTask)}
                   >
                     <MapPin className="h-4 w-4" />
                     Abrir en Maps
@@ -579,6 +523,39 @@ export default function WorkdayPage() {
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Incidencias</p>
                 <p className="text-sm text-muted-foreground">No hay incidencias asociadas a esta tarea.</p>
+              </div>
+
+              <Separator />
+
+              {/* Botones de acción en el modal */}
+              <div className="flex flex-col gap-2 pt-2">
+                <Button
+                  variant={isSessionActive ? "destructive" : "default"}
+                  className="w-full gap-2"
+                  onClick={() => detailsTask && handleSessionToggle(detailsTask)}
+                  disabled={isSessionBusy}
+                >
+                  <Clock className="h-4 w-4" />
+                  {isSessionActive ? "Registrar salida" : "Registrar llegada"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-emerald-500 text-emerald-600"
+                  onClick={() => detailsTask && openMapsForTask(detailsTask)}
+                >
+                  <MapPin className="h-4 w-4" />
+                  Ver en Maps
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-amber-500 text-amber-600"
+                  onClick={() => detailsTask && handleReportIncident(detailsTask)}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Reportar incidencia
+                </Button>
               </div>
             </div>
           </ScrollArea>
