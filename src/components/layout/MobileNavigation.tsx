@@ -17,6 +17,7 @@ interface MobileNavigationProps {
   currentUser?: {
     full_name: string;
     role: string;
+    email?: string | null;
     avatar_url?: string;
   } | null;
   navItems?: AppNavEntry[];
@@ -124,15 +125,16 @@ export const MobileNavigation = ({ currentUser, navItems }: MobileNavigationProp
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{currentUser.full_name}</p>
-                      <Badge variant="secondary" className="text-xs capitalize">
+                      <Badge variant="secondary" className="text-xs capitalize mb-1">
                         {currentUser.role}
                       </Badge>
+                      <p className="text-xs text-muted-foreground truncate">{currentUser.email || "user@oko.com"}</p>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto scrollbar-thin">
                 <nav className="p-4 space-y-2">
                   {entries.map((entry) => {
                     if (entry.type === "item") {

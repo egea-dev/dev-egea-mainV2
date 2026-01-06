@@ -19,7 +19,8 @@ export interface Profile {
   full_name: string;
   email: string | null;
   phone: string | null;
-  role: 'admin' | 'manager' | 'responsable' | 'operario';
+  whatsapp: string | null;
+  role: 'admin' | 'manager' | 'responsable' | 'operario' | 'produccion' | 'envios' | 'almacen' | 'comercial';
   status: 'activo' | 'vacaciones' | 'baja';
   avatar_url: string | null;
   created_at: string;
@@ -210,11 +211,10 @@ export interface UserSession {
 
 export interface RolePermission {
   id: string;
-  role: 'admin' | 'responsable' | 'operario';
-  page: string;
-  can_view: boolean;
-  can_edit: boolean;
-  can_delete: boolean;
+  role: string;
+  resource: string;
+  action: string;
+  granted: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -525,6 +525,19 @@ export interface PlanDay {
 }
 
 // =====================================================================
+// TIPOS PARA PERMISOS DE USUARIO
+// =====================================================================
+
+export interface UserPermission {
+  id: string;
+  user_id: string;
+  module: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// =====================================================================
 // TIPOS DE UNIÓN (DATABASE TYPES)
 // =====================================================================
 
@@ -616,10 +629,21 @@ export type Database = {
         Insert: Omit<CommunicationLog, 'id' | 'created_at'>;
         Update: Partial<Omit<CommunicationLog, 'id' | 'created_at'>>;
       };
+      user_permissions: {
+        Row: UserPermission;
+        Insert: Omit<UserPermission, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<UserPermission, 'id' | 'created_at' | 'updated_at'>>;
+      };
     };
     Views: {
       detailed_tasks: {
         Row: DetailedTask;
+      };
+      user_workload_stats: {
+        Row: {
+          profile_id: string;
+          active_tasks_count: number;
+        };
       };
       user_workload: {
         Row: UserWorkload;
@@ -701,8 +725,8 @@ export type Database = {
       has_permission: {
         Args: {
           user_role: string;
-          page: string;
-          permission: string;
+          resource: string;
+          action: string;
         };
         Returns: boolean;
       };
@@ -732,7 +756,7 @@ export type Database = {
 // TIPOS UTILITARIOS
 // =====================================================================
 
-export type UserRole = 'admin' | 'manager' | 'responsable' | 'operario';
+export type UserRole = 'admin' | 'manager' | 'responsable' | 'operario' | 'produccion' | 'envios' | 'almacen' | 'comercial';
 export type UserStatus = 'activo' | 'vacaciones' | 'baja';
 export type TaskState = 'pendiente' | 'urgente' | 'en fabricacion' | 'a la espera' | 'terminado' | 'incidente' | 'arreglo';
 export type TaskStatus = 'pendiente' | 'acabado' | 'en progreso';

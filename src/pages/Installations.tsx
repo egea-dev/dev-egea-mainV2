@@ -112,15 +112,15 @@ export default function InstallationsPage() {
   // const isManagerView = profile?.role === "admin" || profile?.role === "manager"; // Assume Manager for this view for now
 
   // Filters Sidebar
-  const [operatorSearch, setOperatorSearch] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const [vehicleSearch, setVehicleSearch] = useState("");
 
   const filteredUsers = useMemo(() => {
-    const query = operatorSearch.toLowerCase();
+    const query = userSearch.toLowerCase();
     return users.filter(u =>
       !query || (u.full_name && u.full_name.toLowerCase().includes(query))
     );
-  }, [users, operatorSearch]);
+  }, [users, userSearch]);
 
   const filteredVehicles = useMemo(() => {
     const query = vehicleSearch.toLowerCase();
@@ -195,8 +195,7 @@ export default function InstallationsPage() {
       );
       setTasks(updatedTasks);
 
-      const { error } = await supabase
-        .from('screen_data')
+      const { error } = await (supabase.from('screen_data') as any)
         .update(updates)
         .eq('id', task.id);
 
@@ -257,14 +256,14 @@ export default function InstallationsPage() {
           {/* Sidebar (Resources) */}
           <Card className="bg-slate-950/30 border-slate-800 flex flex-col min-h-0 h-full">
             <div className="p-3 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Operarios</h3>
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Usuarios</h3>
               <div className="relative">
                 <Search className="absolute left-2 top-2 h-4 w-4 text-slate-600" />
                 <Input
                   placeholder="Buscar..."
                   className="h-8 pl-8 bg-slate-900 border-slate-800 text-xs"
-                  value={operatorSearch}
-                  onChange={e => setOperatorSearch(e.target.value)}
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
                 />
               </div>
             </div>

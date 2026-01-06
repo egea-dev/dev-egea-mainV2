@@ -1,13 +1,12 @@
 import { ReactNode } from 'react';
 import { useProfile } from '@/hooks/use-supabase';
 import { Navigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 
 type PermissionGuardProps = {
   children: ReactNode;
-  requiredRole?: 'admin' | 'responsable' | 'operario';
+  requiredRole?: 'admin' | 'manager' | 'responsable' | 'operario';
   requiredPermission?: 'view' | 'edit' | 'delete';
-  page?: string;
+  resource?: string;
   fallback?: ReactNode;
 };
 
@@ -15,7 +14,7 @@ export const PermissionGuard = ({
   children,
   requiredRole,
   requiredPermission = 'view',
-  page,
+  resource,
   fallback = <Navigate to="/admin" replace />
 }: PermissionGuardProps) => {
   const { data: profile, isLoading, isError } = useProfile();
@@ -34,10 +33,25 @@ export const PermissionGuard = ({
     return <>{children}</>;
   }
 
+  // Los managers tienen acceso casi completo
+  if (profile.role === 'manager') {
+    // Managers no pueden eliminar usuarios ni gestionar ciertos recursos críticos
+    if (resource === 'users' && requiredPermission === 'delete') {
+      return fallback;
+    }
+    // Para todo lo demás, los managers tienen acceso
+    return <>{children}</>;
+  }
+
   // Si se requiere un rol específico y el usuario no lo tiene
   if (requiredRole) {
-    // Permitir acceso jerárquico: admin puede acceder a todo, responsable a responsable y operario, etc.
-    const roleHierarchy = { admin: 3, responsable: 2, operario: 1 };
+    // Permitir acceso jerárquico: admin > manager > responsable > operario
+    const roleHierarchy = {
+      admin: 4,
+      manager: 3,
+      responsable: 2,
+      operario: 1
+    };
     const userLevel = roleHierarchy[profile.role as keyof typeof roleHierarchy] || 0;
     const requiredLevel = roleHierarchy[requiredRole] || 0;
 

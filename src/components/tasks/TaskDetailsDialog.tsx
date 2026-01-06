@@ -172,7 +172,7 @@ export function TaskDetailsDialog({
             )}
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Operarios asignados</p>
+              <p className="text-sm font-medium text-muted-foreground">Usuarios asignados</p>
               <div className="flex flex-wrap gap-2">
                 {task.assigned_users && task.assigned_users.length > 0 ? (
                   task.assigned_users.map((user) => (
@@ -184,7 +184,7 @@ export function TaskDetailsDialog({
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin operarios asignados</p>
+                  <p className="text-sm text-muted-foreground">Sin usuarios asignados</p>
                 )}
               </div>
             </div>
@@ -198,8 +198,8 @@ export function TaskDetailsDialog({
                     const style = type.includes("jumper")
                       ? "bg-muted/60 text-foreground ring-border/60"
                       : type.includes("camión") || type.includes("camion")
-                      ? "bg-amber-500/10 text-amber-300 ring-amber-500/30"
-                      : "bg-muted/40 text-muted-foreground ring-border/60";
+                        ? "bg-amber-500/10 text-amber-300 ring-amber-500/30"
+                        : "bg-muted/40 text-muted-foreground ring-border/60";
 
                     return (
                       <div

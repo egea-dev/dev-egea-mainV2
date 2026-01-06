@@ -34,6 +34,8 @@ import { getNavItemsForRole } from "@/config/navigation";
 import { MobileNavigation } from "./layout/MobileNavigation";
 import { useRolePreview } from "@/context/RolePreviewContext";
 import type { AppRole } from "@/config/navigation";
+import { RolePreviewSelector } from "./layout/RolePreviewSelector";
+import { VersionDisplay } from "./VersionDisplay";
 
 const logoPlaceholder = "/logo-placeholder.png";
 
@@ -217,8 +219,11 @@ const SidebarContentComponent = ({
           </SidebarMenuItem>
         </SidebarMenu>
         {!isCollapsed && (
-          <div className="px-4 pt-4">
+          <div className="px-4 pt-4 space-y-2">
             <img src={logoPlaceholder} alt="Egea" className="mx-auto h-8 opacity-80" />
+            <div className="flex justify-center">
+              <VersionDisplay variant="badge" showChangelog />
+            </div>
           </div>
         )}
       </SidebarFooter>
@@ -287,12 +292,15 @@ const MainLayout = ({
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex">
+            <div className="hidden md:flex items-center gap-2">
               <HeaderStatus role={resolvedRole} />
+              <RolePreviewSelector />
             </div>
+            <VersionDisplay variant="badge" showChangelog />
             <ThemeToggle />
           </div>
         </header>
+
         <main className={cn("flex-1 overflow-y-auto p-2 sm:p-4", shellBackground)}>
           {children}
         </main>
@@ -336,10 +344,11 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
   const navItems = navItemsProp ?? getNavItemsForRole(effectiveRole);
   const currentUser = resolvedProfile
     ? {
-        full_name: resolvedProfile.full_name,
-        role: effectiveRole,
-        avatar_url: resolvedProfile.avatar_url ?? undefined,
-      }
+      full_name: resolvedProfile.full_name,
+      role: effectiveRole,
+      email: resolvedProfile.email,
+      avatar_url: resolvedProfile.avatar_url ?? undefined,
+    }
     : undefined;
 
   const handleLogout = async () => {
@@ -401,7 +410,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
       <div className="hidden border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:block">
         {previewRole && (
           <div className="border-b border-primary/30 bg-primary/10">
-          <div className="w-full flex items-center justify-between px-6 py-2 text-sm text-primary">
+            <div className="w-full flex items-center justify-between px-6 py-2 text-sm text-primary">
               <span>
                 Previsualizando como{" "}
                 <span className="font-semibold capitalize">{previewRole}</span>
@@ -423,6 +432,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
           </div>
           <div className="flex items-center gap-4">
             <HeaderStatus role={effectiveRole} />
+            <VersionDisplay variant="badge" showChangelog />
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleLogout} className="hidden md:inline-flex">
               Cerrar sesion

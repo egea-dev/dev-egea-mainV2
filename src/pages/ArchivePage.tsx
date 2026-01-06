@@ -76,7 +76,7 @@ const normalizeArchivedUsers = (value: unknown): ArchivedTaskParticipant[] => {
         status: typeof record.status === 'string' ? record.status : null,
       };
     })
-    .filter((profile): profile is ArchivedTaskParticipant => profile !== null);
+    .filter(Boolean) as ArchivedTaskParticipant[];
 };
 
 const normalizeArchivedVehicles = (value: unknown): ArchivedTaskVehicle[] => {
@@ -94,7 +94,7 @@ const normalizeArchivedVehicles = (value: unknown): ArchivedTaskVehicle[] => {
         type: typeof record.type === 'string' ? record.type : null,
       };
     })
-    .filter((vehicle): vehicle is ArchivedTaskVehicle => vehicle !== null);
+    .filter(Boolean) as ArchivedTaskVehicle[];
 };
 
 const useArchivedTasks = () => {
@@ -269,7 +269,7 @@ export default function ArchivePage() {
   const exportToCSV = () => {
     const headers = [
       'Archivado', 'Sitio', 'Cliente', 'Dirección', 'Descripción',
-      'Responsable', 'Operarios', 'Vehículos', 'Estado', 'Grupo'
+      'Responsable', 'Usuarios', 'Vehículos', 'Estado', 'Grupo'
     ];
 
     const csvData = filteredTasks.map((task) => {
@@ -441,7 +441,7 @@ export default function ArchivePage() {
                   <TableHead className="text-slate-400">Sitio</TableHead>
                   <TableHead className="text-slate-400">Descripción</TableHead>
                   <TableHead className="text-slate-400">Responsable</TableHead>
-                  <TableHead className="text-slate-400">Operarios</TableHead>
+                  <TableHead className="text-slate-400">Usuarios</TableHead>
                   <TableHead className="text-slate-400">Vehículos</TableHead>
                   <TableHead className="text-slate-400">Estado</TableHead>
                 </TableRow>

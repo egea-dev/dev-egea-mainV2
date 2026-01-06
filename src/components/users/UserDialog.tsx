@@ -30,7 +30,7 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
 
   const actorRole = currentUserProfile?.role;
 
-  const roleOptions: Profile["role"][] = ["operario", "responsable", "manager", "admin"];
+  const roleOptions: Profile["role"][] = ["operario", "responsable", "manager", "admin", "produccion", "envios", "almacen", "comercial"];
 
   const disableRoleSelect =
     actorRole !== undefined &&
@@ -56,7 +56,7 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
     setProfile(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (name: keyof Profile, value: 'activo' | 'baja' | 'vacaciones' | 'admin' | 'manager' | 'responsable' | 'operario') => {
+  const handleSelectChange = (name: keyof Profile, value: any) => {
     setProfile(prev => ({ ...prev, [name]: value }));
   };
 
@@ -67,11 +67,12 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
     }
     setLoading(true);
 
-    const { error } = await supabase.rpc('admin_upsert_profile', {
+    const { error } = await (supabase.rpc as any)('admin_upsert_profile', {
       p_profile_id: profile.id ?? null,
       p_full_name: profile.full_name,
       p_email: profile.email || null,
       p_phone: profile.phone || null,
+      p_whatsapp: profile.whatsapp || null,
       p_status: profile.status || 'activo',
       p_role: profile.role || 'operario'
     });
@@ -98,9 +99,9 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{user ? "Editar Operario" : "Nuevo Operario"}</DialogTitle>
+          <DialogTitle>{user ? "Editar Usuario" : "Nuevo Usuario"}</DialogTitle>
           <DialogDescription>
-            {user ? "Modifica los detalles del operario." : "Crea un nuevo operario. Podrás vincularle una cuenta de usuario más tarde."}
+            {user ? "Modifica los detalles del usuario." : "Crea un nuevo usuario. Podrás vincularle una cuenta de acceso más tarde."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -115,6 +116,10 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
           <div className="space-y-2">
             <Label htmlFor="phone">Teléfono</Label>
             <Input id="phone" name="phone" value={profile.phone || ''} onChange={handleChange} placeholder="+34 600 000 000" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp">WhatsApp (Opcional)</Label>
+            <Input id="whatsapp" name="whatsapp" value={profile.whatsapp || ''} onChange={handleChange} placeholder="+34 600 000 000" />
           </div>
           {profile.public_url && (
             <div className="space-y-2">

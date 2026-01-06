@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseProductivity } from '@/integrations/supabase/dual-client';
+import { supabaseProductivity } from '@/integrations/supabase';
 import { toast } from 'sonner';
 
 export type InventoryStatus = 'EN_ALMACEN' | 'EMBALADO' | 'EN_REPARTO' | 'ENTREGADO' | 'DEVUELTO';

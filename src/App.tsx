@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthGuard } from "./components/AuthGuard";
 import { PermissionGuardEnhanced } from "./components/PermissionGuardEnhanced";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
@@ -45,6 +45,7 @@ import { DataManagement } from "./components/data/DataManagement";
 import { ScreenList } from "./components/screens/ScreenList";
 import ScreenDisplay from "./pages/ScreenDisplay";
 import { TemplateList } from "./components/templates/TemplateList";
+import PermissionsMatrixPage from "./pages/PermissionsMatrixPage";
 
 const queryClient = new QueryClient();
 
@@ -69,10 +70,24 @@ const App = () => (
             <Route path="/checkin/:token" element={<CheckinPage />} />
             <Route path="/mis-tareas/:token" element={<MyTasksPage />} />
 
+            {/* Rutas de Usuario/Operario */}
+            <Route path="/user" element={<AuthGuard><AdminLayout /></AuthGuard>}>
+              <Route index element={<Navigate to="/user/workday" replace />} />
+              <Route path="workday" element={<WorkdayPage />} />
+            </Route>
+
             <Route path="/admin" element={<AuthGuard><AdminLayout /></AuthGuard>}>
               <Route index element={<PermissionGuardEnhanced resource="admin" action="view"><AdminPage /></PermissionGuardEnhanced>} />
-              <Route path="installations" element={<InstallationsPage />} />
-              <Route path="comercial" element={<CommercialPage />} />
+              <Route path="installations" element={
+                <PermissionGuardEnhanced resource="installations" action="view">
+                  <InstallationsPage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="comercial" element={
+                <PermissionGuardEnhanced resource="comercial" action="view">
+                  <CommercialPage />
+                </PermissionGuardEnhanced>
+              } />
               <Route
                 path="users"
                 element={
@@ -83,22 +98,55 @@ const App = () => (
               />
               <Route
                 path="communications"
-                element={<CommunicationsPage />}
+                element={
+                  <PermissionGuardEnhanced resource="communications" action="view">
+                    <CommunicationsPage />
+                  </PermissionGuardEnhanced>
+                }
               />
-              <Route path="calendario-global" element={<GlobalCalendarPage />} />
-              <Route path="gestion" element={<ManagementPage />} />
-              <Route path="workday" element={<WorkdayPage />} />
-              <Route path="settings" element={<PermissionGuardEnhanced resource="admin" action="view"><SettingsPage /></PermissionGuardEnhanced>} />
-              <Route path="sla-config" element={<PermissionGuardEnhanced resource="admin" action="view"><SlaConfigPage /></PermissionGuardEnhanced>} />
-              <Route path="system-log" element={<PermissionGuardEnhanced resource="admin" action="view"><SystemLogPage /></PermissionGuardEnhanced>} />
+              <Route path="calendario-global" element={
+                <PermissionGuardEnhanced resource="calendario-global" action="view">
+                  <GlobalCalendarPage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="gestion" element={
+                <PermissionGuardEnhanced resource="gestion" action="view">
+                  <ManagementPage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="workday" element={
+                <PermissionGuardEnhanced resource="dashboard" action="view">
+                  <WorkdayPage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="settings" element={<PermissionGuardEnhanced resource="settings" action="view"><SettingsPage /></PermissionGuardEnhanced>} />
+              <Route path="permissions-matrix" element={<PermissionGuardEnhanced resource="matrix" action="view"><PermissionsMatrixPage /></PermissionGuardEnhanced>} />
+              <Route path="sla-config" element={<PermissionGuardEnhanced resource="sla-config" action="view"><SlaConfigPage /></PermissionGuardEnhanced>} />
+              <Route path="system-log" element={<PermissionGuardEnhanced resource="system-log" action="view"><SystemLogPage /></PermissionGuardEnhanced>} />
               <Route path="archive" element={<PermissionGuardEnhanced resource="admin" action="view"><ArchivePage /></PermissionGuardEnhanced>} />
               <Route path="data" element={<PermissionGuardEnhanced resource="admin" action="view"><DataManagement /></PermissionGuardEnhanced>} />
               <Route path="screens" element={<PermissionGuardEnhanced resource="admin" action="view"><ScreenList /></PermissionGuardEnhanced>} />
               <Route path="templates" element={<PermissionGuardEnhanced resource="admin" action="view"><TemplateList /></PermissionGuardEnhanced>} />
-              <Route path="production" element={<ProductionPage />} />
-              <Route path="kiosk" element={<KioskPage />} />
-              <Route path="warehouse" element={<WarehousePage />} />
-              <Route path="envios" element={<ShippingScanPage />} />
+              <Route path="produccion" element={
+                <PermissionGuardEnhanced resource="produccion" action="view">
+                  <ProductionPage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="kiosk" element={
+                <PermissionGuardEnhanced resource="kiosk" action="view">
+                  <KioskPage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="almacen" element={
+                <PermissionGuardEnhanced resource="almacen" action="view">
+                  <WarehousePage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="envios" element={
+                <PermissionGuardEnhanced resource="envios" action="view">
+                  <ShippingScanPage />
+                </PermissionGuardEnhanced>
+              } />
             </Route>
 
             <Route path="/data-entry/:id" element={<AuthGuard><DataEntryPage /></AuthGuard>} />

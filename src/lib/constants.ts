@@ -139,7 +139,6 @@ export const VEHICLE_TYPE_LABELS: Record<string, string> = {
   [VEHICLE_TYPES.FURGONETA]: 'Furgoneta',
   [VEHICLE_TYPES.OTRO]: 'Otro',
 };
-
 // =====================================================================
 // ROLES DE USUARIO
 // =====================================================================
@@ -148,6 +147,10 @@ export const USER_ROLES = {
   MANAGER: 'manager',
   RESPONSABLE: 'responsable',
   OPERARIO: 'operario',
+  PRODUCCION: 'produccion',
+  ENVIOS: 'envios',
+  ALMACEN: 'almacen',
+  COMERCIAL: 'comercial',
 } as const;
 
 export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
@@ -157,6 +160,10 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   [USER_ROLES.MANAGER]: 'Manager',
   [USER_ROLES.RESPONSABLE]: 'Responsable',
   [USER_ROLES.OPERARIO]: 'Operario',
+  [USER_ROLES.PRODUCCION]: 'Producción',
+  [USER_ROLES.ENVIOS]: 'Envíos',
+  [USER_ROLES.ALMACEN]: 'Almacén',
+  [USER_ROLES.COMERCIAL]: 'Comercial',
 };
 
 // =====================================================================

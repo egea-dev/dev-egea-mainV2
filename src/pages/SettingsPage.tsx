@@ -36,6 +36,10 @@ import { Profile } from "@/types";
 import { UserDialog } from "@/components/users/UserDialog";
 import { useQueryClient } from "@tanstack/react-query";
 import type { JsonValue } from "@/integrations/supabase/types";
+import { useAllUserPermissions, useUpsertUserPermission } from "@/hooks/use-user-permissions";
+import PermissionsMatrix from "../components/settings/PermissionsMatrix";
+import SlaConfig from "../components/settings/SlaConfig";
+import { ShieldCheck, Zap } from "lucide-react";
 
 type ConfigValues = Record<string, JsonValue | undefined>;
 
@@ -64,6 +68,10 @@ export default function SettingsPage() {
   const deleteConfigMutation = useDeleteSystemConfig();
   const queryClient = useQueryClient();
 
+  // Hooks para permisos individuales por usuario
+  const { data: allUserPermissions = [] } = useAllUserPermissions();
+  const upsertUserPermission = useUpsertUserPermission();
+
   const [fullName, setFullName] = useState('');
   const [configValues, setConfigValues] = useState<ConfigValues>({});
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -91,6 +99,29 @@ export default function SettingsPage() {
 
   // Estados para permisos
   const [rolePermissions, setRolePermissions] = useState<Record<string, Record<string, { can_view: boolean; can_edit: boolean }>>>({});
+  // Definición unificada de módulos del sistema
+  const SYSTEM_MODULES = [
+    { id: 'dashboard', label: 'Dashboard', icon: Shield },
+    { id: 'installations', label: 'Instalaciones', icon: Shield },
+    { id: 'comercial', label: 'Comercial', icon: Shield },
+    { id: 'production', label: 'Producción', icon: Shield },
+    { id: 'warehouse', label: 'Almacén', icon: Shield },
+    { id: 'envios', label: 'Envíos', icon: Shield },
+    { id: 'users', label: 'Usuarios', icon: Shield },
+    { id: 'vehicles', label: 'Vehículos', icon: Shield },
+    { id: 'screens', label: 'Pantallas', icon: Shield },
+    { id: 'templates', label: 'Plantillas', icon: Shield },
+    { id: 'data', label: 'Gestión de Datos', icon: Shield },
+    { id: 'archive', label: 'Historial', icon: Shield },
+    { id: 'settings', label: 'Configuración', icon: Shield },
+    { id: 'calendario-global', label: 'Calendario Global', icon: Shield },
+    { id: 'kiosk', label: 'Kiosko', icon: Shield },
+    { id: 'matrix', label: 'Matriz de Permisos', icon: Shield },
+    { id: 'sla-config', label: 'Configuración SLA', icon: Shield },
+    { id: 'communications', label: 'Comunicaciones', icon: Shield },
+    { id: 'system-log', label: 'Logs del Sistema', icon: Shield },
+  ];
+
   const handleUsersRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['users'] });
   };
@@ -123,46 +154,85 @@ export default function SettingsPage() {
   }, [configs]);
 
   // Cargar permisos existentes de la base de datos
-  useEffect(() => {
-    const loadRolePermissions = async () => {
-      try {
-        const { data: permissions, error } = await supabase
-          .from('role_permissions')
-          .select('*');
+  const loadRolePermissions = async () => {
+    try {
+      const { data: permissions, error } = await supabase
+        .from('role_permissions')
+        .select('*');
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const permissionsByRole: Record<string, Record<string, { can_view: boolean; can_edit: boolean }>> = {};
+      const typedPermissions = permissions as any[];
+      const permissionsByRole: Record<string, Record<string, { can_view: boolean; can_edit: boolean }>> = {};
 
-        // Inicializar estructura base
-        ['admin', 'manager', 'responsable', 'operario'].forEach(role => {
-          permissionsByRole[role] = {};
-          [
-            '/admin', '/admin/installations', '/admin/data', '/admin/screens',
-            '/admin/templates', '/admin/users', '/admin/archive', '/admin/settings'
-          ].forEach(page => {
-            permissionsByRole[role][page] = { can_view: role === 'admin', can_edit: role === 'admin' };
-          });
+      // Inicializar estructura base para los roles
+      ['manager', 'responsable', 'operario', 'production', 'shipping', 'warehouse', 'comercial'].forEach(role => {
+        permissionsByRole[role] = {};
+        SYSTEM_MODULES.forEach(module => {
+          permissionsByRole[role][module.id] = { can_view: false, can_edit: false };
         });
+      });
 
-        // Cargar permisos desde la base de datos
-        permissions?.forEach(permission => {
-          if (permissionsByRole[permission.role] && permissionsByRole[permission.role][permission.page]) {
-            permissionsByRole[permission.role][permission.page] = {
-              can_view: permission.can_view,
-              can_edit: permission.can_edit
-            };
+      // Cargar permisos desde la base de datos
+      typedPermissions?.forEach((permission: any) => {
+        const role = permission.role;
+        const resource = permission.resource;
+
+        if (permissionsByRole[role] && permissionsByRole[role][resource]) {
+          if (permission.action === 'view') {
+            permissionsByRole[role][resource].can_view = permission.granted;
+          } else if (permission.action === 'edit' || permission.action === 'update') {
+            permissionsByRole[role][resource].can_edit = permission.granted;
           }
-        });
+        }
+      });
 
-        setRolePermissions(permissionsByRole);
-      } catch (error) {
-        console.error('Error al cargar permisos:', error);
-      }
-    };
+      setRolePermissions(permissionsByRole);
+    } catch (error) {
+      console.error('Error al cargar permisos:', error);
+    }
+  };
 
+  useEffect(() => {
     loadRolePermissions();
   }, []);
+
+  const saveRolePermissions = async () => {
+    try {
+      const rolesToReset = Object.keys(rolePermissions);
+      const { error } = await supabase
+        .from('role_permissions')
+        .delete()
+        .in('role', rolesToReset.length ? rolesToReset : ['manager', 'responsable', 'operario', 'production', 'shipping', 'warehouse', 'comercial']);
+
+      if (error) throw error;
+
+      const permissionsToInsert: any[] = [];
+      Object.entries(rolePermissions).forEach(([role, modules]) => {
+        Object.entries(modules as Record<string, any>).forEach(([resource, permissions]) => {
+          if (permissions.can_view) {
+            permissionsToInsert.push({ role, resource, action: 'view', granted: true });
+          }
+          if (permissions.can_edit) {
+            permissionsToInsert.push({ role, resource, action: 'edit', granted: true });
+          }
+        });
+      });
+
+      if (permissionsToInsert.length > 0) {
+        const { error: insertError } = await (supabase
+          .from('role_permissions') as any)
+          .insert(permissionsToInsert);
+
+        if (insertError) throw insertError;
+      }
+
+      toast.success('Permisos de rol actualizados correctamente');
+    } catch (error) {
+      console.error('Error al guardar permisos de rol:', error);
+      toast.error('Error al guardar permisos');
+    }
+  };
 
   const handleUpdateProfile = () => {
     if (profile) {
@@ -388,13 +458,16 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="profile">Perfil</TabsTrigger>
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="permissions">Permisos</TabsTrigger>
-          <TabsTrigger value="company">Empresa</TabsTrigger>
-          <TabsTrigger value="appearance">Apariencia</TabsTrigger>
-          <TabsTrigger value="system">Sistema</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-9 h-auto gap-1 bg-transparent p-0">
+          <TabsTrigger value="profile" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Perfil</TabsTrigger>
+          <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Usuarios</TabsTrigger>
+          <TabsTrigger value="permissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground line-clamp-1 text-center">Permisos (Rol)</TabsTrigger>
+          <TabsTrigger value="user-permissions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground line-clamp-1 text-center">Permisos (Usuario)</TabsTrigger>
+          <TabsTrigger value="matrix" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground line-clamp-1 text-center">Matriz</TabsTrigger>
+          <TabsTrigger value="sla" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground line-clamp-1 text-center">SLA</TabsTrigger>
+          <TabsTrigger value="company" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Empresa</TabsTrigger>
+          <TabsTrigger value="appearance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Apariencia</TabsTrigger>
+          <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Sistema</TabsTrigger>
         </TabsList>
 
         {/* TAB: Perfil */}
@@ -616,8 +689,8 @@ export default function SettingsPage() {
                                 onClick={async () => {
                                   try {
                                     const newStatus = user.status === 'baja' ? 'activo' : 'baja';
-                                    const { error } = await supabase
-                                      .from('profiles')
+                                    const { error } = await (supabase
+                                      .from('profiles') as any)
                                       .update({ status: newStatus })
                                       .eq('id', user.id);
                                     if (error) throw error;
@@ -643,120 +716,238 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
-        {/* TAB: Permisos */}
+        {/* TAB: Permisos por Rol */}
         <TabsContent value="permissions">
+          <Card className="bg-slate-950/20 border-white/5">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Control de Acceso por Rol (Templates)
+                </CardTitle>
+                <CardDescription>Configura los permisos base para cada nivel de acceso</CardDescription>
+              </div>
+              <Button onClick={saveRolePermissions} className="gap-2">
+                <ShieldCheck className="h-4 w-4" />
+                Guardar Todos los Roles
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[700px] pr-4">
+                <div className="space-y-10">
+                  {['manager', 'responsable', 'operario', 'production', 'shipping', 'warehouse', 'comercial'].map((role) => (
+                    <div key={role} className="space-y-6">
+                      <div className="flex items-center gap-4">
+                        <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                        <h3 className="text-xs font-black uppercase tracking-[0.3em] text-primary/70 px-6 py-2 rounded-full border border-primary/10 bg-primary/5 backdrop-blur-sm">
+                          PLANTILLA: {role}
+                        </h3>
+                        <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {SYSTEM_MODULES.map((module) => (
+                          <div key={module.id} className="group relative flex flex-col gap-4 p-4 border border-white/5 rounded-2xl bg-slate-900/40 hover:bg-slate-900/60 transition-all duration-300">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                <span className="text-xs font-bold">{module.label.substring(0, 2).toUpperCase()}</span>
+                              </div>
+                              <span className="text-sm font-semibold text-slate-200">{module.label}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/5">
+                              <div className="flex items-center gap-3 flex-1 justify-center bg-black/20 py-2 rounded-lg border border-white/5">
+                                <Label htmlFor={`${role}-${module.id}-view`} className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Ver</Label>
+                                <Switch
+                                  id={`${role}-${module.id}-view`}
+                                  checked={rolePermissions[role]?.[module.id]?.can_view ?? false}
+                                  onCheckedChange={(checked) => {
+                                    setRolePermissions(prev => ({
+                                      ...prev,
+                                      [role]: { ...prev[role], [module.id]: { ...prev[role]?.[module.id], can_view: checked } }
+                                    }));
+                                  }}
+                                />
+                              </div>
+                              <div className="flex items-center gap-3 flex-1 justify-center bg-black/20 py-2 rounded-lg border border-white/5">
+                                <Label htmlFor={`${role}-${module.id}-edit`} className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Editar</Label>
+                                <Switch
+                                  id={`${role}-${module.id}-edit`}
+                                  checked={rolePermissions[role]?.[module.id]?.can_edit ?? false}
+                                  onCheckedChange={(checked) => {
+                                    setRolePermissions(prev => ({
+                                      ...prev,
+                                      [role]: { ...prev[role], [module.id]: { ...prev[role]?.[module.id], can_edit: checked } }
+                                    }));
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB: Permisos por Usuario */}
+        <TabsContent value="user-permissions">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Control de Acceso por Rol
+                <User className="h-5 w-5" />
+                Permisos Individuales por Usuario
               </CardTitle>
-              <CardDescription>Configura permisos para cada rol en el sistema</CardDescription>
+              <CardDescription>
+                Configura permisos específicos para cada usuario. Los permisos individuales sobrescriben los permisos por rol.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-6">
-                {['admin', 'responsable', 'operario'].map((role) => (
-                  <div key={role} className="space-y-4">
-                    <h3 className="text-lg font-semibold capitalize">{role}</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {[
-                        { page: '/admin', label: 'Dashboard' },
-                        { page: '/admin/installations', label: 'Instalaciones' },
-                        { page: '/admin/data', label: 'Gestión de Datos' },
-                        { page: '/admin/screens', label: 'Pantallas' },
-                        { page: '/admin/templates', label: 'Plantillas' },
-                        { page: '/admin/users', label: 'Usuarios' },
-                        { page: '/admin/archive', label: 'Historial' },
-                        { page: '/admin/settings', label: 'Configuración' },
-                      ].map(({ page, label }) => (
-                        <div key={page} className="flex items-center justify-between p-3 border rounded-lg">
-                          <span className="text-sm font-medium">{label}</span>
-                          <div className="flex gap-2">
-                            <Switch
-                              checked={rolePermissions[role]?.[page]?.can_view || role === 'admin'}
-                              onCheckedChange={(checked) => {
-                                setRolePermissions(prev => ({
-                                  ...prev,
-                                  [role]: {
-                                    ...prev[role],
-                                    [page]: {
-                                      ...prev[role]?.[page],
-                                      can_view: checked
-                                    }
-                                  }
-                                }));
-                              }}
-                              disabled={role === 'admin'}
-                            />
-                            <Switch
-                              checked={rolePermissions[role]?.[page]?.can_edit || role === 'admin'}
-                              onCheckedChange={(checked) => {
-                                setRolePermissions(prev => ({
-                                  ...prev,
-                                  [role]: {
-                                    ...prev[role],
-                                    [page]: {
-                                      ...prev[role]?.[page],
-                                      can_edit: checked
-                                    }
-                                  }
-                                }));
-                              }}
-                              disabled={role === 'admin'}
-                            />
+              <ScrollArea className="h-[700px] pr-4">
+                <div className="space-y-6">
+                  {users.map((user: Profile) => (
+                    <Card key={user.id}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                              {user.avatar_url ? (
+                                <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <User className="w-5 h-5 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="font-semibold">{user.full_name}</h4>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <span>{user.email}</span>
+                                <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="text-xs">
+                                  {user.role}
+                                </Badge>
+                                <StatusBadge status={user.status} size="sm" />
+                              </div>
+                            </div>
                           </div>
+                          {user.role === 'admin' && (
+                            <Badge variant="outline" className="text-xs">
+                              Acceso Total
+                            </Badge>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {SYSTEM_MODULES.map((module) => {
+                            const userPerms = allUserPermissions.filter(
+                              p => p.user_id === user.id && p.resource === module.id
+                            );
+                            const hasView = userPerms.some(p => p.action === 'view' && p.granted === true);
+                            const hasEdit = userPerms.some(p => p.action === 'edit' && p.granted === true);
+
+                            // Si no hay permisos explícitos, se asume que usa los del rol (podríamos marcarlo visualmente)
+                            const isViewOverride = userPerms.some(p => p.action === 'view');
+                            const isEditOverride = userPerms.some(p => p.action === 'edit');
+
+                            return (
+                              <div
+                                key={module.id}
+                                className={`flex flex-col gap-4 p-4 rounded-2xl border transition-all duration-300 ${user.role === 'admin' ? 'opacity-50' : 'bg-slate-900/40 border-white/5 hover:bg-slate-900/60'}`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${hasView ? 'bg-primary/20 text-primary' : 'bg-slate-800 text-slate-500'}`}>
+                                    <span className="text-xs font-bold">{module.label.substring(0, 2).toUpperCase()}</span>
+                                  </div>
+                                  <span className="text-sm font-semibold text-slate-200">{module.label}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/5">
+                                  <div className="flex items-center gap-3 flex-1 justify-center bg-black/20 py-2 rounded-lg border border-white/5 relative">
+                                    <Label htmlFor={`user-${user.id}-${module.id}-view`} className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Ver</Label>
+                                    <Switch
+                                      id={`user-${user.id}-${module.id}-view`}
+                                      checked={hasView}
+                                      onCheckedChange={async (checked) => {
+                                        if (user.role === 'admin') return;
+                                        try {
+                                          await upsertUserPermission.mutateAsync({
+                                            userId: user.id,
+                                            resource: module.id,
+                                            action: 'view',
+                                            granted: checked,
+                                          });
+                                          toast.success(`Acceso de lectura ${checked ? 'activado' : 'desactivado'} para ${user.full_name}`);
+                                        } catch (error) { console.error(error); }
+                                      }}
+                                      disabled={user.role === 'admin' || upsertUserPermission.isPending}
+                                    />
+                                    {isViewOverride && <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary" title="Override activo" />}
+                                  </div>
+                                  <div className="flex items-center gap-3 flex-1 justify-center bg-black/20 py-2 rounded-lg border border-white/5 relative">
+                                    <Label htmlFor={`user-${user.id}-${module.id}-edit`} className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">Edit</Label>
+                                    <Switch
+                                      id={`user-${user.id}-${module.id}-edit`}
+                                      checked={hasEdit}
+                                      onCheckedChange={async (checked) => {
+                                        if (user.role === 'admin') return;
+                                        try {
+                                          await upsertUserPermission.mutateAsync({
+                                            userId: user.id,
+                                            resource: module.id,
+                                            action: 'edit',
+                                            granted: checked,
+                                          });
+                                          toast.success(`Acceso de edición ${checked ? 'activado' : 'desactivado'} para ${user.full_name}`);
+                                        } catch (error) { console.error(error); }
+                                      }}
+                                      disabled={user.role === 'admin' || upsertUserPermission.isPending}
+                                    />
+                                    {isEditOverride && <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary" title="Override activo" />}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              <div className="mt-6 p-4 bg-muted rounded-lg border">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Información sobre Permisos Individuales</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      <li>Los permisos individuales sobrescriben los permisos por rol</li>
+                      <li>Los usuarios con rol admin siempre tienen acceso completo</li>
+                      <li>Si un módulo está activado aquí, el usuario tendrá acceso independientemente de su rol</li>
+                      <li>Si está desactivado, el usuario NO tendrá acceso aunque su rol lo permita</li>
+                    </ul>
                   </div>
-                ))}
-
-                <div className="flex justify-end">
-                  <Button onClick={async () => {
-                    try {
-                      // Guardar permisos en la base de datos
-                      const rolesToReset = Object.keys(rolePermissions);
-                      const { error } = await supabase
-                        .from('role_permissions')
-                        .delete()
-                        .in('role', rolesToReset.length ? rolesToReset : ['admin', 'manager', 'responsable', 'operario']);
-
-                      if (error) throw error;
-
-                      // Insertar nuevos permisos
-                      const permissionsToInsert = [];
-                      for (const [role, pages] of Object.entries(rolePermissions)) {
-                        for (const [page, permissions] of Object.entries(pages)) {
-                          if (permissions.can_view || permissions.can_edit) {
-                            permissionsToInsert.push({
-                              role,
-                              page,
-                              can_view: permissions.can_view || false,
-                              can_edit: permissions.can_edit || false,
-                              can_delete: role === 'admin' // Solo admins pueden eliminar
-                            });
-                          }
-                        }
-                      }
-
-                      if (permissionsToInsert.length > 0) {
-                        const { error: insertError } = await supabase
-                          .from('role_permissions')
-                          .insert(permissionsToInsert);
-
-                        if (insertError) throw insertError;
-                      }
-
-                      toast.success('Permisos actualizados correctamente');
-                    } catch (error) {
-                      console.error('Error al guardar permisos:', error);
-                      toast.error('Error al guardar permisos');
-                    }
-                  }}>
-                    Guardar Permisos
-                  </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB: Matriz de Permisos */}
+        <TabsContent value="matrix">
+          <Card className="bg-slate-950/20 border-white/5">
+            <CardContent className="p-6">
+              <PermissionsMatrix />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB: Configuración SLA */}
+        <TabsContent value="sla">
+          <Card className="bg-slate-950/20 border-white/5">
+            <CardContent className="p-6">
+              <SlaConfig />
             </CardContent>
           </Card>
         </TabsContent>

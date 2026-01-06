@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { supabaseProductivity } from '@/integrations/supabase/dual-client';
+import { supabaseProductivity } from '@/integrations/supabase';
 import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon } from 'lucide-react';
 import PageShell from '@/components/layout/PageShell';
 import QRScanner from '@/components/common/QRScanner';

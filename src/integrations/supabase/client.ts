@@ -1,12 +1,14 @@
 import { createClient, type SupabaseClient as SupabaseClientType } from '@supabase/supabase-js';
+import type { Database as MainDatabase } from './types';
+import type { Database as ProductivityDatabase } from './types-productivity';
 
-import type { Database } from './types';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_MAIN_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_MAIN_ANON_KEY;
+const productivityUrl = import.meta.env.VITE_SUPABASE_PRODUCTIVITY_URL;
+const productivityAnonKey = import.meta.env.VITE_SUPABASE_PRODUCTIVITY_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Faltan las variables de entorno de Supabase');
+  throw new Error('Faltan las variables de entorno de Supabase (MAIN)');
 }
 
 const fetchWithRetry = async (
@@ -45,45 +47,43 @@ const fetchWithRetry = async (
 };
 
 // MAIN Supabase client
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+export const supabaseMain = createClient<MainDatabase>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storageKey: 'supabase.auth.token',
+    storageKey: 'supabase.main.auth.token', // Clave única para MAIN
     storage: window.localStorage,
     flowType: 'pkce'
   },
   global: {
     headers: {
-      'X-Client-Info': 'egea-productivity'
+      'X-Client-Info': 'egea-main'
     },
     fetch: fetchWithRetry
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
-    }
   },
   db: {
     schema: 'public'
   }
 });
 
+// Alias para compatibilidad
+export const supabase = supabaseMain;
+
 // PRODUCTIVITY Supabase client
-export const supabaseProductivity = createClient<Database>(
-  import.meta.env.VITE_SUPABASE_PRODUCTIVITY_URL,
-  import.meta.env.VITE_SUPABASE_PRODUCTIVITY_ANON_KEY,
+export const supabaseProductivity = createClient<ProductivityDatabase>(
+  productivityUrl || '',
+  productivityAnonKey || '',
   {
     auth: {
-      persistSession: false,
+      persistSession: false, // IMPORTANTE: No persistir para evitar colisiones de GoTrueClient
       autoRefreshToken: false,
       detectSessionInUrl: false,
-      storage: null // Explicitly disable storage to prevent conflict
+      storage: null
     },
     global: {
       headers: {
-        'X-Client-Info': 'egea-productivity-db'
+        'X-Client-Info': 'egea-productivity'
       },
       fetch: fetchWithRetry
     },
@@ -93,6 +93,13 @@ export const supabaseProductivity = createClient<Database>(
   }
 );
 
-export type SupabaseClient = SupabaseClientType<Database>;
+// Hook para compatibilidad con código que usa useDualSupabase
+export const useDualSupabase = () => {
+  return {
+    main: supabaseMain,
+    productivity: supabaseProductivity,
+  };
+};
 
+export type SupabaseClient = SupabaseClientType<MainDatabase>;
 export * from './types';

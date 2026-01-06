@@ -7,7 +7,7 @@ const packageJson = JSON.parse(readFileSync("./package.json", "utf8"));
 
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    host: "0.0.0.0",
     port: 8083,
   },
   plugins: [react()],

@@ -3,7 +3,7 @@ import {
     Users, UploadCloud, FileCheck, AlertTriangle, FileText, Plus, MinusCircle, Edit, Save, X, BoxSelect, MapPin, Share2, Loader2, History, Copy
 } from 'lucide-react';
 import { Order, OrderLine, OrderDocument, OrderStatus } from '@/types/commercial';
-import { supabaseProductivity as supabase } from '@/integrations/supabase/dual-client';
+import { supabaseProductivity as supabase } from '@/integrations/supabase';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { OrderStatusBadge } from '@/components/badges';
@@ -419,7 +419,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                 onChange={handleChange}
                                                 disabled={!isEditing}
                                                 placeholder="https://maps.google..."
-                                            className="bg-muted/30 border-border/60 text-foreground flex-1"
+                                                className="bg-muted/30 border-border/60 text-foreground flex-1"
                                             />
                                             {formData.delivery_location_url && (
                                                 <Button

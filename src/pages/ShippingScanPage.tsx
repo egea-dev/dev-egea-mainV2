@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabaseProductivity } from '@/integrations/supabase/dual-client';
+import { supabaseProductivity } from '@/integrations/supabase';
 import {
   AlertTriangle,
   Truck,

@@ -560,13 +560,13 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                 name="selectedUsers"
                 render={({ field }) => (
                   <FormItem className={FIELD_WRAPPER}>
-                    <FormLabel>Operarios asignados</FormLabel>
+                    <FormLabel>Usuarios asignados</FormLabel>
                     <MultiSelectCombobox
-                      options={users.map((user) => ({ id: user.id, name: user.full_name }))}
-                      selected={field.value}
+                      options={users.map((u: any) => ({ id: u.id, name: u.full_name })) as any}
+                      selected={field.value as any}
                       onSelectedChange={field.onChange}
-                      placeholder="Seleccionar operarios..."
-                      searchPlaceholder="Buscar operario..."
+                      placeholder="Seleccionar usuarios..."
+                      searchPlaceholder="Buscar usuario..."
                     />
                     <FormMessage />
                   </FormItem>
@@ -579,8 +579,8 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                   <FormItem className={FIELD_WRAPPER}>
                     <FormLabel>Vehiculos asignados</FormLabel>
                     <MultiSelectCombobox
-                      options={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
-                      selected={field.value}
+                      options={vehicles.map((v: any) => ({ id: v.id, name: v.name })) as any}
+                      selected={field.value as any}
                       onSelectedChange={field.onChange}
                       placeholder="Seleccionar vehiculos..."
                       searchPlaceholder="Buscar vehiculo..."

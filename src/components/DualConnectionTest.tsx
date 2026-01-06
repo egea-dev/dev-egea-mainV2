@@ -1,6 +1,6 @@
 // Componente de prueba para verificar conexión dual Supabase
 import { useEffect, useState } from 'react';
-import { supabaseMain, supabaseProductivity } from '@/integrations/supabase/dual-client';
+import { supabaseMain, supabaseProductivity } from '@/integrations/supabase';
 
 export const DualConnectionTest = () => {
     const [mainStatus, setMainStatus] = useState<'testing' | 'success' | 'error'>('testing');

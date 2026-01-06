@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabaseProductivity as supabase } from "@/integrations/supabase/dual-client";
+import { supabaseProductivity as supabase } from "@/integrations/supabase";
 import { toast } from "sonner";
 
 export type DocumentType = 'PRESUPUESTO' | 'PEDIDO_ACEPTADO';

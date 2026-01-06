@@ -9,25 +9,50 @@ export default function AuthPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    const handleAuthRedirect = async (session: any) => {
+      if (!session?.user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('auth_user_id', session.user.id)
+        .maybeSingle();
+
+      const role = profile?.role?.toLowerCase() || 'operario';
+
+      // Redirección basada en rol (nombres en español)
+      switch (role) {
+        case 'admin':
+        case 'manager':
+          navigate("/admin");
+          break;
+        case 'produccion':
+          navigate("/admin/produccion");
+          break;
+        case 'envios':
+          navigate("/admin/envios");
+          break;
+        case 'almacen':
+          navigate("/admin/almacen");
+          break;
+        case 'comercial':
+          navigate("/admin/comercial");
+          break;
+        case 'responsable':
+          navigate("/admin/installations");
+          break;
+        case 'operario':
+        default:
+          // Operarios van a su vista de jornada (fuera de /admin)
+          navigate("/user/workday");
+          break;
+      }
+    };
+
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Obtener perfil para redirigir según rol
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('auth_user_id', session.user.id)
-          .maybeSingle();
-
-        const role = profile?.role?.toLowerCase() || 'operario';
-
-        // Admin y Manager van al dashboard principal
-        if (role === 'admin' || role === 'manager') {
-          navigate("/admin");
-        } else {
-          // Operarios y responsables van a su jornada
-          navigate("/admin/workday");
-        }
+        handleAuthRedirect(session);
       }
     };
 
@@ -35,22 +60,7 @@ export default function AuthPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
-        // Obtener perfil para redirigir según rol
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('auth_user_id', session.user.id)
-          .maybeSingle();
-
-        const role = profile?.role?.toLowerCase() || 'operario';
-
-        // Admin y Manager van al dashboard principal
-        if (role === 'admin' || role === 'manager') {
-          navigate("/admin");
-        } else {
-          // Operarios y responsables van a su jornada
-          navigate("/admin/workday");
-        }
+        handleAuthRedirect(session);
       }
     });
 

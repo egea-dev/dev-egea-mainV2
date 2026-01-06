@@ -1,5 +1,5 @@
 // Hook para usar el cliente dual Supabase
-import { useDualSupabase } from '@/integrations/supabase/dual-client';
+import { useDualSupabase } from '@/integrations/supabase';
 
 /**
  * Hook para acceder a ambas bases de datos

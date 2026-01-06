@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabaseProductivity } from '@/integrations/supabase/dual-client';
+import { supabaseProductivity } from '@/integrations/supabase';
 import { WorkOrder, WorkOrderLine, WorkOrderStatus } from '@/types/production';
 import { toast } from 'sonner';
 

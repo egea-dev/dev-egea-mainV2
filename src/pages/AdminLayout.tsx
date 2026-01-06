@@ -25,7 +25,8 @@ function AdminLayout() {
   const isLoading = isLoadingUsers || isLoadingVehicles || isLoadingProfile;
 
   useEffect(() => {
-    if (isLoading || location.pathname !== '/admin') {
+    // Modificado: Ahora redirige si estamos en raiz O en la ruta antigua 'workday'
+    if (isLoading || (location.pathname !== '/admin' && location.pathname !== '/admin/workday')) {
       return;
     }
 
@@ -33,7 +34,7 @@ function AdminLayout() {
       return;
     }
 
-    navigate('/admin/workday', { replace: true });
+    navigate('/admin/installations', { replace: true });
   }, [isLoading, useCompactLayout, location.pathname, navigate]);
 
   if (isLoading) {

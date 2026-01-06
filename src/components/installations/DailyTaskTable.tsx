@@ -20,7 +20,7 @@ export const DailyTaskTable = ({ tasks, onEditTask, onRefresh }: DailyTaskTableP
     return (
       <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center text-muted-foreground h-[400px] flex flex-col justify-center items-center">
         <h3 className="text-lg font-semibold">No hay tareas programadas.</h3>
-        <p className="mt-1 text-sm">Arrastra un operario o vehículo aquí para crear una tarea.</p>
+        <p className="mt-1 text-sm">Arrastra un usuario o vehículo aquí para crear una tarea.</p>
       </div>
     );
   }
@@ -30,7 +30,7 @@ export const DailyTaskTable = ({ tasks, onEditTask, onRefresh }: DailyTaskTableP
       <TableHeader>
         <TableRow>
           <TableHead className="w-[50px]"></TableHead>
-          <TableHead className="w-[200px]">Operarios</TableHead>
+          <TableHead className="w-[200px]">Usuarios</TableHead>
           <TableHead className="w-[180px]">Sitio de Trabajo</TableHead>
           <TableHead>Descripción</TableHead>
           <TableHead className="w-[150px] text-right">Vehículos</TableHead>

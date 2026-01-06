@@ -8,11 +8,12 @@ export type Profile = {
   phone?: string | null;
   whatsapp?: string | null;
   public_url?: string | null;
-  role: 'admin' | 'manager' | 'responsable' | 'operario';
+  role: 'admin' | 'manager' | 'responsable' | 'operario' | 'produccion' | 'envios' | 'almacen' | 'comercial';
   avatar_url?: string | null;
   created_at?: string;
   updated_at?: string;
   status?: 'activo' | 'baja' | 'vacaciones';
+  active_tasks_count?: number;
 };
 
 export type Vehicle = {
@@ -54,12 +55,12 @@ export type Task = {
   work_site_imagotipo_enabled?: boolean | null;
   data: TaskData;
   responsible_profile_id: string | null;
-  
+
   // Relaciones anidadas que vienen de Supabase
   responsible?: Profile | null;
   assigned_users: Profile[];
   assigned_vehicles: Vehicle[];
-  
+
   // Campos aplanados para conveniencia en el frontend
   site?: string;
   description?: string;

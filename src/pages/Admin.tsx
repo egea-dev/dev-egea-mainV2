@@ -474,7 +474,7 @@ export default function AdminPage() {
       const taskDays = new Set<string>();
       const pendingDays = new Set<string>();
 
-      (data ?? []).forEach((task) => {
+      (data as any[] ?? []).forEach((task: any) => {
         if (!task?.start_date) return;
         const taskDate = parseISO(task.start_date);
         if (Number.isNaN(taskDate.getTime())) return;
@@ -653,7 +653,7 @@ export default function AdminPage() {
 
   const archiveTask = useCallback(async (taskId: string, options?: { skipRefresh?: boolean }) => {
     try {
-      const { data, error } = await supabase.rpc('archive_task_by_id', {
+      const { data, error } = await (supabase.rpc as any)('archive_task_by_id', {
         p_task_id: taskId
       });
 
@@ -684,8 +684,7 @@ export default function AdminPage() {
         updates.status = 'acabado';
       }
 
-      const { error } = await supabase
-        .from('screen_data')
+      const { error } = await (supabase.from('screen_data') as any)
         .update(updates)
         .eq('id', taskId);
 
@@ -762,7 +761,7 @@ export default function AdminPage() {
         const mapped = mapDetailedTaskToTask(task);
         const fallback = normalizeTaskLocation(mapped);
         const locationPayload = fallback
-        const { data, error } = await supabase.rpc('register_arrival', {
+        const { data, error } = await (supabase.rpc as any)('register_arrival', {
           p_profile_id: currentUser.id,
           p_task_id: task.id,
           p_start_location: {
@@ -939,7 +938,7 @@ export default function AdminPage() {
                   stats?.active_users || 0
                 )}
               </div>
-              <p className="text-xs text-slate-500">Operarios activos</p>
+              <p className="text-xs text-slate-500">Usuarios activos</p>
             </CardContent>
           </Card>
 
@@ -1234,7 +1233,7 @@ export default function AdminPage() {
                     />
                   </TableHead>
                   <TableHead className="text-sm min-w-[100px]">Fecha</TableHead>
-                  <TableHead className="text-sm min-w-[120px]">Operarios</TableHead>
+                  <TableHead className="text-sm min-w-[120px]">Usuarios</TableHead>
                   <TableHead className="text-sm min-w-[150px]">Sitio de Trabajo</TableHead>
                   <TableHead className="text-sm min-w-[200px]">Descripción</TableHead>
                   <TableHead className="text-sm min-w-[120px]">Vehículos</TableHead>

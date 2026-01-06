@@ -72,23 +72,40 @@ export const useUsers = () => {
   return useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch profiles and availability
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*, user_availability(*)')
         .order('full_name');
-      if (error) {
-        console.error('Error fetching users:', error);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
         return [];
       }
+
+      // Fetch workload stats separately to avoid relationship error (PGRST200)
+      const { data: stats, error: statsError } = await (supabase as any)
+        .from('user_workload_stats')
+        .select('*');
+
+      if (statsError) {
+        console.warn('Error fetching workload stats:', statsError);
+      }
+
       const today = dayjs();
-      return (data ?? []).map((profileRow) => {
+      const statsMap = new Map((stats ?? []).map((s: any) => [s.profile_id, s.active_tasks_count]));
+
+      return (profiles ?? []).map((profileRow: any) => {
         const row = profileRow as ProfileRow;
         const availability = Array.isArray(row.user_availability) ? row.user_availability : [];
         const onLeave = availability.find((entry) =>
           today.isAfter(dayjs(entry.start_date).subtract(1, 'day')) && today.isBefore(dayjs(entry.end_date).add(1, 'day'))
         );
-        const status = onLeave?.reason ?? 'activo';
-        return { ...row, status } as Profile;
+        const status = onLeave?.reason ?? (profileRow.status || 'activo');
+
+        const active_tasks_count = statsMap.get(profileRow.id) || 0;
+
+        return { ...row, status, active_tasks_count } as Profile;
       });
     },
   });

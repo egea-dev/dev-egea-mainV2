@@ -3,7 +3,30 @@ import { supabase } from '@/integrations/supabase/client';
 import { Profile } from '@/types';
 
 type Permission = 'view' | 'create' | 'edit' | 'delete';
-type Resource = 'dashboard' | 'users' | 'vehicles' | 'installations' | 'templates' | 'screens' | 'communications' | 'archive' | 'admin';
+type Resource =
+  | 'dashboard'
+  | 'users'
+  | 'vehicles'
+  | 'installations'
+  | 'templates'
+  | 'screens'
+  | 'communications'
+  | 'archive'
+  | 'admin'
+  | 'comercial'
+  | 'calendario-global'
+  | 'gestion'
+  | 'production'
+  | 'produccion'
+  | 'kiosk'
+  | 'almacen'
+  | 'envios'
+  | 'data'
+  | 'settings'
+  | 'matrix'
+  | 'sla-config'
+  | 'system-log';
+
 
 interface PermissionGuardEnhancedProps {
   children: React.ReactNode;
@@ -14,15 +37,16 @@ interface PermissionGuardEnhancedProps {
 }
 const FALLBACK_ROLE = 'operario' as Profile['role'];
 
-type NormalizedRole = 'admin' | 'manager' | 'responsable' | 'operario' | '';
+type NormalizedRole = 'admin' | 'manager' | 'responsable' | 'operario' | 'produccion' | 'envios' | 'almacen' | 'comercial' | '';
 
 const normalizeRole = (role: string | null | undefined): NormalizedRole => {
   if (!role) return '';
   const value = role.toLowerCase();
-  if (value === 'admin' || value === 'manager' || value === 'responsable' || value === 'operario') {
-    return value;
-  }
-  return '';
+  const validRoles: NormalizedRole[] = [
+    'admin', 'manager', 'responsable', 'operario',
+    'produccion', 'envios', 'almacen', 'comercial'
+  ];
+  return validRoles.includes(value as NormalizedRole) ? value as NormalizedRole : '';
 };
 
 const extractBooleanResult = (input: unknown): boolean | undefined => {
@@ -86,13 +110,51 @@ const getPermissionByHierarchy = (role: string, resource: Resource, action: Perm
       return allowedActions.includes(action);
     }
     case 'operario': {
-      const allowedResources: Resource[] = ['dashboard', 'vehicles', 'installations', 'screens', 'communications'];
+      // NOTA: Comunicaciones deshabilitadas temporalmente
+      const allowedResources: Resource[] = ['dashboard', 'vehicles', 'installations', 'screens', 'calendario-global'];
       const allowedActions: Permission[] = ['view'];
       if (!allowedResources.includes(resource)) return false;
-      if (resource === 'communications' && (action === 'create' || action === 'edit')) {
-        return true;
-      }
       return allowedActions.includes(action);
+    }
+    case 'produccion': {
+      // Rol especializado en producción - SOLO producción
+      const productionResources: Resource[] = ['dashboard', 'produccion'];
+      if (!productionResources.includes(resource)) return false;
+      // Production puede ver y editar en su área
+      if (resource === 'produccion') {
+        return ['view', 'create', 'edit'].includes(action);
+      }
+      return action === 'view';
+    }
+    case 'envios': {
+      // Rol especializado en envíos - SOLO envíos
+      const shippingResources: Resource[] = ['dashboard', 'envios'];
+      if (!shippingResources.includes(resource)) return false;
+      // Shipping puede gestionar envíos
+      if (resource === 'envios') {
+        return ['view', 'create', 'edit'].includes(action);
+      }
+      return action === 'view';
+    }
+    case 'almacen': {
+      // Rol especializado en almacén - almacén y comercial (consulta)
+      const warehouseResources: Resource[] = ['dashboard', 'almacen', 'comercial'];
+      if (!warehouseResources.includes(resource)) return false;
+      // Warehouse puede gestionar almacén y ver comercial
+      if (resource === 'almacen') {
+        return ['view', 'create', 'edit'].includes(action);
+      }
+      return action === 'view';
+    }
+    case 'comercial': {
+      // Rol especializado en ventas - SOLO comercial
+      const comercialResources: Resource[] = ['dashboard', 'comercial'];
+      if (!comercialResources.includes(resource)) return false;
+      // Comercial puede gestionar pedidos comerciales
+      if (resource === 'comercial') {
+        return ['view', 'create', 'edit'].includes(action);
+      }
+      return action === 'view';
     }
     default:
       return false;
@@ -100,7 +162,16 @@ const getPermissionByHierarchy = (role: string, resource: Resource, action: Perm
 };
 
 const canManageRoleByHierarchy = (managerRole: string, targetRole: string): boolean => {
-  const rank: Record<string, number> = { admin: 4, manager: 3, responsable: 2, operario: 1 };
+  const rank: Record<string, number> = {
+    admin: 8,
+    manager: 7,
+    responsable: 6,
+    operario: 5,
+    produccion: 4,
+    envios: 3,
+    almacen: 2,
+    comercial: 1
+  };
   return (rank[normalizeRole(managerRole)] ?? 0) > (rank[normalizeRole(targetRole)] ?? 0);
 };
 
@@ -128,15 +199,15 @@ export const PermissionGuardEnhanced = ({
               .select('role')
               .eq('auth_user_id', user.id)
               .maybeSingle();
-            
+
             if (profileError) {
               if (profileError.code !== 'PGRST116') {
                 console.error('Error loading profile role:', profileError);
               }
               const fallbackPermission = await checkUserPermission(FALLBACK_ROLE, resource, action);
               setHasPermission(fallbackPermission);
-            } else if (profile?.role) {
-              const permission = await checkUserPermission(profile.role, resource, action);
+            } else if ((profile as any)?.role) {
+              const permission = await checkUserPermission((profile as any).role, resource, action);
               setHasPermission(permission);
             } else {
               const fallbackPermission = await checkUserPermission(FALLBACK_ROLE, resource, action);
@@ -180,31 +251,31 @@ export const PermissionGuardEnhanced = ({
 
   // Función para verificar permisos según jerarquía
   const checkUserPermission = async (role: string, resource: Resource, action: Permission): Promise<boolean> => {
-      const normalizedRole = normalizeRole(role) || FALLBACK_ROLE;
-      const cacheKey = `${normalizedRole}-${resource}-${action}`;
-      if (cacheRef.current.has(cacheKey)) {
-        return cacheRef.current.get(cacheKey)!;
+    const normalizedRole = normalizeRole(role) || FALLBACK_ROLE;
+    const cacheKey = `${normalizedRole}-${resource}-${action}`;
+    if (cacheRef.current.has(cacheKey)) {
+      return cacheRef.current.get(cacheKey)!;
+    }
+
+    try {
+      const { data, error } = await (supabase
+        .rpc('has_permission' as any, {
+          user_role: normalizedRole,
+          resource,
+          action
+        } as any) as any);
+
+      const fallbackResult = getPermissionByHierarchy(normalizedRole, resource, action);
+
+      if (error) {
+        console.error('Error checking permission:', error);
+        cacheRef.current.set(cacheKey, fallbackResult);
+        console.debug('[PermissionGuard][fallback-error]', { normalizedRole, resource, action, result: fallbackResult });
+        return fallbackResult;
       }
 
-      try {
-        const { data, error } = await supabase
-          .rpc('has_permission', {
-            user_role: normalizedRole,
-            resource,
-            action
-          });
-
-        const fallbackResult = getPermissionByHierarchy(normalizedRole, resource, action);
-
-        if (error) {
-          console.error('Error checking permission:', error);
-          cacheRef.current.set(cacheKey, fallbackResult);
-          console.debug('[PermissionGuard][fallback-error]', { normalizedRole, resource, action, result: fallbackResult });
-          return fallbackResult;
-        }
-
-        const normalizedResult = extractBooleanResult(data);
-        const result = typeof normalizedResult === 'boolean'
+      const normalizedResult = extractBooleanResult(data);
+      const result = typeof normalizedResult === 'boolean'
         ? normalizedResult
         : fallbackResult;
 
@@ -212,10 +283,10 @@ export const PermissionGuardEnhanced = ({
       return result;
     } catch (error) {
       console.error('Error checking permission:', error);
-        const fallbackResult = getPermissionByHierarchy(normalizedRole, resource, action);
-        cacheRef.current.set(cacheKey, fallbackResult);
-        return fallbackResult;
-      }
+      const fallbackResult = getPermissionByHierarchy(normalizedRole, resource, action);
+      cacheRef.current.set(cacheKey, fallbackResult);
+      return fallbackResult;
+    }
   };
 
 
@@ -244,7 +315,7 @@ export const usePermission = (resource: Resource, action: Permission) => {
             .select('*')
             .eq('auth_user_id', user.id)
             .maybeSingle();
-          
+
           if (profileError) {
             if (profileError.code !== 'PGRST116') {
               console.error('Error getting current user profile:', profileError);
@@ -277,12 +348,12 @@ export const usePermission = (resource: Resource, action: Permission) => {
       }
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase
           .rpc('has_permission', {
             user_role: normalizedRole,
             resource,
             action
-          });
+          }) as any);
 
         const fallbackResult = getPermissionByHierarchy(normalizedRole, resource, action);
 
@@ -332,11 +403,11 @@ export const usePermission = (resource: Resource, action: Permission) => {
 };
 
 // Componente simplificado para checks rápidos
-export const Can = ({ 
-  resource, 
-  action, 
-  children, 
-  fallback = null 
+export const Can = ({
+  resource,
+  action,
+  children,
+  fallback = null
 }: PermissionGuardEnhancedProps) => {
   return (
     <PermissionGuardEnhanced resource={resource} action={action} fallback={fallback}>
@@ -372,7 +443,7 @@ export const CanManageRole = ({
             .select('*')
             .eq('auth_user_id', user.id)
             .single();
-          
+
           if (profile) {
             fetchedRole = normalizeRole(profile.role) || null;
             setCurrentUser(profile);

@@ -92,7 +92,11 @@ SidebarHeader.displayName = "SidebarHeader";
 
 export const SidebarContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex-1 overflow-hidden", className)} {...props} />
+    <div
+      ref={ref}
+      className={cn("flex-1 overflow-y-auto scrollbar-thin pr-1", className)}
+      {...props}
+    />
   )
 );
 SidebarContent.displayName = "SidebarContent";
@@ -136,7 +140,7 @@ export const SidebarMenuButton = React.forwardRef<
         "hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/20 dark:hover:text-primary",
         isCollapsed && "h-10 w-10 justify-center p-0",
         isActive &&
-          "bg-primary/15 text-primary ring-1 ring-primary/40 hover:bg-primary/20 hover:text-primary dark:bg-primary/25 dark:text-primary",
+        "bg-primary/15 text-primary ring-1 ring-primary/40 hover:bg-primary/20 hover:text-primary dark:bg-primary/25 dark:text-primary",
         className
       )}
       {...props}

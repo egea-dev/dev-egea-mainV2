@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabaseProductivity as supabase } from "@/integrations/supabase/dual-client";
+import { supabaseProductivity as supabase } from "@/integrations/supabase";
 import { WorkOrder, WorkOrderStatus, WorkOrderWithDetails } from "@/types/production";
 import { toast } from "sonner";
 
@@ -86,8 +86,8 @@ export const useUpdateWorkOrderStatus = () => {
             status: WorkOrderStatus;
             notes?: string;
         }) => {
-            const { data, error } = await supabase
-                .from('produccion_work_orders')
+            const { data, error } = await (supabase
+                .from('produccion_work_orders') as any)
                 .update({
                     status,
                     updated_at: new Date().toISOString()
@@ -113,7 +113,7 @@ export const useUpdateWorkOrderStatus = () => {
     });
 };
 
-// Hook para asignar operario
+// Hook para asignar usuario
 export const useAssignTechnician = () => {
     const queryClient = useQueryClient();
 
@@ -125,8 +125,8 @@ export const useAssignTechnician = () => {
             workOrderId: string;
             technicianId: string | null;
         }) => {
-            const { data, error } = await supabase
-                .from('produccion_work_orders')
+            const { data, error } = await (supabase
+                .from('produccion_work_orders') as any)
                 .update({
                     assigned_technician_id: technicianId,
                     updated_at: new Date().toISOString()
@@ -144,10 +144,10 @@ export const useAssignTechnician = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-            toast.success("Operario asignado exitosamente");
+            toast.success("Usuario asignado exitosamente");
         },
         onError: (error: any) => {
-            toast.error(`Error al asignar operario: ${error.message}`);
+            toast.error(`Error al asignar usuario: ${error.message}`);
         }
     });
 };
@@ -164,8 +164,8 @@ export const useUpdateWorkOrderPriority = () => {
             workOrderId: string;
             priority: number;
         }) => {
-            const { data, error } = await supabase
-                .from('produccion_work_orders')
+            const { data, error } = await (supabase
+                .from('produccion_work_orders') as any)
                 .update({
                     priority,
                     updated_at: new Date().toISOString()
@@ -214,8 +214,8 @@ export const useUpdateQualityCheck = () => {
                 updates.notes = notes;
             }
 
-            const { data, error } = await supabase
-                .from('produccion_work_orders')
+            const { data, error } = await (supabase
+                .from('produccion_work_orders') as any)
                 .update(updates)
                 .eq('id', workOrderId)
                 .select()

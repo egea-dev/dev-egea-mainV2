@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabaseProductivity as supabase } from "@/integrations/supabase/dual-client";
+import { supabaseProductivity as supabase } from "@/integrations/supabase";
 
 export interface SLAConfig {
     region: string;

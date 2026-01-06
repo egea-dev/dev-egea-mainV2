@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabaseProductivity } from "@/integrations/supabase/dual-client";
+import { supabaseProductivity } from "@/integrations/supabase";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
