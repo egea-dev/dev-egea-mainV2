@@ -397,56 +397,102 @@ export default function WorkdayPage() {
       </Card>
 
       {/* Resumen de Tareas Pendientes */}
-      <Card>
+      <Card className="border bg-gradient-to-br from-card to-card/50">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Resumen de Tareas</CardTitle>
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              Resumen de Tareas
+            </span>
+          </CardTitle>
           <CardDescription>
             Estado actual de todas tus tareas asignadas
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
-                <span className="text-sm font-medium">Tareas atrasadas (días anteriores)</span>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Tareas Atrasadas */}
+            <div className="rounded-lg border-2 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 p-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">
+                    Atrasadas
+                  </p>
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-300">
+                    {taskStats.overdue}
+                  </p>
+                </div>
+                <AlertTriangle className="h-8 w-8 text-red-500 dark:text-red-400" />
               </div>
-              <Badge variant="destructive">{taskStats.overdue}</Badge>
+              <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
+                De días anteriores
+              </p>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-500" />
-                <span className="text-sm font-medium">Tareas pendientes (por realizar)</span>
+            {/* Tareas Pendientes */}
+            <div className="rounded-lg border-2 border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                    Pendientes
+                  </p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                    {taskStats.pending}
+                  </p>
+                </div>
+                <Clock className="h-8 w-8 text-amber-500 dark:text-amber-400" />
               </div>
-              <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                {taskStats.pending}
-              </Badge>
+              <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-2">
+                Por realizar
+              </p>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium">Tareas pendientes de validar</span>
+            {/* Tareas Pendientes de Validar */}
+            <div className="rounded-lg border-2 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/20 p-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                    Por Validar
+                  </p>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                    {taskStats.validation}
+                  </p>
+                </div>
+                <CheckCircle2 className="h-8 w-8 text-blue-500 dark:text-blue-400" />
               </div>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {taskStats.validation}
-              </Badge>
+              <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-2">
+                Esperando revisión
+              </p>
             </div>
 
-            <div className="flex items-center justify-between py-2 border-b">
-              <div className="flex items-center gap-2">
-                <CalendarCheck className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm font-medium">Próximas tareas (programadas)</span>
+            {/* Próximas Tareas */}
+            <div className="rounded-lg border-2 border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/20 p-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                    Próximas
+                  </p>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                    {taskStats.upcoming}
+                  </p>
+                </div>
+                <CalendarCheck className="h-8 w-8 text-emerald-500 dark:text-emerald-400" />
               </div>
-              <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
-                {taskStats.upcoming}
-              </Badge>
+              <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-2">
+                Programadas
+              </p>
             </div>
+          </div>
 
-            <div className="flex items-center justify-between pt-3 mt-2 border-t-2">
-              <span className="text-sm font-semibold">Total de tareas pendientes</span>
-              <Badge className="text-base px-3 py-1">{taskStats.total}</Badge>
+          {/* Total de Tareas */}
+          <div className="mt-3 pt-3 border-t">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">
+                Total de tareas pendientes
+              </p>
+              <p className="text-lg font-bold text-primary">
+                {taskStats.total}
+              </p>
             </div>
           </div>
         </CardContent>
