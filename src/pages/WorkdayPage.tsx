@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import type { Task } from "@/types";
 import { useWorkSession } from "@/hooks/use-work-session";
 import { useQueryClient } from "@tanstack/react-query";
-import { Clock, MapPin, AlertTriangle, Info } from "lucide-react";
+import { Clock, MapPin, AlertTriangle, Info, CheckCircle2, CalendarCheck } from "lucide-react";
 import { buildMapsSearchUrl } from "@/utils/maps";
 import { WeeklyCalendar } from "@/components/calendar/WeeklyCalendar";
 
@@ -79,6 +79,41 @@ export default function WorkdayPage() {
     if (!activeTask) return tasksForUser;
     return tasksForUser.filter((task) => task.id !== activeTask.id && task.state !== "terminado");
   }, [tasksForUser, activeTask]);
+
+  // Estadísticas de tareas para visualización
+  const taskStats = useMemo(() => {
+    const now = dayjs();
+
+    // Tareas no realizadas de días anteriores (fecha de inicio pasada)
+    const overdueTasks = tasksForUser.filter((task) => {
+      if (!task.start_date) return false;
+      return dayjs(task.start_date).isBefore(now, 'day') && task.state !== "terminado";
+    });
+
+    // Tareas pendientes (estado pendiente)
+    const pendingTasks = tasksForUser.filter((task) =>
+      task.state === "pendiente" || task.status === "pendiente"
+    );
+
+    // Tareas pendientes de validar
+    const validationTasks = tasksForUser.filter((task) =>
+      task.state === "pendiente de validar" || task.status === "pendiente de validar"
+    );
+
+    // Próximas tareas (fecha de inicio futura)
+    const futureTasks = tasksForUser.filter((task) => {
+      if (!task.start_date) return false;
+      return dayjs(task.start_date).isAfter(now, 'day');
+    });
+
+    return {
+      overdue: overdueTasks.length,
+      pending: pendingTasks.length,
+      validation: validationTasks.length,
+      upcoming: futureTasks.length,
+      total: tasksForUser.length,
+    };
+  }, [tasksForUser]);
 
   // Hook de sesión de trabajo
   const {
@@ -173,11 +208,11 @@ export default function WorkdayPage() {
     if (!profile?.id) return;
 
     try {
-      // Crear log de comunicación para incidencia
+      // @ts-ignore - Tipos de Supabase no coinciden con schema real
       const { error } = await supabase.from("communication_logs").insert({
         type: "incidencia",
         recipient: "panel-admin",
-        subject: `Incidencia en ${task.data?.site ?? task.data?.location ?? "tarea"}`,
+        subject: `Incidencia en ${String(task.data?.site ?? task.data?.location ?? "tarea")}`,
         message: `El operario ${profile.full_name ?? "usuario"} ha reportado una incidencia`,
         status: "pending",
         metadata: {
@@ -357,6 +392,62 @@ export default function WorkdayPage() {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               DURACIÓN: <span className="text-foreground">{durationLabel}</span>
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Resumen de Tareas Pendientes */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Resumen de Tareas</CardTitle>
+          <CardDescription>
+            Estado actual de todas tus tareas asignadas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between py-2 border-b">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <span className="text-sm font-medium">Tareas atrasadas (días anteriores)</span>
+              </div>
+              <Badge variant="destructive">{taskStats.overdue}</Badge>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-500" />
+                <span className="text-sm font-medium">Tareas pendientes (por realizar)</span>
+              </div>
+              <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                {taskStats.pending}
+              </Badge>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                <span className="text-sm font-medium">Tareas pendientes de validar</span>
+              </div>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                {taskStats.validation}
+              </Badge>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b">
+              <div className="flex items-center gap-2">
+                <CalendarCheck className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm font-medium">Próximas tareas (programadas)</span>
+              </div>
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                {taskStats.upcoming}
+              </Badge>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 mt-2 border-t-2">
+              <span className="text-sm font-semibold">Total de tareas pendientes</span>
+              <Badge className="text-base px-3 py-1">{taskStats.total}</Badge>
+            </div>
           </div>
         </CardContent>
       </Card>
