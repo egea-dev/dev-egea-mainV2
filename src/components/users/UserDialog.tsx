@@ -73,8 +73,7 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
       p_email: profile.email || null,
       p_phone: profile.phone || null,
       p_status: profile.status || 'activo',
-      p_role: profile.role || 'operario',
-      p_whatsapp: profile.whatsapp || null
+      p_role: profile.role || 'operario'
     });
 
     if (error) {

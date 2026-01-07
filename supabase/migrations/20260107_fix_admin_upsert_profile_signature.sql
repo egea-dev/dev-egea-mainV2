@@ -1,5 +1,5 @@
 -- MIGRATION: 20260107_fix_admin_upsert_profile_signature.sql
--- Description: Ensures admin_upsert_profile function exists with correct signature
+-- Description: Ensures admin_upsert_profile function exists with correct signature (without whatsapp)
 
 BEGIN;
 
@@ -8,15 +8,14 @@ DROP FUNCTION IF EXISTS public.admin_upsert_profile(TEXT, UUID, TEXT, TEXT, TEXT
 DROP FUNCTION IF EXISTS public.admin_upsert_profile(TEXT, UUID, TEXT, TEXT, TEXT, TEXT);
 DROP FUNCTION IF EXISTS public.admin_upsert_profile(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT);
 
--- Recreate with the correct signature
+-- Recreate with the correct signature (without whatsapp)
 CREATE OR REPLACE FUNCTION public.admin_upsert_profile(
   p_full_name TEXT,
   p_profile_id UUID DEFAULT NULL,
   p_email TEXT DEFAULT NULL,
   p_phone TEXT DEFAULT NULL,
   p_status TEXT DEFAULT 'activo',
-  p_role TEXT DEFAULT 'operario',
-  p_whatsapp TEXT DEFAULT NULL
+  p_role TEXT DEFAULT 'operario'
 )
 RETURNS public.profiles AS $$
 DECLARE
@@ -59,12 +58,11 @@ BEGIN
 
   IF p_profile_id IS NULL THEN
     -- CREATE operation
-    INSERT INTO public.profiles (full_name, email, phone, whatsapp, status, role)
+    INSERT INTO public.profiles (full_name, email, phone, status, role)
     VALUES (
       p_full_name,
       p_email,
       p_phone,
-      p_whatsapp,
       COALESCE(p_status, 'activo'),
       COALESCE(p_role, 'operario')
     )
@@ -75,7 +73,6 @@ BEGIN
     SET full_name = p_full_name,
         email = COALESCE(p_email, email),
         phone = COALESCE(p_phone, phone),
-        whatsapp = COALESCE(p_whatsapp, whatsapp),
         status = COALESCE(p_status, status),
         role = CASE
           WHEN v_actor.role = 'admin' THEN COALESCE(p_role, v_target.role)
