@@ -14,9 +14,6 @@ export const PageShell = ({ title, description, actions, children, className }: 
     <section className={cn(innerWrapperClasses, "space-y-6", className)}>
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <p className="text-[9px] uppercase tracking-[0.28em] text-muted-foreground">
-            Envios
-          </p>
           <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
             {title}
           </h1>
