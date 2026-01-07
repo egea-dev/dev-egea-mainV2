@@ -294,9 +294,9 @@ const MainLayout = ({
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2">
               <HeaderStatus role={resolvedRole} />
-              <RolePreviewSelector />
+              {/* <RolePreviewSelector /> */}
             </div>
-            <VersionDisplay variant="badge" showChangelog />
+            {/* <VersionDisplay variant="badge" showChangelog /> */}
             <ThemeToggle />
           </div>
         </header>
