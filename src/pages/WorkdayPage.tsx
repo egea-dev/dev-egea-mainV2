@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { useProfile, useTasksByDate } from "@/hooks/use-supabase";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
 import { useWorkSession } from "@/hooks/use-work-session";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,6 +28,14 @@ export default function WorkdayPage() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  // Preferencias de usuario
+  const [showCalendar, setShowCalendar] = useState(() => {
+    const saved = localStorage.getItem('workday-show-calendar');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const [taskFilter, setTaskFilter] = useState<'all' | 'overdue' | 'pending' | 'validation' | 'upcoming'>('all');
 
   // Obtener TODAS las tareas del operario (no solo del día seleccionado)
   const { data: allTasks = [] } = useTasksByDate(selectedDate);
@@ -80,7 +89,7 @@ export default function WorkdayPage() {
     return tasksForUser.filter((task) => task.id !== activeTask.id && task.state !== "terminado");
   }, [tasksForUser, activeTask]);
 
-  // Estadísticas de tareas para visualización
+  // Estadísticas de tareas para visualización (revisa TODAS las fechas)
   const taskStats = useMemo(() => {
     const now = dayjs();
 
@@ -112,8 +121,40 @@ export default function WorkdayPage() {
       validation: validationTasks.length,
       upcoming: futureTasks.length,
       total: tasksForUser.length,
+      overdueTasks,
+      pendingTasks,
+      validationTasks,
+      futureTasks,
     };
   }, [tasksForUser]);
+
+  // Tareas filtradas según selección
+  const filteredTasks = useMemo(() => {
+    switch (taskFilter) {
+      case 'overdue':
+        return taskStats.overdueTasks;
+      case 'pending':
+        return taskStats.pendingTasks;
+      case 'validation':
+        return taskStats.validationTasks;
+      case 'upcoming':
+        return taskStats.futureTasks;
+      default:
+        return tasksForUser;
+    }
+  }, [taskFilter, taskStats, tasksForUser]);
+
+  // Guardar preferencia de calendario
+  const toggleCalendar = () => {
+    const newValue = !showCalendar;
+    setShowCalendar(newValue);
+    localStorage.setItem('workday-show-calendar', JSON.stringify(newValue));
+  };
+
+  // Manejar click en tarjeta de estadística
+  const handleStatClick = (filter: typeof taskFilter) => {
+    setTaskFilter(filter === taskFilter ? 'all' : filter);
+  };
 
   // Hook de sesión de trabajo
   const {
@@ -399,20 +440,37 @@ export default function WorkdayPage() {
       {/* Resumen de Tareas Pendientes */}
       <Card className="border bg-gradient-to-br from-card to-card/50">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center justify-between">
-            <span className="flex items-center gap-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center gap-2">
               <Clock className="h-5 w-5 text-primary" />
               Resumen de Tareas
-            </span>
-          </CardTitle>
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleCalendar}
+              className="gap-2"
+            >
+              <CalendarCheck className="h-4 w-4" />
+              {showCalendar ? "Ocultar" : "Mostrar"} Calendario
+            </Button>
+          </div>
           <CardDescription>
-            Estado actual de todas tus tareas asignadas
+            Estado actual de todas tus tareas asignadas. Click en una categoría para filtrar.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
             {/* Tareas Atrasadas */}
-            <div className="rounded-lg border-2 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 p-3">
+            <button
+              onClick={() => handleStatClick('overdue')}
+              className={cn(
+                "rounded-lg border-2 p-3 transition-all hover:scale-105 text-left",
+                taskFilter === 'overdue'
+                  ? "border-red-500 bg-red-100 dark:bg-red-950/40 ring-2 ring-red-500 ring-offset-2"
+                  : "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20 hover:border-red-300"
+              )}
+            >
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">
@@ -427,10 +485,18 @@ export default function WorkdayPage() {
               <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-2">
                 De días anteriores
               </p>
-            </div>
+            </button>
 
             {/* Tareas Pendientes */}
-            <div className="rounded-lg border-2 border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3">
+            <button
+              onClick={() => handleStatClick('pending')}
+              className={cn(
+                "rounded-lg border-2 p-3 transition-all hover:scale-105 text-left",
+                taskFilter === 'pending'
+                  ? "border-amber-500 bg-amber-100 dark:bg-amber-950/40 ring-2 ring-amber-500 ring-offset-2"
+                  : "border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 hover:border-amber-300"
+              )}
+            >
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">
@@ -445,10 +511,18 @@ export default function WorkdayPage() {
               <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-2">
                 Por realizar
               </p>
-            </div>
+            </button>
 
             {/* Tareas Pendientes de Validar */}
-            <div className="rounded-lg border-2 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/20 p-3">
+            <button
+              onClick={() => handleStatClick('validation')}
+              className={cn(
+                "rounded-lg border-2 p-3 transition-all hover:scale-105 text-left",
+                taskFilter === 'validation'
+                  ? "border-blue-500 bg-blue-100 dark:bg-blue-950/40 ring-2 ring-blue-500 ring-offset-2"
+                  : "border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/20 hover:border-blue-300"
+              )}
+            >
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase tracking-wide">
@@ -463,10 +537,18 @@ export default function WorkdayPage() {
               <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-2">
                 Esperando revisión
               </p>
-            </div>
+            </button>
 
             {/* Próximas Tareas */}
-            <div className="rounded-lg border-2 border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/20 p-3">
+            <button
+              onClick={() => handleStatClick('upcoming')}
+              className={cn(
+                "rounded-lg border-2 p-3 transition-all hover:scale-105 text-left",
+                taskFilter === 'upcoming'
+                  ? "border-emerald-500 bg-emerald-100 dark:bg-emerald-950/40 ring-2 ring-emerald-500 ring-offset-2"
+                  : "border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/20 hover:border-emerald-300"
+              )}
+            >
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
@@ -481,7 +563,7 @@ export default function WorkdayPage() {
               <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-2">
                 Programadas
               </p>
-            </div>
+            </button>
           </div>
 
           {/* Total de Tareas */}
@@ -494,26 +576,33 @@ export default function WorkdayPage() {
                 {taskStats.total}
               </p>
             </div>
+            {taskFilter !== 'all' && (
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                Mostrando {filteredTasks.length} tareas filtradas. Click en la categoría para ver todas.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Calendario personal */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Calendario personal</CardTitle>
-          <CardDescription>
-            Selecciona el día que quieres revisar. Tus tareas se actualizarán automáticamente.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-4">
-          <WeeklyCalendar
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-            daysWithTasks={calendarTaskDays}
-          />
-        </CardContent>
-      </Card>
+      {/* Calendario personal - Mostrar/Ocultar según preferencia */}
+      {showCalendar && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Calendario personal</CardTitle>
+            <CardDescription>
+              Selecciona el día que quieres revisar. Tus tareas se actualizarán automáticamente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4">
+            <WeeklyCalendar
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+              daysWithTasks={calendarTaskDays}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tarea en curso */}
       <section className="space-y-4">
@@ -698,6 +787,6 @@ export default function WorkdayPage() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }
