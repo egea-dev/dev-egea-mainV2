@@ -401,15 +401,16 @@ export default function WorkdayPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4 pb-24 md:pb-6">
-      {/* Banner de avisos */}
+      {/* Banner de avisos - Movido más arriba */}
       {tasksForUser.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-          <ul className="list-disc space-y-1 pl-4">
-            <li>
-              Tienes {tasksForUser.length} tarea{tasksForUser.length > 1 ? "s" : ""} pendiente{tasksForUser.length > 1 ? "s" : ""}.
-              Aquí se muestran todas tus tareas: no realizadas de días anteriores, pendientes, pendientes de validar y próximas.
-            </li>
-          </ul>
+        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-4 py-2.5 text-sm text-amber-800 dark:text-amber-200">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <p>
+              Tienes <strong>{tasksForUser.length}</strong> tarea{tasksForUser.length > 1 ? "s" : ""} pendiente{tasksForUser.length > 1 ? "s" : ""}.
+              {" "}Todas tus tareas permanecen visibles hasta que admin/manager las validen.
+            </p>
+          </div>
         </div>
       )}
 
@@ -440,28 +441,16 @@ export default function WorkdayPage() {
       {/* Resumen de Tareas Pendientes */}
       <Card className="border bg-gradient-to-br from-card to-card/50">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              Resumen de Tareas
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleCalendar}
-              className="gap-2"
-            >
-              <CalendarCheck className="h-4 w-4" />
-              {showCalendar ? "Ocultar" : "Mostrar"} Calendario
-            </Button>
-          </div>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            Resumen de Tareas
+          </CardTitle>
           <CardDescription>
-            Estado actual de todas tus tareas asignadas. Click en una categoría para filtrar.
+            Click en una categoría para ver tus tareas. Las tareas permanecen hasta que admin/manager las validen.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
-            {/* Tareas Atrasadas */}
             <button
               onClick={() => handleStatClick('overdue')}
               className={cn(

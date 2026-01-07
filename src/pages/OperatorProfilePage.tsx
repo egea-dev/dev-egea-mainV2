@@ -299,6 +299,29 @@ export default function OperatorProfilePage() {
 
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                                <p className="font-medium">Mostrar calendario</p>
+                                <p className="text-xs text-muted-foreground">Ver calendario en Mi Jornada</p>
+                            </div>
+                        </div>
+                        <Switch
+                            defaultChecked={
+                                localStorage.getItem('workday-show-calendar')
+                                    ? JSON.parse(localStorage.getItem('workday-show-calendar')!)
+                                    : true
+                            }
+                            onCheckedChange={(checked) => {
+                                localStorage.setItem('workday-show-calendar', JSON.stringify(checked));
+                                toast.success(checked ? "Calendario visible" : "Calendario oculto");
+                            }}
+                        />
+                    </div>
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
                             <MapPin className="h-4 w-4 text-muted-foreground" />
                             <div>
                                 <p className="font-medium">Ubicación</p>
