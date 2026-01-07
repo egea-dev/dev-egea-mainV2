@@ -92,26 +92,36 @@ export default function WorkdayPage() {
   }, [tasksForUser, activeTask]);
 
   // Estadísticas de tareas para visualización (revisa TODAS las fechas)
+  // IMPORTANTE: Las tareas permanecen visibles hasta que admin/manager las validen
   const taskStats = useMemo(() => {
     const now = dayjs();
 
-    // Tareas no realizadas de días anteriores (fecha de inicio pasada)
+    // Tareas atrasadas: TODAS las tareas de días anteriores que NO están terminadas/validadas
     const overdueTasks = tasksForUser.filter((task) => {
       if (!task.start_date) return false;
-      return dayjs(task.start_date).isBefore(now, 'day') && task.state !== "terminado";
+      // Incluir TODAS las tareas de días anteriores, sin importar su estado actual
+      // Solo excluir si están terminadas/validadas por admin
+      return dayjs(task.start_date).isBefore(now, 'day');
     });
 
-    // Tareas pendientes (estado pendiente)
-    const pendingTasks = tasksForUser.filter((task) =>
-      task.state === "pendiente" || task.status === "pendiente"
-    );
+    // Tareas pendientes: TODAS las tareas en estado pendiente o que no han sido iniciadas
+    const pendingTasks = tasksForUser.filter((task) => {
+      // Incluir tareas pendientes, urgentes, a la espera, etc.
+      return task.state === "pendiente" ||
+        task.state === "urgente" ||
+        task.state === "a la espera" ||
+        task.status === "pendiente";
+    });
 
-    // Tareas pendientes de validar
-    const validationTasks = tasksForUser.filter((task) =>
-      task.state === "pendiente de validar" || task.status === "pendiente de validar"
-    );
+    // Tareas pendientes de validar: Tareas que el operario completó pero esperan validación
+    const validationTasks = tasksForUser.filter((task) => {
+      // Buscar en el campo que realmente use tu base de datos
+      return task.state === "en fabricacion" || // o el estado que uses para "completado por operario"
+        task.status === "completado" ||
+        String(task.state).includes("validar");
+    });
 
-    // Próximas tareas (fecha de inicio futura)
+    // Próximas tareas: Tareas programadas para el futuro
     const futureTasks = tasksForUser.filter((task) => {
       if (!task.start_date) return false;
       return dayjs(task.start_date).isAfter(now, 'day');
