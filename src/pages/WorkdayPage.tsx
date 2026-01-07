@@ -39,34 +39,49 @@ export default function WorkdayPage() {
   const [taskListOpen, setTaskListOpen] = useState(false);
   const [taskListTitle, setTaskListTitle] = useState("");
 
-  // Obtener TODAS las tareas del operario (no solo del día seleccionado)
-  const { data: allTasks = [] } = useTasksByDate(selectedDate);
+  // CRÍTICO: Obtener TODAS las tareas del usuario sin filtrar por fecha
+  // Esto permite ver tareas del 30, 31 dic y cualquier día anterior
+  const { data: allUserTasks = [] } = useQuery({
+    queryKey: ['all-user-tasks', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+
+      const { data, error } = await supabase
+        .from('detailed_tasks')
+        .select('*')
+        .or(`responsible_profile_id.eq.${profile.id},assigned_profiles.cs.{"id":"${profile.id}"}`);
+
+      if (error) throw error;
+
+      const rows = (data ?? []) as any[];
+      return rows.map((task) => ({
+        ...task,
+        site: task.site || task.data?.site || 'N/A',
+        description: task.description || task.data?.description || 'N/A',
+        responsible: task.responsible_name ? {
+          id: task.responsible_profile_id,
+          full_name: task.responsible_name,
+          status: 'activo'
+        } : null,
+        assigned_users: Array.isArray(task.assigned_profiles) ? task.assigned_profiles : [],
+        assigned_vehicles: Array.isArray(task.assigned_vehicles) ? task.assigned_vehicles : [],
+      }));
+    },
+    enabled: !!profile?.id,
+  });
 
   const [detailsTask, setDetailsTask] = useState<Task | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [calendarTaskDays, setCalendarTaskDays] = useState<Date[]>([]);
 
-  // Filtrar tareas del usuario actual - TODAS las tareas pendientes
+  // Filtrar solo tareas NO terminadas/validadas
+  // ESTO INCLUYE TAREAS DE CUALQUIER FECHA (30 dic, 31 dic, etc.)
   const tasksForUser = useMemo(() => {
-    if (!profile?.id) return [];
-
-    // Filtrar por usuario asignado
-    const userTasks = allTasks.filter((task) => {
-      if (task.responsible_profile_id === profile.id) return true;
-      const assigned = task.assigned_users ?? [];
-      return assigned.some((user) => user.id === profile.id);
-    });
-
-    // Mostrar TODAS las tareas no terminadas:
-    // - No realizadas de días anteriores
-    // - Pendientes
-    // - Pendientes de validar
-    // - Próximas
-    return userTasks.filter((task) => {
-      // Incluir todas las tareas que NO estén terminadas
+    return (allUserTasks as Task[]).filter((task) => {
+      // Excluir solo tareas completamente terminadas/validadas por admin/manager
       return task.state !== "terminado" && task.status !== "acabado";
     });
-  }, [allTasks, profile?.id]);
+  }, [allUserTasks]);
 
   // Tarea activa (la primera pendiente o en curso)
   const activeTask = useMemo(() => {
