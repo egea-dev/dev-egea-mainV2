@@ -88,7 +88,19 @@ export default function AuthPage() {
         <CardContent>
           <Auth
             supabaseClient={supabase}
-            appearance={{ theme: ThemeSupa }}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    inputText: 'hsl(var(--foreground))',
+                    inputBackground: 'hsl(var(--background))',
+                    inputBorder: 'hsl(var(--border))',
+                    inputPlaceholder: 'hsl(var(--muted-foreground))',
+                  }
+                }
+              }
+            }}
             providers={[]}
             redirectTo={`${window.location.origin}/admin`}
             localization={{

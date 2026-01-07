@@ -46,19 +46,12 @@ export default function WorkdayPage() {
     queryFn: async () => {
       if (!profile?.id) return [];
 
-      console.log('🔍 Buscando tareas para usuario:', profile.id);
-
       // Obtener TODAS las tareas y filtrar en el cliente
       const { data, error } = await supabase
         .from('detailed_tasks')
         .select('*');
 
-      if (error) {
-        console.error('❌ Error obteniendo tareas:', error);
-        throw error;
-      }
-
-      console.log('📦 Tareas totales de BD:', data?.length);
+      if (error) throw error;
 
       const rows = (data ?? []) as any[];
 
@@ -74,8 +67,6 @@ export default function WorkdayPage() {
 
         return false;
       });
-
-      console.log('✅ Tareas del usuario:', userTasks.length);
 
       return userTasks.map((task) => ({
         ...task,
@@ -100,17 +91,9 @@ export default function WorkdayPage() {
   // Filtrar solo tareas NO terminadas/validadas
   // ESTO INCLUYE TAREAS DE CUALQUIER FECHA (30 dic, 31 dic, etc.)
   const tasksForUser = useMemo(() => {
-    console.log('🔍 allUserTasks recibidas:', allUserTasks.length);
-    console.log('🔍 Tareas completas:', allUserTasks);
-
-    const filtered = (allUserTasks as Task[]).filter((task) => {
-      const isNotFinished = task.state !== "terminado" && task.status !== "acabado";
-      console.log(`Tarea ${task.data?.site}: state="${task.state}", status="${task.status}", incluir=${isNotFinished}`);
-      return isNotFinished;
+    return (allUserTasks as Task[]).filter((task) => {
+      return task.state !== "terminado" && task.status !== "acabado";
     });
-
-    console.log('✅ Tareas filtradas (tasksForUser):', filtered.length);
-    return filtered;
   }, [allUserTasks]);
 
   // Tarea activa (la primera pendiente o en curso)
@@ -141,59 +124,33 @@ export default function WorkdayPage() {
   const taskStats = useMemo(() => {
     const now = dayjs();
 
-    console.log('📊 Calculando estadísticas con', tasksForUser.length, 'tareas');
-    console.log('Tareas:', tasksForUser);
-
     // Tareas atrasadas: TODAS las tareas de días anteriores
     const overdueTasks = tasksForUser.filter((task) => {
       if (!task.start_date) return false;
-      const isOverdue = dayjs(task.start_date).isBefore(now, 'day');
-      if (isOverdue) {
-        console.log('✅ Tarea atrasada:', task.data?.site, task.start_date);
-      }
-      return isOverdue;
+      return dayjs(task.start_date).isBefore(now, 'day');
     });
 
     // Tareas pendientes: Estados pendiente, urgente, a la espera
     const pendingTasks = tasksForUser.filter((task) => {
-      const isPending = task.state === "pendiente" ||
+      return task.state === "pendiente" ||
         task.state === "urgente" ||
         task.state === "a la espera" ||
         task.status === "pendiente";
-      if (isPending) {
-        console.log('✅ Tarea pendiente:', task.data?.site, task.state);
-      }
-      return isPending;
     });
 
     // Tareas pendientes de validar: En fabricación o completadas
     const validationTasks = tasksForUser.filter((task) => {
-      const needsValidation = task.state === "en fabricacion" ||
+      return task.state === "en fabricacion" ||
         task.status === "completado" ||
         String(task.state).toLowerCase().includes("validar");
-      if (needsValidation) {
-        console.log('✅ Tarea por validar:', task.data?.site, task.state);
-      }
-      return needsValidation;
     });
 
     // Próximas tareas: Programadas para el futuro
     const futureTasks = tasksForUser.filter((task) => {
       if (!task.start_date) return false;
-      const isFuture = dayjs(task.start_date).isAfter(now, 'day');
-      if (isFuture) {
-        console.log('✅ Tarea próxima:', task.data?.site, task.start_date);
-      }
-      return isFuture;
+      return dayjs(task.start_date).isAfter(now, 'day');
     });
 
-    console.log('📈 Resultados:', {
-      atrasadas: overdueTasks.length,
-      pendientes: pendingTasks.length,
-      porValidar: validationTasks.length,
-      próximas: futureTasks.length,
-      total: tasksForUser.length
-    });
 
     return {
       overdue: overdueTasks.length,

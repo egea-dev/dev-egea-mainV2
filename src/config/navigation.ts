@@ -48,7 +48,7 @@ const procesosItems: AppNavItem[] = [
   { type: "item", path: "/admin/kiosk", label: "Pantallas Kiosko", icon: TvMinimal },
   { type: "item", path: "/admin/templates", label: "Plantillas", icon: FileText },
   { type: "item", path: "/admin/produccion", label: "Produccion", icon: Factory },
-  { type: "item", path: "/admin/envios", label: "Envios", icon: Package },
+  { type: "item", path: "/admin/envios", label: "Envíos", icon: Package },
   { type: "item", path: "/admin/almacen", label: "Almacen", icon: Package },
 ];
 
@@ -184,7 +184,7 @@ export const getNavItemsForRole = (role: string | null | undefined): AppNavEntry
       // Envíos solo accede a su módulo
       return [
         { type: "item", path: "/admin", label: "Dashboard", icon: LayoutDashboard },
-        { type: "item", path: "/admin/envios", label: "Envios", icon: Package },
+        { type: "item", path: "/admin/envios", label: "Envíos", icon: Package },
       ];
 
     case 'almacen':
