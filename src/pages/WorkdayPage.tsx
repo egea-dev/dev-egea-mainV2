@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
 import { useWorkSession } from "@/hooks/use-work-session";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Clock, MapPin, AlertTriangle, Info, CheckCircle2, CalendarCheck } from "lucide-react";
 import { buildMapsSearchUrl } from "@/utils/maps";
 import { WeeklyCalendar } from "@/components/calendar/WeeklyCalendar";
