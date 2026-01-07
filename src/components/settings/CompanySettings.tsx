@@ -89,13 +89,13 @@ export default function CompanySettings() {
             const storagePath = `company/${fileName}`;
 
             const { error: uploadError } = await supabase.storage
-                .from('public')
+                .from('avatars')
                 .upload(storagePath, file, { cacheControl: '3600', upsert: true });
 
             if (uploadError) throw uploadError;
 
             const { data: { publicUrl } } = supabase.storage
-                .from('public')
+                .from('avatars')
                 .getPublicUrl(storagePath);
 
             await updateConfig.mutateAsync({

@@ -83,17 +83,16 @@ export const useUsers = () => {
         return [];
       }
 
-      // Fetch workload stats separately to avoid relationship error (PGRST200)
-      const { data: stats, error: statsError } = await (supabase as any)
-        .from('user_workload_stats')
-        .select('*');
-
-      if (statsError) {
-        console.warn('Error fetching workload stats:', statsError);
-      }
+      // NOTA: user_workload_stats comentado porque la tabla no existe
+      // const { data: stats, error: statsError } = await (supabase as any)
+      //   .from('user_workload_stats')
+      //   .select('*');
+      // if (statsError) {
+      //   console.warn('Error fetching workload stats:', statsError);
+      // }
 
       const today = dayjs();
-      const statsMap = new Map((stats ?? []).map((s: any) => [s.profile_id, s.active_tasks_count]));
+      const statsMap = new Map(); // Sin stats por ahora
 
       return (profiles ?? []).map((profileRow: any) => {
         const row = profileRow as ProfileRow;

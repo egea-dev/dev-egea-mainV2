@@ -800,11 +800,6 @@ export default function AdminPage() {
 
   // Filtrar tareas según la categoría seleccionada
   const filteredTasks = useMemo(() => {
-    console.log(`[DEBUG] Filtering pendingTasks. Total: ${pendingTasks?.length}`, {
-      filter: taskFilter,
-      sampleTask: pendingTasks?.[0]
-    });
-
     if (!pendingTasks) return [];
 
     return pendingTasks.filter(task => {
@@ -826,9 +821,6 @@ export default function AdminPage() {
       // Se muestran TODAS las tareas no archivadas, independientemente de su fecha
       // El administrador/manager debe archivarlas manualmente cuando ya no sean relevantes
 
-      if (categoryMatch) {
-        console.log('[DEBUG] Matched Task:', task.id, task.screen_group);
-      }
       return categoryMatch;
     });
   }, [pendingTasks, taskFilter]);
