@@ -46,15 +46,38 @@ export default function WorkdayPage() {
     queryFn: async () => {
       if (!profile?.id) return [];
 
+      console.log('🔍 Buscando tareas para usuario:', profile.id);
+
+      // Obtener TODAS las tareas y filtrar en el cliente
       const { data, error } = await supabase
         .from('detailed_tasks')
-        .select('*')
-        .or(`responsible_profile_id.eq.${profile.id},assigned_profiles.cs.{"id":"${profile.id}"}`);
+        .select('*');
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error obteniendo tareas:', error);
+        throw error;
+      }
+
+      console.log('📦 Tareas totales de BD:', data?.length);
 
       const rows = (data ?? []) as any[];
-      return rows.map((task) => ({
+
+      // Filtrar por usuario en el cliente
+      const userTasks = rows.filter((task) => {
+        // Verificar si es responsable
+        if (task.responsible_profile_id === profile.id) return true;
+
+        // Verificar si está asignado
+        if (Array.isArray(task.assigned_profiles)) {
+          return task.assigned_profiles.some((p: any) => p.id === profile.id);
+        }
+
+        return false;
+      });
+
+      console.log('✅ Tareas del usuario:', userTasks.length);
+
+      return userTasks.map((task) => ({
         ...task,
         site: task.site || task.data?.site || 'N/A',
         description: task.description || task.data?.description || 'N/A',
