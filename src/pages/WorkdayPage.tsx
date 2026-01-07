@@ -111,35 +111,58 @@ export default function WorkdayPage() {
   const taskStats = useMemo(() => {
     const now = dayjs();
 
-    // Tareas atrasadas: TODAS las tareas de días anteriores que NO están terminadas/validadas
+    console.log('📊 Calculando estadísticas con', tasksForUser.length, 'tareas');
+    console.log('Tareas:', tasksForUser);
+
+    // Tareas atrasadas: TODAS las tareas de días anteriores
     const overdueTasks = tasksForUser.filter((task) => {
       if (!task.start_date) return false;
-      // Incluir TODAS las tareas de días anteriores, sin importar su estado actual
-      // Solo excluir si están terminadas/validadas por admin
-      return dayjs(task.start_date).isBefore(now, 'day');
+      const isOverdue = dayjs(task.start_date).isBefore(now, 'day');
+      if (isOverdue) {
+        console.log('✅ Tarea atrasada:', task.data?.site, task.start_date);
+      }
+      return isOverdue;
     });
 
-    // Tareas pendientes: TODAS las tareas en estado pendiente o que no han sido iniciadas
+    // Tareas pendientes: Estados pendiente, urgente, a la espera
     const pendingTasks = tasksForUser.filter((task) => {
-      // Incluir tareas pendientes, urgentes, a la espera, etc.
-      return task.state === "pendiente" ||
+      const isPending = task.state === "pendiente" ||
         task.state === "urgente" ||
         task.state === "a la espera" ||
         task.status === "pendiente";
+      if (isPending) {
+        console.log('✅ Tarea pendiente:', task.data?.site, task.state);
+      }
+      return isPending;
     });
 
-    // Tareas pendientes de validar: Tareas que el operario completó pero esperan validación
+    // Tareas pendientes de validar: En fabricación o completadas
     const validationTasks = tasksForUser.filter((task) => {
-      // Buscar en el campo que realmente use tu base de datos
-      return task.state === "en fabricacion" || // o el estado que uses para "completado por operario"
+      const needsValidation = task.state === "en fabricacion" ||
         task.status === "completado" ||
-        String(task.state).includes("validar");
+        String(task.state).toLowerCase().includes("validar");
+      if (needsValidation) {
+        console.log('✅ Tarea por validar:', task.data?.site, task.state);
+      }
+      return needsValidation;
     });
 
-    // Próximas tareas: Tareas programadas para el futuro
+    // Próximas tareas: Programadas para el futuro
     const futureTasks = tasksForUser.filter((task) => {
       if (!task.start_date) return false;
-      return dayjs(task.start_date).isAfter(now, 'day');
+      const isFuture = dayjs(task.start_date).isAfter(now, 'day');
+      if (isFuture) {
+        console.log('✅ Tarea próxima:', task.data?.site, task.start_date);
+      }
+      return isFuture;
+    });
+
+    console.log('📈 Resultados:', {
+      atrasadas: overdueTasks.length,
+      pendientes: pendingTasks.length,
+      porValidar: validationTasks.length,
+      próximas: futureTasks.length,
+      total: tasksForUser.length
     });
 
     return {
