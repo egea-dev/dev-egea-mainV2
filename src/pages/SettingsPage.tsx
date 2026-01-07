@@ -39,6 +39,9 @@ import type { JsonValue } from "@/integrations/supabase/types";
 import { useAllUserPermissions, useUpsertUserPermission } from "@/hooks/use-user-permissions";
 import PermissionsMatrix from "../components/settings/PermissionsMatrix";
 import SlaConfig from "../components/settings/SlaConfig";
+import CompanySettings from "../components/settings/CompanySettings";
+import AppearanceSettings from "../components/settings/AppearanceSettings";
+import SystemSettings from "../components/settings/SystemSettings";
 import { ShieldCheck, Zap } from "lucide-react";
 
 type ConfigValues = Record<string, JsonValue | undefined>;
@@ -954,178 +957,17 @@ export default function SettingsPage() {
 
         {/* TAB: Empresa */}
         <TabsContent value="company">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Información de la Empresa
-              </CardTitle>
-              <CardDescription>Configure los datos de su organización</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="company_name" className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Nombre de la Empresa
-                </Label>
-                <Input
-                  id="company_name"
-                  value={stringConfig('company_name')}
-                  onChange={(event) =>
-                    setConfigValues((prev) => ({ ...prev, company_name: event.target.value }))
-                  }
-                  onBlur={(event) => handleUpdateConfig('company_name', event.currentTarget.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company_email" className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  Email de Contacto
-                </Label>
-                <Input
-                  id="company_email"
-                  type="email"
-                  value={stringConfig('company_email')}
-                  onChange={(event) =>
-                    setConfigValues((prev) => ({ ...prev, company_email: event.target.value }))
-                  }
-                  onBlur={(event) => handleUpdateConfig('company_email', event.currentTarget.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company_phone" className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Teléfono de Contacto
-                </Label>
-                <Input
-                  id="company_phone"
-                  value={stringConfig('company_phone')}
-                  onChange={(event) =>
-                    setConfigValues((prev) => ({ ...prev, company_phone: event.target.value }))
-                  }
-                  onBlur={(event) => handleUpdateConfig('company_phone', event.currentTarget.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company_logo" className="flex items-center gap-2">
-                  <Upload className="h-4 w-4" />
-                  URL del Logo
-                </Label>
-                <Input
-                  id="company_logo"
-                  placeholder="https://ejemplo.com/logo.png"
-                  value={stringConfig('company_logo')}
-                  onChange={(event) =>
-                    setConfigValues((prev) => ({ ...prev, company_logo: event.target.value }))
-                  }
-                  onBlur={(event) => handleUpdateConfig('company_logo', event.currentTarget.value)}
-                />
-                <p className="text-xs text-muted-foreground">URL pública de la imagen del logo</p>
-              </div>
-            </CardContent>
-          </Card>
+          <CompanySettings />
         </TabsContent>
 
         {/* TAB: Apariencia */}
         <TabsContent value="appearance">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5" />
-                Apariencia
-              </CardTitle>
-              <CardDescription>Personaliza el aspecto visual de la aplicación</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="theme_primary_color">Color Primario</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="theme_primary_color"
-                    type="color"
-                    className="w-20 h-10"
-                    value={stringConfig('theme_primary_color', '#0ea5e9')}
-                    onChange={(event) => {
-                      setConfigValues((prev) => ({
-                        ...prev,
-                        theme_primary_color: event.target.value
-                      }));
-                      handleUpdateConfig('theme_primary_color', event.target.value);
-                    }}
-                  />
-                  <Input
-                    value={stringConfig('theme_primary_color', '#0ea5e9')}
-                    onChange={(event) =>
-                      setConfigValues((prev) => ({
-                        ...prev,
-                        theme_primary_color: event.target.value
-                      }))
-                    }
-                    onBlur={(event) => handleUpdateConfig('theme_primary_color', event.currentTarget.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <AppearanceSettings />
         </TabsContent>
 
         {/* TAB: Sistema */}
         <TabsContent value="system">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Configuración del Sistema
-              </CardTitle>
-              <CardDescription>Opciones generales del sistema</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Notificaciones</Label>
-                  <p className="text-sm text-muted-foreground">Habilitar notificaciones del sistema</p>
-                </div>
-                <Switch
-                  checked={booleanConfig('enable_notifications')}
-                  onCheckedChange={(checked) => {
-                    setConfigValues((prev) => ({ ...prev, enable_notifications: checked }));
-                    handleUpdateConfig('enable_notifications', checked);
-                  }}
-                />
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <Label htmlFor="default_task_duration">Duración por defecto de tareas (horas)</Label>
-                <Input
-                  id="default_task_duration"
-                  type="number"
-                  min="1"
-                  max="24"
-                  value={numberConfig('default_task_duration', 8)}
-                  onChange={(event) => {
-                    const parsed = Number.parseInt(event.target.value, 10);
-                    setConfigValues((prev) => ({
-                      ...prev,
-                      default_task_duration: Number.isNaN(parsed) ? null : parsed
-                    }));
-                  }}
-                  onBlur={(event) => {
-                    const parsed = Number.parseInt(event.currentTarget.value, 10);
-                    handleUpdateConfig('default_task_duration', Number.isNaN(parsed) ? null : parsed);
-                  }}
-                />
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <Label>Versión de la Aplicación</Label>
-                <Input
-                  value={stringConfig('app_version', '1.0.0-alpha')}
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <SystemSettings />
         </TabsContent>
 
         {/* TAB: Avanzado */}
