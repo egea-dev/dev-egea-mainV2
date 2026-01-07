@@ -19,15 +19,32 @@ END $$;
 -- PARTE 2: CORREGIR NOMBRES DE ROLES (INGLÉS → ESPAÑOL)
 -- ============================================================================
 
--- Actualizar role_permissions
-UPDATE public.role_permissions SET role = 'produccion' WHERE role = 'production';
-UPDATE public.role_permissions SET role = 'envios' WHERE role = 'shipping';
-UPDATE public.role_permissions SET role = 'almacen' WHERE role = 'warehouse';
+-- Actualizar role_permissions SOLO si existen roles en inglés
+DO $$
+BEGIN
+  -- Solo actualizar si existen roles en inglés
+  IF EXISTS (SELECT 1 FROM public.role_permissions WHERE role IN ('production', 'shipping', 'warehouse')) THEN
+    UPDATE public.role_permissions SET role = 'produccion' WHERE role = 'production';
+    UPDATE public.role_permissions SET role = 'envios' WHERE role = 'shipping';
+    UPDATE public.role_permissions SET role = 'almacen' WHERE role = 'warehouse';
+    RAISE NOTICE '  → Permisos actualizados de inglés a español';
+  ELSE
+    RAISE NOTICE '  → Permisos ya están en español (OK)';
+  END IF;
+END $$;
 
--- Actualizar profiles de usuarios
-UPDATE public.profiles SET role = 'produccion' WHERE role = 'production';
-UPDATE public.profiles SET role = 'envios' WHERE role = 'shipping';
-UPDATE public.profiles SET role = 'almacen' WHERE role = 'warehouse';
+-- Actualizar profiles de usuarios SOLO si existen roles en inglés
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.profiles WHERE role IN ('production', 'shipping', 'warehouse')) THEN
+    UPDATE public.profiles SET role = 'produccion' WHERE role = 'production';
+    UPDATE public.profiles SET role = 'envios' WHERE role = 'shipping';
+    UPDATE public.profiles SET role = 'almacen' WHERE role = 'warehouse';
+    RAISE NOTICE '  → Perfiles de usuarios actualizados';
+  ELSE
+    RAISE NOTICE '  → Perfiles ya están en español (OK)';
+  END IF;
+END $$;
 
 DO $$ BEGIN
   RAISE NOTICE '✓ Paso 2/4: Roles actualizados a español';
