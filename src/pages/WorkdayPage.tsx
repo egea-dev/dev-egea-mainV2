@@ -36,6 +36,8 @@ export default function WorkdayPage() {
   });
 
   const [taskFilter, setTaskFilter] = useState<'all' | 'overdue' | 'pending' | 'validation' | 'upcoming'>('all');
+  const [taskListOpen, setTaskListOpen] = useState(false);
+  const [taskListTitle, setTaskListTitle] = useState("");
 
   // Obtener TODAS las tareas del operario (no solo del día seleccionado)
   const { data: allTasks = [] } = useTasksByDate(selectedDate);
@@ -151,9 +153,11 @@ export default function WorkdayPage() {
     localStorage.setItem('workday-show-calendar', JSON.stringify(newValue));
   };
 
-  // Manejar click en tarjeta de estadística
-  const handleStatClick = (filter: typeof taskFilter) => {
-    setTaskFilter(filter === taskFilter ? 'all' : filter);
+  // Manejar click en tarjeta de estadística - Abre dialog con lista de tareas
+  const handleStatClick = (filter: typeof taskFilter, title: string) => {
+    setTaskFilter(filter);
+    setTaskListTitle(title);
+    setTaskListOpen(true);
   };
 
   // Hook de sesión de trabajo
@@ -452,7 +456,7 @@ export default function WorkdayPage() {
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => handleStatClick('overdue')}
+              onClick={() => handleStatClick('overdue', 'Tareas Atrasadas')}
               className={cn(
                 "rounded-lg border-2 p-3 transition-all hover:scale-105 text-left",
                 taskFilter === 'overdue'
@@ -478,7 +482,7 @@ export default function WorkdayPage() {
 
             {/* Tareas Pendientes */}
             <button
-              onClick={() => handleStatClick('pending')}
+              onClick={() => handleStatClick('pending', 'Tareas Pendientes')}
               className={cn(
                 "rounded-lg border-2 p-3 transition-all hover:scale-105 text-left",
                 taskFilter === 'pending'
@@ -504,7 +508,7 @@ export default function WorkdayPage() {
 
             {/* Tareas Pendientes de Validar */}
             <button
-              onClick={() => handleStatClick('validation')}
+              onClick={() => handleStatClick('validation', 'Tareas Por Validar')}
               className={cn(
                 "rounded-lg border-2 p-3 transition-all hover:scale-105 text-left",
                 taskFilter === 'validation'
@@ -530,7 +534,7 @@ export default function WorkdayPage() {
 
             {/* Próximas Tareas */}
             <button
-              onClick={() => handleStatClick('upcoming')}
+              onClick={() => handleStatClick('upcoming', 'Próximas Tareas')}
               className={cn(
                 "rounded-lg border-2 p-3 transition-all hover:scale-105 text-left",
                 taskFilter === 'upcoming'
@@ -772,6 +776,72 @@ export default function WorkdayPage() {
                   Reportar incidencia
                 </Button>
               </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Lista de Tareas */}
+      <Dialog open={taskListOpen} onOpenChange={setTaskListOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>{taskListTitle}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-3">
+              {filteredTasks.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No hay tareas en esta categoría
+                </p>
+              ) : (
+                filteredTasks.map((task) => (
+                  <Card key={task.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold">{String(task.data?.site ?? "Sin ubicación")}</h4>
+                            <Badge variant={
+                              task.state === "pendiente" ? "secondary" :
+                                task.state === "en_curso" ? "default" :
+                                  task.state === "pendiente de validar" ? "outline" :
+                                    "secondary"
+                            }>
+                              {task.state}
+                            </Badge>
+                          </div>
+
+                          {task.data?.location && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              <span>{String(task.data.location)}</span>
+                            </div>
+                          )}
+
+                          {task.start_date && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>{dayjs(task.start_date).format("DD/MM/YYYY HH:mm")}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setDetailsTask(task);
+                            setDetailsOpen(true);
+                            setTaskListOpen(false);
+                          }}
+                        >
+                          Ver detalles
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
           </ScrollArea>
         </DialogContent>
