@@ -77,10 +77,17 @@ export default function WorkdayPage() {
   // Filtrar solo tareas NO terminadas/validadas
   // ESTO INCLUYE TAREAS DE CUALQUIER FECHA (30 dic, 31 dic, etc.)
   const tasksForUser = useMemo(() => {
-    return (allUserTasks as Task[]).filter((task) => {
-      // Excluir solo tareas completamente terminadas/validadas por admin/manager
-      return task.state !== "terminado" && task.status !== "acabado";
+    console.log('🔍 allUserTasks recibidas:', allUserTasks.length);
+    console.log('🔍 Tareas completas:', allUserTasks);
+
+    const filtered = (allUserTasks as Task[]).filter((task) => {
+      const isNotFinished = task.state !== "terminado" && task.status !== "acabado";
+      console.log(`Tarea ${task.data?.site}: state="${task.state}", status="${task.status}", incluir=${isNotFinished}`);
+      return isNotFinished;
     });
+
+    console.log('✅ Tareas filtradas (tasksForUser):', filtered.length);
+    return filtered;
   }, [allUserTasks]);
 
   // Tarea activa (la primera pendiente o en curso)
