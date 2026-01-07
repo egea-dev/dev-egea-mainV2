@@ -13,10 +13,9 @@ DO $$
 DECLARE
   v_roles TEXT;
 BEGIN
-  SELECT string_agg(DISTINCT role, ', ' ORDER BY role)
+  SELECT string_agg(role, ', ')
   INTO v_roles
-  FROM public.profiles
-  WHERE role IS NOT NULL;
+  FROM (SELECT DISTINCT role FROM public.profiles WHERE role IS NOT NULL ORDER BY role) AS distinct_roles;
   
   RAISE NOTICE 'Current roles in database: %', v_roles;
   RAISE NOTICE 'Constraint removed. You can now create/edit users with any role.';
