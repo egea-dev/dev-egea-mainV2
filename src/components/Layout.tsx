@@ -301,7 +301,7 @@ const MainLayout = ({
           </div>
         </header>
 
-        <main className={cn("flex-1 overflow-y-auto p-2 sm:p-4", shellBackground)}>
+        <main className={cn("flex-1 overflow-y-auto p-1 sm:p-4 md:p-6", shellBackground)}>
           {children}
         </main>
       </div>
