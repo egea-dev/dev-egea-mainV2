@@ -37,6 +37,7 @@ import ShippingScanPage from "./pages/ShippingScanPage";
 import KioskDisplayPage from "./pages/KioskDisplayPage";
 import PlantBoardPage from "./pages/PlantBoardPage";
 import ShippingBoardPage from "./pages/ShippingBoardPage";
+import OperatorProfilePage from "./pages/OperatorProfilePage";
 
 // --- LAYOUTS Y COMPONENTES PRINCIPALES ---
 import AdminLayout from "./pages/AdminLayout";
@@ -74,6 +75,7 @@ const App = () => (
             <Route path="/user" element={<AuthGuard><AdminLayout /></AuthGuard>}>
               <Route index element={<Navigate to="/user/workday" replace />} />
               <Route path="workday" element={<WorkdayPage />} />
+              <Route path="profile" element={<OperatorProfilePage />} />
             </Route>
 
             <Route path="/admin" element={<AuthGuard><AdminLayout /></AuthGuard>}>
