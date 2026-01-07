@@ -606,17 +606,31 @@ export default function SettingsPage() {
                         </Button>
                         <Button
                           onClick={async () => {
-                            if (!inviteEmail) return;
+                            if (!inviteEmail) {
+                              toast.error('El email es obligatorio');
+                              return;
+                            }
 
                             try {
-                              const { error } = await supabase.auth.admin.inviteUserByEmail(inviteEmail);
+                              const { data, error } = await (supabase.rpc as any)('invite_user_by_email', {
+                                p_email: inviteEmail,
+                                p_full_name: inviteEmail.split('@')[0],
+                                p_role: 'operario'
+                              });
+
                               if (error) throw error;
 
-                              toast.success('Invitación enviada');
-                              setInviteEmail('');
-                              setIsInviteDialogOpen(false);
-                            } catch (error) {
-                              toast.error('Error al enviar invitación');
+                              if (data?.success) {
+                                toast.success('Perfil creado. Ahora debes invitar al usuario desde Supabase Dashboard > Auth > Users > Invite User');
+                                setInviteEmail('');
+                                setIsInviteDialogOpen(false);
+                                handleUsersRefresh();
+                              } else {
+                                toast.error(data?.message || 'Error al crear perfil');
+                              }
+                            } catch (error: any) {
+                              console.error('Error inviting user:', error);
+                              toast.error(error.message || 'Error al invitar usuario');
                             }
                           }}
                         >

@@ -68,13 +68,13 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
     setLoading(true);
 
     const { error } = await (supabase.rpc as any)('admin_upsert_profile', {
-      p_profile_id: profile.id ?? null,
       p_full_name: profile.full_name,
+      p_profile_id: profile.id ?? null,
       p_email: profile.email || null,
       p_phone: profile.phone || null,
-      p_whatsapp: profile.whatsapp || null,
       p_status: profile.status || 'activo',
-      p_role: profile.role || 'operario'
+      p_role: profile.role || 'operario',
+      p_whatsapp: profile.whatsapp || null
     });
 
     if (error) {
