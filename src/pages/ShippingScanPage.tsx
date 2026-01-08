@@ -479,7 +479,7 @@ export default function ShippingScanPage() {
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
   return (
-    <PageShell title="Expedición y Logística" description="Control de salidas y gestión de envíos">
+    <PageShell title="Expedición y Logística" description="Control de salidas y gestión de envíos" className="space-y-0">
       <div className="flex flex-col gap-2">
         {/* ESCÁNER - PANTALLA COMPLETA EN MÓVIL */}
         <div className="w-full">
