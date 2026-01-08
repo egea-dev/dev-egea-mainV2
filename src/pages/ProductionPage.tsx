@@ -366,7 +366,7 @@ export function ProductionPage() {
   };
 
   return (
-    <PageShell title="Control de Producción" description="Fabricación, corte y confección">
+    <PageShell title="Control de Producción" description="Fabricación, corte y confección" className="space-y-0">
       <div className="flex flex-col gap-2">
         {/* ESCÁNER - PANTALLA COMPLETA */}
         <div className="w-full">
