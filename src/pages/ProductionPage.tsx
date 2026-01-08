@@ -367,22 +367,22 @@ export function ProductionPage() {
 
   return (
     <PageShell title="Control de Producción" description="Fabricación, corte y confección">
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* COLUMNA IZQUIERDA */}
-        <div className="lg:w-[360px] flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        {/* ESCÁNER - PANTALLA COMPLETA */}
+        <div className="w-full">
           {/* Escáner */}
-          <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl p-6">
-            <div className="flex items-center gap-2 mb-4">
+          <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-lg p-2">
+            <div className="flex items-center gap-2 mb-2">
               <QrCode className="w-5 h-5 text-[#FF6B35]" />
               <h3 className="text-white font-bold">Escáner de producción</h3>
             </div>
             {!cameraActive ? (
               <button
                 onClick={() => setCameraActive(true)}
-                className="w-full aspect-video bg-[#0D0F11] rounded-xl border border-dashed border-[#2A2D31] flex flex-col items-center justify-center gap-2 text-[#B5B8BA] hover:text-white hover:border-[#FF6B35]/40 transition"
+                className="w-full aspect-[3/4] min-h-[600px] bg-[#0D0F11] rounded-lg border-2 border-dashed border-[#2A2D31] flex flex-col items-center justify-center gap-3 text-[#B5B8BA] hover:text-white hover:border-[#FF6B35]/40 transition"
               >
-                <Camera className="w-10 h-10" />
-                <span className="text-sm font-medium">Activar cámara</span>
+                <Camera className="w-16 h-16" />
+                <span className="text-lg font-semibold">Activar cámara</span>
               </button>
             ) : (
               <div className="space-y-3">
@@ -395,26 +395,30 @@ export function ProductionPage() {
                 </button>
               </div>
             )}
-            <div className="flex gap-2 mt-4">
-              <input
-                type="text"
-                placeholder="Escaneo manual / Ref..."
-                className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-3 text-sm text-white focus:ring-2 focus:ring-[#FF6B35] outline-none"
-                value={qrInput}
-                onChange={(e) => setQrInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
-              />
-              <button
-                onClick={() => handleScan(qrInput)}
-                className="px-4 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
           </div>
 
-          {/* Cola de producción */}
-          <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl p-6">
+          {/* Input Manual Debajo */}
+          <div className="flex gap-2 mt-2">
+            <input
+              type="text"
+              placeholder="Código del pedido o escanea QR..."
+              className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-4 text-base md:text-lg text-white focus:ring-2 focus:ring-[#FF6B35] outline-none"
+              value={qrInput}
+              onChange={(e) => setQrInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
+            />
+            <button
+              onClick={() => handleScan(qrInput)}
+              className="px-6 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition text-lg font-semibold"
+            >
+              <ArrowRight className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* COLA DE PRODUCCIÓN - DEBAJO */}
+        <div className="w-full lg:flex-1">
+          <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-lg p-2">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-[#FF6B35]" />
