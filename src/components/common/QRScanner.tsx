@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, ScanLine, AlertCircle, Keyboard } from 'lucide-react';
+import { X, Camera, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import jsQR from 'jsqr';
 
 interface QRScannerProps {
     onScan: (decodedText: string) => void;
@@ -13,117 +15,181 @@ interface QRScannerProps {
 
 const QRScanner: React.FC<QRScannerProps> = ({
     onScan,
+    onError,
     onClose,
     fullscreen = false,
     className
 }) => {
-    const [manualInput, setManualInput] = useState('');
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const animationRef = useRef<number>();
+    const [error, setError] = useState<string>('');
+    const [isLoading, setIsLoading] = useState(true);
 
-    const handleManualScan = () => {
-        if (manualInput.trim()) {
-            onScan(manualInput.trim());
-            setManualInput('');
-        }
-    };
+    useEffect(() => {
+        let stream: MediaStream | null = null;
+        let mounted = true;
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleManualScan();
-        }
-    };
+        const startCamera = async () => {
+            try {
+                console.log('🎥 Iniciando cámara con HTTPS...');
+                setIsLoading(true);
+                setError('');
+
+                // Verificar que getUserMedia está disponible
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('getUserMedia no disponible. Asegúrate de estar usando HTTPS.');
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+
+                if (!mounted || !videoRef.current) return;
+
+                videoRef.current.srcObject = stream;
+                videoRef.current.setAttribute('playsinline', 'true');
+                await videoRef.current.play();
+
+                setIsLoading(false);
+                if (navigator.vibrate) navigator.vibrate(100);
+
+                console.log('✅ Cámara iniciada correctamente');
+                requestAnimationFrame(tick);
+            } catch (err: any) {
+                console.error('❌ Error al iniciar cámara:', err);
+                let errorMessage = 'Error al acceder a la cámara';
+
+                if (err.name === 'NotAllowedError') {
+                    errorMessage = 'Permiso de cámara denegado. Permite el acceso en la configuración del navegador.';
+                } else if (err.name === 'NotFoundError') {
+                    errorMessage = 'No se encontró cámara en el dispositivo.';
+                } else if (err.name === 'NotReadableError') {
+                    errorMessage = 'La cámara está siendo usada por otra aplicación.';
+                } else {
+                    errorMessage = err.message || 'Error desconocido';
+                }
+
+                setError(errorMessage);
+                setIsLoading(false);
+                toast.error(errorMessage);
+                if (onError) onError(err);
+            }
+        };
+
+        const tick = () => {
+            if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+                const canvas = canvasRef.current;
+                const video = videoRef.current;
+
+                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                if (ctx) {
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: 'dontInvert',
+                    });
+
+                    if (code) {
+                        console.log('✅ QR detectado:', code.data);
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        onScan(code.data);
+                        return; // Detener escaneo
+                    }
+                }
+            }
+            animationRef.current = requestAnimationFrame(tick);
+        };
+
+        startCamera();
+
+        return () => {
+            mounted = false;
+            if (animationRef.current) cancelAnimationFrame(animationRef.current);
+            if (stream) stream.getTracks().forEach(track => track.stop());
+        };
+    }, [onScan, onError]);
 
     return (
         <div className={cn(
-            "relative bg-gradient-to-br from-slate-900 to-slate-800 rounded-lg overflow-hidden shadow-2xl border-2 border-blue-500/50",
-            fullscreen
-                ? "fixed inset-0 z-50 rounded-none"
-                : "w-full",
+            "relative bg-black rounded-lg overflow-hidden shadow-2xl border-2 border-green-500/50",
+            fullscreen ? "fixed inset-0 z-50 rounded-none" : "w-full aspect-video",
             className
         )}>
-            <div className="p-6 md:p-8">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-blue-500/20 rounded-lg">
-                            <ScanLine className="w-6 h-6 text-blue-400" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-white">Escaneo Manual</h3>
-                            <p className="text-sm text-gray-400">Ingresa el código del pedido</p>
-                        </div>
-                    </div>
-                    {onClose && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-white hover:bg-white/10"
-                            onClick={onClose}
-                        >
-                            <X className="w-5 h-5" />
-                        </Button>
-                    )}
-                </div>
+            <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                playsInline
+                muted
+                autoPlay
+            />
+            <canvas ref={canvasRef} className="hidden" />
 
-                {/* Info Alert */}
-                <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                        <p className="text-yellow-200 font-semibold mb-1">Cámara no disponible</p>
-                        <p className="text-yellow-300/80">
-                            La cámara requiere HTTPS. Por favor, ingresa el código manualmente o escanea con un lector externo.
-                        </p>
+            {/* Loading */}
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                    <div className="text-center text-white p-6">
+                        <Camera className="w-16 h-16 mx-auto mb-4 animate-pulse text-green-400" />
+                        <p className="text-lg font-semibold">Iniciando cámara...</p>
                     </div>
                 </div>
+            )}
 
-                {/* Manual Input */}
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Código del Pedido
-                        </label>
-                        <div className="flex gap-2">
-                            <div className="relative flex-1">
-                                <Keyboard className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                                <input
-                                    type="text"
-                                    value={manualInput}
-                                    onChange={(e) => setManualInput(e.target.value)}
-                                    onKeyPress={handleKeyPress}
-                                    placeholder="Ej: PED-2024-001 o escanea con lector externo"
-                                    className="w-full pl-11 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                                    autoFocus
-                                />
-                            </div>
-                            <Button
-                                onClick={handleManualScan}
-                                disabled={!manualInput.trim()}
-                                className="px-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                Buscar
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Instructions */}
-                    <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                        <h4 className="text-sm font-semibold text-white mb-2">💡 Instrucciones:</h4>
-                        <ul className="text-sm text-gray-400 space-y-1">
-                            <li>• Escribe o pega el número de pedido</li>
-                            <li>• Usa un lector QR externo y pega el resultado aquí</li>
-                            <li>• Presiona Enter o click en "Buscar"</li>
-                        </ul>
-                    </div>
-
-                    {/* HTTPS Info */}
-                    <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                        <h4 className="text-sm font-semibold text-blue-300 mb-2">ℹ️ Para habilitar la cámara:</h4>
-                        <p className="text-xs text-blue-200/80">
-                            La API de cámara del navegador requiere conexión HTTPS.
-                            Contacta con el administrador para configurar un certificado SSL.
-                        </p>
+            {/* Error */}
+            {error && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-6">
+                    <div className="text-center text-white max-w-md">
+                        <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-400" />
+                        <p className="text-lg font-semibold mb-2">Error de Cámara</p>
+                        <p className="text-sm text-gray-300">{error}</p>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {/* Overlay de escaneo */}
+            {!error && !isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="relative w-64 h-64 md:w-80 md:h-80">
+                        <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-green-400 rounded-tl-xl"></div>
+                        <div className="absolute top-0 right-0 w-16 h-16 border-t-4 border-r-4 border-green-400 rounded-tr-xl"></div>
+                        <div className="absolute bottom-0 left-0 w-16 h-16 border-b-4 border-l-4 border-green-400 rounded-bl-xl"></div>
+                        <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-green-400 rounded-br-xl"></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-full h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent animate-pulse"></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Botón cerrar */}
+            {onClose && (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-3 right-3 text-white bg-black/70 hover:bg-black/90 z-10 h-12 w-12 rounded-full"
+                    onClick={onClose}
+                >
+                    <X className="w-6 h-6" />
+                </Button>
+            )}
+
+            {/* Indicador */}
+            {!error && !isLoading && (
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10 pointer-events-none">
+                    <div className="bg-black/80 backdrop-blur px-6 py-3 rounded-full text-sm text-white flex items-center gap-3 border border-green-500/30">
+                        <Camera className="w-5 h-5 text-green-400 animate-pulse" />
+                        <span className="font-semibold">Enfoca el código QR</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
