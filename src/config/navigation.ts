@@ -176,7 +176,7 @@ export const getNavItemsForRole = (role: string | null | undefined): AppNavEntry
     case 'produccion':
       // Producción solo accede a su módulo
       return [
-        { type: "item", path: "/admin", label: "Dashboard", icon: LayoutDashboard },
+
         { type: "item", path: "/admin/produccion", label: "Produccion", icon: Factory },
       ];
 
