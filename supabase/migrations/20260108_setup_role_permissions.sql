@@ -10,40 +10,40 @@
 -- =====================================================
 
 -- Permisos para rol PRODUCCION
-INSERT INTO public.role_permissions (role, resource, action, description)
+INSERT INTO public.role_permissions (role, resource, action)
 VALUES 
-  ('produccion', 'produccion', 'view', 'Ver módulo de producción'),
-  ('produccion', 'produccion', 'create', 'Crear órdenes de producción'),
-  ('produccion', 'produccion', 'edit', 'Editar órdenes de producción'),
-  ('produccion', 'produccion_work_orders', 'view', 'Ver órdenes de trabajo'),
-  ('produccion', 'produccion_work_orders', 'edit', 'Editar órdenes de trabajo')
+  ('produccion', 'produccion', 'view'),
+  ('produccion', 'produccion', 'create'),
+  ('produccion', 'produccion', 'edit'),
+  ('produccion', 'produccion_work_orders', 'view'),
+  ('produccion', 'produccion_work_orders', 'edit')
 ON CONFLICT (role, resource, action) DO NOTHING;
 
 -- Permisos para rol ENVIOS
-INSERT INTO public.role_permissions (role, resource, action, description)
+INSERT INTO public.role_permissions (role, resource, action)
 VALUES 
-  ('envios', 'envios', 'view', 'Ver módulo de envíos'),
-  ('envios', 'envios', 'create', 'Crear envíos'),
-  ('envios', 'envios', 'edit', 'Editar envíos'),
-  ('envios', 'produccion_work_orders', 'view', 'Ver órdenes para envío'),
-  ('envios', 'produccion_work_orders', 'edit', 'Actualizar estado de envío')
+  ('envios', 'envios', 'view'),
+  ('envios', 'envios', 'create'),
+  ('envios', 'envios', 'edit'),
+  ('envios', 'produccion_work_orders', 'view'),
+  ('envios', 'produccion_work_orders', 'edit')
 ON CONFLICT (role, resource, action) DO NOTHING;
 
 -- Permisos para rol ALMACEN
-INSERT INTO public.role_permissions (role, resource, action, description)
+INSERT INTO public.role_permissions (role, resource, action)
 VALUES 
-  ('almacen', 'almacen', 'view', 'Ver módulo de almacén'),
-  ('almacen', 'almacen', 'edit', 'Gestionar almacén'),
-  ('almacen', 'comercial', 'view', 'Ver módulo comercial'),
-  ('almacen', 'produccion_work_orders', 'view', 'Ver órdenes')
+  ('almacen', 'almacen', 'view'),
+  ('almacen', 'almacen', 'edit'),
+  ('almacen', 'comercial', 'view'),
+  ('almacen', 'produccion_work_orders', 'view')
 ON CONFLICT (role, resource, action) DO NOTHING;
 
 -- Permisos para rol COMERCIAL
-INSERT INTO public.role_permissions (role, resource, action, description)
+INSERT INTO public.role_permissions (role, resource, action)
 VALUES 
-  ('comercial', 'comercial', 'view', 'Ver módulo comercial'),
-  ('comercial', 'comercial', 'create', 'Crear pedidos comerciales'),
-  ('comercial', 'comercial', 'edit', 'Editar pedidos comerciales')
+  ('comercial', 'comercial', 'view'),
+  ('comercial', 'comercial', 'create'),
+  ('comercial', 'comercial', 'edit')
 ON CONFLICT (role, resource, action) DO NOTHING;
 
 -- 2. HABILITAR RLS EN TABLAS CRÍTICAS
@@ -122,7 +122,7 @@ BEGIN
 END $$;
 
 -- Verificar permisos insertados
-SELECT role, resource, action, description 
+SELECT role, resource, action 
 FROM public.role_permissions 
 WHERE role IN ('produccion', 'envios', 'almacen', 'comercial')
 ORDER BY role, resource, action;
