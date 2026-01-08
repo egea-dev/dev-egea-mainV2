@@ -121,7 +121,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
     return (
         <div className={cn(
             "relative bg-black rounded-lg overflow-hidden shadow-2xl border-2 border-green-500/50",
-            fullscreen ? "fixed inset-0 z-50 rounded-none" : "w-full aspect-video",
+            fullscreen ? "fixed inset-0 z-50 rounded-none" : "w-full aspect-[3/4] min-h-[600px]",
             className
         )}>
             <video
