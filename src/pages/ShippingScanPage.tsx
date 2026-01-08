@@ -479,12 +479,12 @@ export default function ShippingScanPage() {
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
   return (
-    <PageShell title="Expediciones y Logística" description="Control de salidas y gestión de envíos">
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* COLUMNA IZQUIERDA */}
-        <div className="lg:w-[360px] flex flex-col gap-4">
+    <PageShell title="Expedición y Logística" description="Control de salidas y gestión de envíos">
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
+        {/* COLUMNA IZQUIERDA - Escáner y Cola */}
+        <div className="lg:w-[320px] flex flex-col gap-3">
           {/* Escáner */}
-          <div className="bg-[#323438] border border-[#45474A] rounded-2xl p-6">
+          <div className="bg-[#323438] border border-[#45474A] rounded-2xl p-4 lg:p-5">
             <div className="flex items-center gap-2 mb-4">
               <QrCode className="w-5 h-5 text-indigo-400" />
               <h3 className="text-white font-bold">Egea QR Cam</h3>
@@ -527,7 +527,7 @@ export default function ShippingScanPage() {
           </div>
 
           {/* Cola de Almacén */}
-          <div className="bg-[#323438] border border-[#45474A] rounded-2xl p-5">
+          <div className="bg-[#323438] border border-[#45474A] rounded-2xl p-4">
             <h3 className="font-bold text-[#8B8D90] mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
               <span>Cola de Almacén</span>
               <span className="bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full text-xs">{pendingOrders.length}</span>
@@ -630,7 +630,7 @@ export default function ShippingScanPage() {
         <div className="flex-1">
           {scannedOrder ? (
             <div className="bg-[#323438] h-full rounded-2xl shadow-lg border border-[#45474A] flex flex-col overflow-hidden">
-              <div className="p-6 border-b border-[#45474A] bg-[#1A1D1F]/50 flex justify-between items-start">
+              <div className="p-4 lg:p-6 border-b border-[#45474A] bg-[#1A1D1F]/50 flex justify-between items-start">
                 <div>
                   <h2 className="text-xl md:text-3xl font-bold text-[#FFFFFF] mb-1">{scannedOrder.order_number}</h2>
                   <div className="text-xs text-[#8B8D90] font-mono">
@@ -640,7 +640,7 @@ export default function ShippingScanPage() {
                 <span className="text-sm md:text-lg px-4 py-2 bg-[#45474A] text-white rounded-full">{scannedOrder.status}</span>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6 custom-scrollbar">
                 {/* PROTOCOLO DE REVISIÓN */}
                 {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
                   <div className="bg-amber-900/10 border border-amber-500/30 p-5 rounded-xl flex items-start gap-4">
