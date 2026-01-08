@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0",
     port: 8083,
-    https: true,
+    // https: true, // Deshabilitado temporalmente para facilitar acceso móvil
   },
   plugins: [react(), basicSsl()],
   resolve: {
