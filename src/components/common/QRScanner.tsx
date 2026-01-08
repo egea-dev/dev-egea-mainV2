@@ -122,7 +122,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
             "relative bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700",
             isFullscreen
                 ? "fixed inset-0 z-50 rounded-none"
-                : "w-full h-[300px] md:h-[400px]",
+                : "w-full h-[450px] md:h-[500px]",
             className
         )}>
             <div id="reader" className="w-full h-full"></div>
