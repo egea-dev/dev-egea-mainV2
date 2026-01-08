@@ -498,11 +498,11 @@ export default function ShippingScanPage() {
                 <span className="text-lg font-semibold">Activar cámara</span>
               </button>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <QRScanner onScan={handleScan} onClose={() => setCameraActive(false)} />
                 <button
                   onClick={() => setCameraActive(false)}
-                  className="w-full py-2 bg-[#45474A] text-white rounded-lg hover:bg-[#6E6F71] transition"
+                  className="w-full py-3 bg-[#45474A] text-white rounded-lg hover:bg-[#6E6F71] transition font-medium"
                 >
                   Cerrar cámara
                 </button>
@@ -515,16 +515,16 @@ export default function ShippingScanPage() {
             <input
               type="text"
               placeholder="Código del pedido o escanea QR..."
-              className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-4 text-base md:text-lg text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
               value={qrInput}
               onChange={(e) => setQrInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
             />
             <button
               onClick={() => handleScan(qrInput)}
-              className="px-6 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-lg font-semibold"
+              className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold flex items-center justify-center min-w-[60px]"
             >
-              <ArrowRight className="w-6 h-6" />
+              <ArrowRight className="w-5 h-5" />
             </button>
           </div>
         </div>

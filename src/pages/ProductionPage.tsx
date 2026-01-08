@@ -385,11 +385,11 @@ export function ProductionPage() {
                 <span className="text-lg font-semibold">Activar cámara</span>
               </button>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <QRScanner onScan={handleScan} onClose={() => setCameraActive(false)} />
                 <button
                   onClick={() => setCameraActive(false)}
-                  className="w-full py-2 bg-[#2A2D31] text-white rounded-lg hover:bg-[#3A3D41] transition"
+                  className="w-full py-3 bg-[#2A2D31] text-white rounded-lg hover:bg-[#3A3D41] transition font-medium"
                 >
                   Cerrar cámara
                 </button>
@@ -402,16 +402,16 @@ export function ProductionPage() {
             <input
               type="text"
               placeholder="Código del pedido o escanea QR..."
-              className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-4 text-base md:text-lg text-white focus:ring-2 focus:ring-[#FF6B35] outline-none"
+              className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-[#FF6B35] outline-none"
               value={qrInput}
               onChange={(e) => setQrInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
             />
             <button
               onClick={() => handleScan(qrInput)}
-              className="px-6 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition text-lg font-semibold"
+              className="px-5 py-3 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition font-semibold flex items-center justify-center min-w-[60px]"
             >
-              <ArrowRight className="w-6 h-6" />
+              <ArrowRight className="w-5 h-5" />
             </button>
           </div>
         </div>
