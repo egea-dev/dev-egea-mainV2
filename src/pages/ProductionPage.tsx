@@ -199,9 +199,9 @@ export function ProductionPage() {
 
   const printShippingLabel = async () => {
     if (!scannedOrder) return;
-    const labelWidth = '61mm';
-    const labelHeight = '99mm';
-    const qrUrlLarge = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(scannedOrder.qr_payload || scannedOrder.order_number)}`;
+    const labelWidth = '60mm';
+    const labelHeight = '90mm';
+    const qrUrlLarge = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(scannedOrder.qr_payload || scannedOrder.order_number)}`;
     const orderNumber = escapeHtml(scannedOrder.order_number);
     const customerName = escapeHtml(scannedOrder.customer_name || 'Sin cliente');
     const contactName = escapeHtml(scannedOrder.contact_name || '-');
