@@ -11,9 +11,9 @@ type PageShellProps = {
 
 export const PageShell = ({ title, description, actions, children, className }: PageShellProps) => {
   return (
-    <section className={cn(innerWrapperClasses, "space-y-1 sm:space-y-2 lg:space-y-4", className)}>
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
+    <section className={cn(innerWrapperClasses, "space-y-0", className)}>
+      <header className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-1">
+        <div className="space-y-0">
           <h1 className="text-lg font-semibold text-foreground sm:text-xl md:text-2xl">
             {title}
           </h1>
