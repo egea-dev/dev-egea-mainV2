@@ -622,10 +622,10 @@ export function ProductionPage() {
                 {['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD'].includes(scannedOrder.status) && !showFinishModal && (
                   <button
                     onClick={initiateFinish}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg rounded-xl flex items-center justify-center transition"
+                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm sm:text-base rounded-lg flex items-center justify-center transition gap-2"
                   >
-                    <CheckCircle className="w-6 h-6 mr-2" />
-                    FINALIZAR (A ENVÍO)
+                    <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                    <span className="whitespace-nowrap">Finalizar (A Envío)</span>
                   </button>
                 )}
 
@@ -633,14 +633,14 @@ export function ProductionPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={printShippingLabel}
-                      className="flex-1 py-4 bg-[#2A2D31] hover:bg-[#3A3D41] text-white font-bold rounded-xl flex items-center justify-center transition"
+                      className="flex-1 py-3 px-3 bg-[#2A2D31] hover:bg-[#3A3D41] text-white font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
                     >
-                      <Printer className="w-5 h-5 mr-2" />
-                      REIMPRIMIR
+                      <Printer className="w-4 h-4 flex-shrink-0" />
+                      <span className="whitespace-nowrap">Reimprimir</span>
                     </button>
-                    <div className="flex-[2] py-4 bg-[#0D0F11] text-emerald-500 rounded-xl font-bold text-center border border-emerald-500/30 flex items-center justify-center">
-                      <CheckCircle className="w-5 h-5 mr-2" />
-                      LISTO PARA ENVÍO ({scannedOrder.packages_count} Bultos)
+                    <div className="flex-[2] py-3 px-3 bg-[#0D0F11] text-emerald-400 rounded-lg font-semibold text-xs sm:text-sm text-center border border-emerald-500/30 flex items-center justify-center gap-2">
+                      <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">Listo ({scannedOrder.packages_count} Bultos)</span>
                     </div>
                   </div>
                 )}
