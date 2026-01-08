@@ -485,17 +485,17 @@ export default function ShippingScanPage() {
         <div className="w-full">
           {/* Escáner */}
           <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-2">
               <QrCode className="w-5 h-5 text-indigo-400" />
               <h3 className="text-white font-bold">Egea QR Cam</h3>
             </div>
             {!cameraActive ? (
               <button
                 onClick={() => setCameraActive(true)}
-                className="w-full aspect-video bg-[#1A1D1F] rounded-xl border border-dashed border-[#45474A] flex flex-col items-center justify-center gap-2 text-[#B5B8BA] hover:text-white hover:border-indigo-500/40 transition"
+                className="w-full aspect-[3/4] min-h-[600px] bg-[#1A1D1F] rounded-lg border-2 border-dashed border-[#45474A] flex flex-col items-center justify-center gap-3 text-[#B5B8BA] hover:text-white hover:border-indigo-500/40 transition"
               >
-                <Camera className="w-10 h-10" />
-                <span className="text-sm font-medium">Activar cámara</span>
+                <Camera className="w-16 h-16" />
+                <span className="text-lg font-semibold">Activar cámara</span>
               </button>
             ) : (
               <div className="space-y-3">
