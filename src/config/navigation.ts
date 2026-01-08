@@ -183,13 +183,11 @@ export const getNavItemsForRole = (role: string | null | undefined): AppNavEntry
     case 'envios':
       // Envíos solo accede a su módulo
       return [
-        { type: "item", path: "/admin", label: "Dashboard", icon: LayoutDashboard },
         { type: "item", path: "/admin/envios", label: "Envíos", icon: Package },
       ];
 
     case 'almacen':
       return [
-        { type: "item", path: "/admin", label: "Dashboard", icon: LayoutDashboard },
         { type: "item", path: "/admin/almacen", label: "Almacen", icon: Package },
         { type: "item", path: "/admin/comercial", label: "Comercial", icon: ShoppingCart },
       ];
@@ -197,7 +195,6 @@ export const getNavItemsForRole = (role: string | null | undefined): AppNavEntry
     case 'comercial':
       // Comercial solo accede a su módulo
       return [
-        { type: "item", path: "/admin", label: "Dashboard", icon: LayoutDashboard },
         { type: "item", path: "/admin/comercial", label: "Comercial", icon: ShoppingCart },
       ];
 

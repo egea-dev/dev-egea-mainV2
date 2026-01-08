@@ -480,11 +480,11 @@ export default function ShippingScanPage() {
 
   return (
     <PageShell title="Expedición y Logística" description="Control de salidas y gestión de envíos">
-      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4">
+      <div className="flex flex-col lg:flex-row gap-2 lg:gap-4">
         {/* COLUMNA IZQUIERDA - Escáner y Cola */}
-        <div className="lg:w-[320px] flex flex-col gap-3">
+        <div className="lg:w-[280px] flex flex-col gap-2">
           {/* Escáner */}
-          <div className="bg-[#323438] border border-[#45474A] rounded-2xl p-4 lg:p-5">
+          <div className="bg-[#323438] border border-[#45474A] rounded-xl p-3 lg:p-5">
             <div className="flex items-center gap-2 mb-4">
               <QrCode className="w-5 h-5 text-indigo-400" />
               <h3 className="text-white font-bold">Egea QR Cam</h3>
@@ -527,7 +527,7 @@ export default function ShippingScanPage() {
           </div>
 
           {/* Cola de Almacén */}
-          <div className="bg-[#323438] border border-[#45474A] rounded-2xl p-4">
+          <div className="bg-[#323438] border border-[#45474A] rounded-xl p-3">
             <h3 className="font-bold text-[#8B8D90] mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
               <span>Cola de Almacén</span>
               <span className="bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full text-xs">{pendingOrders.length}</span>
