@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { supabaseProductivity } from '@/integrations/supabase';
-import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon } from 'lucide-react';
+import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon, FileText } from 'lucide-react';
 import PageShell from '@/components/layout/PageShell';
 import QRScanner from '@/components/common/QRScanner';
 import { toast } from 'sonner';
@@ -200,47 +200,195 @@ export function ProductionPage() {
   const printShippingLabel = async () => {
     if (!scannedOrder) return;
 
-    // URL del servidor de impresión en Raspberry Pi
-    const PRINT_SERVER_URL = 'http://192.168.1.234:3001/print';
+    const labelWidth = '60mm';
+    const labelHeight = '86mm';
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(scannedOrder.qr_payload || scannedOrder.order_number)}`;
 
-    console.log('📄 Enviando etiqueta a servidor de impresión:', scannedOrder.order_number);
-    console.log('📦 Bultos:', packagesInput);
-    console.log('🖨️  Servidor:', PRINT_SERVER_URL);
+    const orderNumber = escapeHtml(scannedOrder.order_number);
+    const customerName = escapeHtml(scannedOrder.customer_name || 'Sin cliente');
+    const contactName = escapeHtml(scannedOrder.contact_name || '-');
+    const deliveryAddress = escapeHtml(scannedOrder.delivery_address || 'Sin dirección');
+    const region = escapeHtml(scannedOrder.region || '-');
+    const packageCount = escapeHtml(String(packagesInput));
+    const totalUnits = escapeHtml(String(scannedOrder.quantity_total || 0));
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>Etiqueta - ${orderNumber}</title>
+          <style>
+            @page { size: ${labelWidth} ${labelHeight}; margin: 0; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+              width: ${labelWidth};
+              height: ${labelHeight};
+              font-family: Arial, sans-serif;
+              background: white;
+              color: black;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .label {
+              width: ${labelWidth};
+              height: ${labelHeight};
+              padding: 2mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              text-align: center;
+            }
+            .topline { font-size: 2mm; font-weight: 700; letter-spacing: 0.5mm; text-transform: uppercase; margin-bottom: 1mm; }
+            .brand { font-size: 4mm; font-weight: 900; text-transform: uppercase; margin-bottom: 0.5mm; }
+            .site { font-size: 2mm; color: #333; margin-bottom: 1mm; }
+            .badge { background: #111; color: #fff; width: 100%; font-size: 2.5mm; font-weight: 800; text-transform: uppercase; padding: 1mm 0; margin-bottom: 1mm; }
+            .order { font-size: 5mm; font-weight: 900; margin-bottom: 1.5mm; }
+            .info { width: 100%; border: 0.3mm solid #999; background: #f2f2f2; padding: 2mm; font-size: 2mm; line-height: 1.4; text-align: left; margin-bottom: 2mm; }
+            .info-row { margin-bottom: 0.8mm; }
+            .info-label { font-weight: 900; text-transform: uppercase; }
+            .qr { width: 28mm; height: 28mm; margin: 1mm 0; border: 0.4mm solid #111; }
+            .counts { border: 0.4mm solid #111; font-weight: 900; font-size: 3.5mm; padding: 1.5mm; margin: 1mm 0; text-transform: uppercase; }
+            .units { font-size: 2.5mm; }
+          </style>
+        </head>
+        <body>
+          <div class="label">
+            <div class="topline">PRODUCCION</div>
+            <div class="brand">DECORACIONES EGEA</div>
+            <div class="site">www.decoracionesegea.com</div>
+            <div class="badge">ETIQUETA DE ENVIO</div>
+            <div class="order">${orderNumber}</div>
+            <div class="info">
+              <div class="info-row"><span class="info-label">Cliente:</span> ${customerName}</div>
+              <div class="info-row"><span class="info-label">Contacto:</span> ${contactName}</div>
+              <div class="info-row"><span class="info-label">Dirección:</span> ${deliveryAddress}</div>
+              <div class="info-row"><span class="info-label">Región:</span> ${region}</div>
+            </div>
+            <img class="qr" src="${qrUrl}" alt="QR" />
+            <div class="counts">BULTOS: ${packageCount}</div>
+            <div class="units">Total Unidades: ${totalUnits}</div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    console.log('📄 Generando etiqueta pequeña:', orderNumber);
 
     try {
-      const response = await fetch(PRINT_SERVER_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          orderNumber: scannedOrder.order_number,
-          customerName: scannedOrder.customer_name || 'Sin cliente',
-          contactName: scannedOrder.contact_name,
-          deliveryAddress: scannedOrder.delivery_address,
-          region: scannedOrder.region,
-          packagesCount: packagesInput,
-          totalUnits: scannedOrder.quantity_total || 0,
-          qrData: scannedOrder.qr_payload || scannedOrder.order_number
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        console.log('✅ Etiqueta enviada a impresión correctamente');
-        toast.success('Etiqueta enviada a impresión Brother QL-700', {
-          duration: 3000,
-        });
-        await confirmProductionFinish();
-      } else {
-        console.error('❌ Error del servidor:', data.error);
-        toast.error(`Error al imprimir: ${data.error}`);
-      }
-
+      printHtmlToIframe(htmlContent);
+      toast.success('Etiqueta 60x86mm generada');
+      await confirmProductionFinish();
     } catch (error) {
-      console.error('❌ Error de conexión:', error);
-      toast.error('No se pudo conectar con el servidor de impresión. Verifica que la Raspberry Pi esté encendida.');
+      console.error('❌ Error:', error);
+      toast.error('Error al generar etiqueta');
+    }
+  };
+
+  const printA4Document = async () => {
+    if (!scannedOrder) return;
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(scannedOrder.qr_payload || scannedOrder.order_number)}`;
+    const orderNumber = escapeHtml(scannedOrder.order_number);
+    const customerName = escapeHtml(scannedOrder.customer_name || 'Sin cliente');
+    const contactName = escapeHtml(scannedOrder.contact_name || '-');
+    const deliveryAddress = escapeHtml(scannedOrder.delivery_address || 'Sin dirección');
+    const region = escapeHtml(scannedOrder.region || '-');
+    const packageCount = escapeHtml(String(packagesInput));
+    const totalUnits = escapeHtml(String(scannedOrder.quantity_total || 0));
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>Albarán - ${orderNumber}</title>
+          <style>
+            @page { size: A4; margin: 20mm; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: Arial, sans-serif; color: #000; background: #fff; }
+            .document { max-width: 170mm; margin: 0 auto; }
+            .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10mm; margin-bottom: 10mm; }
+            .company { font-size: 24pt; font-weight: 900; margin-bottom: 5mm; }
+            .doc-type { font-size: 18pt; font-weight: 700; background: #000; color: #fff; padding: 3mm; }
+            .order-number { font-size: 32pt; font-weight: 900; text-align: center; margin: 10mm 0; }
+            .section { margin-bottom: 8mm; }
+            .section-title { font-size: 12pt; font-weight: 700; border-bottom: 2px solid #000; padding-bottom: 2mm; margin-bottom: 3mm; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+            .info-item { margin-bottom: 3mm; }
+            .info-label { font-size: 9pt; font-weight: 700; text-transform: uppercase; color: #666; }
+            .info-value { font-size: 11pt; margin-top: 1mm; }
+            .qr-section { text-align: center; margin: 10mm 0; }
+            .qr-section img { width: 100mm; height: 100mm; border: 2px solid #000; }
+            .summary { background: #f5f5f5; border: 2px solid #000; padding: 5mm; margin-top: 10mm; }
+            .summary-row { display: flex; justify-content: space-between; font-size: 14pt; font-weight: 700; margin-bottom: 3mm; }
+            .footer { text-align: center; margin-top: 15mm; font-size: 9pt; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="document">
+            <div class="header">
+              <div class="company">DECORACIONES EGEA</div>
+              <div>www.decoracionesegea.com</div>
+              <div class="doc-type">ALBARÁN DE ENVÍO</div>
+            </div>
+
+            <div class="order-number">${orderNumber}</div>
+
+            <div class="section">
+              <div class="section-title">Datos del Cliente</div>
+              <div class="info-grid">
+                <div class="info-item">
+                  <div class="info-label">Cliente</div>
+                  <div class="info-value">${customerName}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Contacto</div>
+                  <div class="info-value">${contactName}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Dirección de Entrega</div>
+                  <div class="info-value">${deliveryAddress}</div>
+                </div>
+                <div class="info-item">
+                  <div class="info-label">Región</div>
+                  <div class="info-value">${region}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="qr-section">
+              <img src="${qrUrl}" alt="Código QR" />
+            </div>
+
+            <div class="summary">
+              <div class="summary-row">
+                <span>Total Bultos:</span>
+                <span>${packageCount}</span>
+              </div>
+              <div class="summary-row">
+                <span>Total Unidades:</span>
+                <span>${totalUnits}</span>
+              </div>
+            </div>
+
+            <div class="footer">
+              Documento generado automáticamente - ${new Date().toLocaleString('es-ES')}
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    console.log('📄 Generando albarán A4:', orderNumber);
+
+    try {
+      printHtmlToIframe(htmlContent);
+      toast.success('Albarán A4 generado');
+      await confirmProductionFinish();
+    } catch (error) {
+      console.error('❌ Error:', error);
+      toast.error('Error al generar albarán');
     }
   };
 
@@ -463,14 +611,24 @@ export function ProductionPage() {
                         onChange={(e) => setPackagesInput(parseInt(e.target.value) || 1)}
                         className="w-32 bg-[#0D0F11] border border-[#2A2D31] rounded-xl p-4 text-center text-2xl font-bold text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
-                      <button
-                        onClick={printShippingLabel}
-                        disabled={isPersisting}
-                        className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50"
-                      >
-                        <Printer className="w-6 h-6 mr-2" />
-                        IMPRIMIR ETIQUETA Y FINALIZAR
-                      </button>
+                      <div className="flex-1 flex gap-2">
+                        <button
+                          onClick={printShippingLabel}
+                          disabled={isPersisting}
+                          className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
+                        >
+                          <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
+                          <span className="whitespace-nowrap">Etiqueta 60x86mm</span>
+                        </button>
+                        <button
+                          onClick={printA4Document}
+                          disabled={isPersisting}
+                          className="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
+                        >
+                          <FileText className="w-5 h-5 mr-2 flex-shrink-0" />
+                          <span className="whitespace-nowrap">Albarán A4</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
