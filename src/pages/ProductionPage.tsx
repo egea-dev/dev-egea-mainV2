@@ -340,7 +340,20 @@ export function ProductionPage() {
         </body>
       </html>
     `;
-    printHtmlToIframe(htmlContent);
+
+    console.log('📄 Generando etiqueta de envío para:', orderNumber);
+    console.log('📦 Bultos:', packageCount);
+    console.log('🔗 QR URL:', qrUrlLarge);
+
+    try {
+      printHtmlToIframe(htmlContent);
+      console.log('✅ Etiqueta enviada a impresión');
+      toast.success('Etiqueta de envío generada');
+    } catch (error) {
+      console.error('❌ Error al imprimir etiqueta:', error);
+      toast.error('Error al generar etiqueta de envío');
+    }
+
     await confirmProductionFinish();
   };
 
