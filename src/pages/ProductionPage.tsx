@@ -199,162 +199,49 @@ export function ProductionPage() {
 
   const printShippingLabel = async () => {
     if (!scannedOrder) return;
-    const labelWidth = '60mm';
-    const labelHeight = '90mm';
-    const qrUrlLarge = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(scannedOrder.qr_payload || scannedOrder.order_number)}`;
-    const orderNumber = escapeHtml(scannedOrder.order_number);
-    const customerName = escapeHtml(scannedOrder.customer_name || 'Sin cliente');
-    const contactName = escapeHtml(scannedOrder.contact_name || '-');
-    const deliveryAddress = escapeHtml(scannedOrder.delivery_address || 'Sin direccion');
-    const region = escapeHtml(scannedOrder.region || '-');
-    const packageCount = escapeHtml(String(packagesInput));
-    const totalUnits = escapeHtml(String(scannedOrder.quantity_total || 0));
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <title>Etiqueta Envio - ${orderNumber}</title>
-          <style>
-            * { box-sizing: border-box; }
-            @page { size: ${labelWidth} ${labelHeight}; margin: 0; }
-            html, body {
-              width: ${labelWidth};
-              height: ${labelHeight};
-              margin: 0;
-              padding: 0;
-              overflow: hidden;
-            }
-            body {
-              font-family: Arial, sans-serif;
-              color: #111;
-              background: #fff;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            .label {
-              width: ${labelWidth};
-              height: ${labelHeight};
-              padding: 2mm 1.8mm 2mm;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              gap: 1.4mm;
-              border: 0;
-              text-align: center;
-            }
-            .topline {
-              font-size: 1.6mm;
-              font-weight: 700;
-              letter-spacing: 0.55mm;
-              text-transform: uppercase;
-            }
-            .brand {
-              font-size: 3.2mm;
-              font-weight: 900;
-              text-transform: uppercase;
-              letter-spacing: 0.3mm;
-              line-height: 1.1;
-            }
-            .brand span { display: block; }
-            .site {
-              font-size: 1.7mm;
-              color: #333;
-            }
-            .badge {
-              margin-top: 0.6mm;
-              background: #111;
-              color: #fff;
-              width: 100%;
-              font-size: 2.1mm;
-              font-weight: 800;
-              text-transform: uppercase;
-              letter-spacing: 0.45mm;
-              padding: 0.8mm 0;
-            }
-            .order {
-              font-size: 3.6mm;
-              font-weight: 900;
-              margin: 0.6mm 0 0.8mm;
-            }
-            .box {
-              width: 100%;
-              border: 0.3mm solid #999;
-              background: #f2f2f2;
-              padding: 1.6mm 1.4mm;
-              font-size: 1.9mm;
-              line-height: 1.3;
-              text-align: left;
-            }
-            .box-row {
-              display: flex;
-              gap: 1mm;
-              margin-bottom: 0.6mm;
-            }
-            .box-row:last-child { margin-bottom: 0; }
-            .box-label {
-              min-width: 9.5mm;
-              font-weight: 900;
-              text-transform: uppercase;
-              color: #111;
-            }
-            .qr {
-              width: 24mm;
-              height: 24mm;
-              border: 0.3mm solid #111;
-              margin: 1.2mm auto 0.8mm;
-              background: #fff;
-            }
-            .counts {
-              border: 0.35mm solid #111;
-              font-weight: 900;
-              font-size: 2.8mm;
-              padding: 1mm 0;
-              margin: 0.6mm auto 0.8mm;
-              width: 22mm;
-              text-transform: uppercase;
-            }
-            .units {
-              font-size: 1.9mm;
-              margin-bottom: 0.2mm;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="label">
-            <div class="topline">Produccion</div>
-            <div class="brand"><span>Decoraciones</span><span>Egea</span></div>
-            <div class="site">www.decoracionesegea.com</div>
-            <div class="badge">Etiqueta de Envio</div>
-            <div class="order">${orderNumber}</div>
-            <div class="box">
-              <div class="box-row"><span class="box-label">Cliente:</span><span>${customerName}</span></div>
-              <div class="box-row"><span class="box-label">Contacto:</span><span>${contactName}</span></div>
-              <div class="box-row"><span class="box-label">Direccion:</span><span>${deliveryAddress}</span></div>
-              <div class="box-row"><span class="box-label">Region:</span><span>${region}</span></div>
-            </div>
-            <img class="qr" src="${qrUrlLarge}" alt="QR" />
-            <div class="counts">Bultos: ${packageCount}</div>
-            <div class="units">Total Unidades: ${totalUnits}</div>
-          </div>
-        </body>
-      </html>
-    `;
 
-    console.log('📄 Generando etiqueta de envío para:', orderNumber);
-    console.log('📦 Bultos:', packageCount);
-    console.log('🔗 QR URL:', qrUrlLarge);
+    // URL del servidor de impresión en Raspberry Pi
+    const PRINT_SERVER_URL = 'http://192.168.1.234:3001/print';
+
+    console.log('📄 Enviando etiqueta a servidor de impresión:', scannedOrder.order_number);
+    console.log('📦 Bultos:', packagesInput);
+    console.log('🖨️  Servidor:', PRINT_SERVER_URL);
 
     try {
-      printHtmlToIframe(htmlContent);
-      console.log('✅ Etiqueta enviada a impresión');
-      toast.success('Etiqueta de envío generada');
-    } catch (error) {
-      console.error('❌ Error al imprimir etiqueta:', error);
-      toast.error('Error al generar etiqueta de envío');
-    }
+      const response = await fetch(PRINT_SERVER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderNumber: scannedOrder.order_number,
+          customerName: scannedOrder.customer_name || 'Sin cliente',
+          contactName: scannedOrder.contact_name,
+          deliveryAddress: scannedOrder.delivery_address,
+          region: scannedOrder.region,
+          packagesCount: packagesInput,
+          totalUnits: scannedOrder.quantity_total || 0,
+          qrData: scannedOrder.qr_payload || scannedOrder.order_number
+        })
+      });
 
-    await confirmProductionFinish();
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ Etiqueta enviada a impresión correctamente');
+        toast.success('Etiqueta enviada a impresión Brother QL-700', {
+          duration: 3000,
+        });
+        await confirmProductionFinish();
+      } else {
+        console.error('❌ Error del servidor:', data.error);
+        toast.error(`Error al imprimir: ${data.error}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error de conexión:', error);
+      toast.error('No se pudo conectar con el servidor de impresión. Verifica que la Raspberry Pi esté encendida.');
+    }
   };
 
   const confirmProductionFinish = async () => {
