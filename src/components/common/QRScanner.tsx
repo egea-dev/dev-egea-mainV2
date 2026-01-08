@@ -13,12 +13,12 @@ interface QRScannerProps {
     className?: string;
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ 
-    onScan, 
-    onError, 
+const QRScanner: React.FC<QRScannerProps> = ({
+    onScan,
+    onError,
     onClose,
     fullscreen = false,
-    className 
+    className
 }) => {
     const [isScanning, setIsScanning] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(fullscreen);
@@ -27,36 +27,77 @@ const QRScanner: React.FC<QRScannerProps> = ({
     useEffect(() => {
         const startScanner = async () => {
             try {
+                // Solicitar permisos de cámara primero
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: "environment" } } // Cámara trasera en móvil
+                });
+                stream.getTracks().forEach(track => track.stop()); // Detener stream temporal
+
                 const devices = await Html5Qrcode.getCameras();
+                console.log('Cámaras disponibles:', devices);
+
                 if (devices && devices.length) {
-                    const cameraId = devices[0].id;
+                    // Preferir cámara trasera en móvil
+                    let cameraId = devices[0].id;
+                    const backCamera = devices.find(device =>
+                        device.label.toLowerCase().includes('back') ||
+                        device.label.toLowerCase().includes('rear') ||
+                        device.label.toLowerCase().includes('trasera')
+                    );
+                    if (backCamera) {
+                        cameraId = backCamera.id;
+                        console.log('Usando cámara trasera:', backCamera.label);
+                    }
+
                     const scanner = new Html5Qrcode("reader");
                     scannerRef.current = scanner;
 
+                    // Configuración optimizada para móvil
+                    const config = {
+                        fps: 10,
+                        qrbox: function (viewfinderWidth: number, viewfinderHeight: number) {
+                            // Cuadro de escaneo responsive
+                            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                            const qrboxSize = Math.floor(minEdge * 0.7);
+                            return {
+                                width: qrboxSize,
+                                height: qrboxSize
+                            };
+                        },
+                        aspectRatio: 1.0,
+                        disableFlip: false
+                    };
+
                     await scanner.start(
                         cameraId,
-                        {
-                            fps: 10,
-                            qrbox: { width: 250, height: 250 }
-                        },
+                        config,
                         (decodedText) => {
                             // Vibración táctil en móvil
                             if (navigator.vibrate) {
                                 navigator.vibrate(200);
                             }
+                            console.log('QR escaneado:', decodedText);
                             onScan(decodedText);
                         },
                         (errorMessage) => {
-                            if (onError) onError(errorMessage);
+                            // Solo loguear errores, no mostrarlos (son muy frecuentes)
+                            // if (onError) onError(errorMessage);
                         }
                     );
                     setIsScanning(true);
+                    console.log('Escáner iniciado correctamente');
                 } else {
                     toast.error("No se encontraron cámaras");
                 }
-            } catch (err) {
-                console.error("Error iniciando cámara", err);
-                toast.error("Error al acceder a la cámara");
+            } catch (err: any) {
+                console.error("Error iniciando cámara:", err);
+                if (err.name === 'NotAllowedError') {
+                    toast.error("Permiso de cámara denegado. Por favor, permite el acceso a la cámara.");
+                } else if (err.name === 'NotFoundError') {
+                    toast.error("No se encontró ninguna cámara en el dispositivo.");
+                } else {
+                    toast.error("Error al acceder a la cámara: " + err.message);
+                }
             }
         };
 
@@ -66,6 +107,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
             if (scannerRef.current) {
                 scannerRef.current.stop().then(() => {
                     scannerRef.current?.clear();
+                    console.log('Escáner detenido');
                 }).catch(err => console.error("Error stopping scanner", err));
             }
         };
@@ -78,13 +120,13 @@ const QRScanner: React.FC<QRScannerProps> = ({
     return (
         <div className={cn(
             "relative bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-700",
-            isFullscreen 
-                ? "fixed inset-0 z-50 rounded-none" 
+            isFullscreen
+                ? "fixed inset-0 z-50 rounded-none"
                 : "w-full h-[300px] md:h-[400px]",
             className
         )}>
             <div id="reader" className="w-full h-full"></div>
-            
+
             {/* Botón cerrar */}
             {onClose && (
                 <Button
@@ -96,7 +138,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                     <X className="w-6 h-6 md:w-5 md:h-5" />
                 </Button>
             )}
-            
+
             {/* Indicador de escaneo */}
             <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10 pointer-events-none">
                 <div className="bg-black/50 backdrop-blur px-4 py-2 rounded-full text-xs md:text-sm text-white flex items-center gap-2">
@@ -104,7 +146,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                     Escaneando...
                 </div>
             </div>
-            
+
             {/* Botón fullscreen (solo visible en móvil cuando no está fullscreen) */}
             {!isFullscreen && (
                 <Button
@@ -116,7 +158,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                     <Maximize2 className="w-5 h-5" />
                 </Button>
             )}
-            
+
             {/* Botón minimizar (solo en fullscreen) */}
             {isFullscreen && (
                 <Button
