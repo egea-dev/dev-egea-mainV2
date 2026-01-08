@@ -480,11 +480,11 @@ export default function ShippingScanPage() {
 
   return (
     <PageShell title="Expedición y Logística" description="Control de salidas y gestión de envíos">
-      <div className="flex flex-col lg:flex-row gap-2 lg:gap-4">
-        {/* COLUMNA IZQUIERDA - Escáner y Cola */}
-        <div className="lg:w-[280px] flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
+        {/* ESCÁNER - PANTALLA COMPLETA EN MÓVIL */}
+        <div className="w-full">
           {/* Escáner */}
-          <div className="bg-[#323438] border border-[#45474A] rounded-xl p-3 lg:p-5">
+          <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2">
             <div className="flex items-center gap-2 mb-4">
               <QrCode className="w-5 h-5 text-indigo-400" />
               <h3 className="text-white font-bold">Egea QR Cam</h3>
@@ -508,26 +508,30 @@ export default function ShippingScanPage() {
                 </button>
               </div>
             )}
-            <div className="flex gap-2 mt-4">
-              <input
-                type="text"
-                placeholder="Escaneo manual / Ref..."
-                className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-3 text-sm text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
-                value={qrInput}
-                onChange={(e) => setQrInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
-              />
-              <button
-                onClick={() => handleScan(qrInput)}
-                className="px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
           </div>
 
-          {/* Cola de Almacén */}
-          <div className="bg-[#323438] border border-[#45474A] rounded-xl p-3">
+          {/* Input Manual Debajo */}
+          <div className="flex gap-2 mt-2">
+            <input
+              type="text"
+              placeholder="Código del pedido o escanea QR..."
+              className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-4 text-base md:text-lg text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
+              value={qrInput}
+              onChange={(e) => setQrInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
+            />
+            <button
+              onClick={() => handleScan(qrInput)}
+              className="px-6 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-lg font-semibold"
+            >
+              <ArrowRight className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+
+        {/* COLA DE ALMACÉN - DEBAJO EN MÓVIL, AL LADO EN DESKTOP */}
+        <div className="w-full lg:flex-1">
+          <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2">
             <h3 className="font-bold text-[#8B8D90] mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
               <span>Cola de Almacén</span>
               <span className="bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full text-xs">{pendingOrders.length}</span>
