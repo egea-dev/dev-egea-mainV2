@@ -1,89 +1,235 @@
-# Egea Main Control (Chrono Display)
+# Egea Productivity App
 
-![Version](https://img.shields.io/badge/version-1.0.0--alpha-blue)
-![React](https://img.shields.io/badge/React-18.x-61DAFB)
-![Vite](https://img.shields.io/badge/Vite-7.x-646CFF)
-![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E)
-![License](https://img.shields.io/badge/license-Private-red)
+Sistema de gestión integral para instalaciones, producción comercial y logística.
 
-**Egea Main Control** es una plataforma integral de productividad y gestión operativa diseñada para el control de instalaciones, flotas de vehículos, gestión de personal y comunicaciones internas. El sistema combina un panel de control interactivo con capacidades de planificación en tiempo real.
+---
 
-## 🚀 Características Principales
+## 🚀 Inicio Rápido
 
-El proyecto está estructurado modularmente para cubrir distintas áreas operativas:
+```bash
+# Instalar dependencias
+npm install
 
-* **📊 Dashboard Operativo:** Visualización de estadísticas, estados y resumen diario.
-* **📅 Gestión de Instalaciones:** Planificación mediante calendarios interactivos (`FullCalendar`), asignación de tareas y seguimiento de estados.
-* **🚗 Control de Flotas (Vehículos):** Gestión de inventario de vehículos, estados y asignaciones.
-* **👥 Gestión de Usuarios y Roles:** Sistema de autenticación y autorización con roles (Administrador, Operario, Manager) y permisos granulares.
-* **💬 Comunicaciones:** Sistema de mensajería directa y chat integrado para la coordinación de equipos.
-* **🔧 Configuración del Sistema:** Gestión de plantillas de tareas, importación de datos y configuraciones globales.
+# Iniciar servidor de desarrollo
+npm run dev
 
-## 🛠️ Stack Tecnológico
+# Abrir en navegador
+https://localhost:8083
+```
 
-* **Frontend:** React 18, TypeScript, Vite.
-* **Estilos & UI:** Tailwind CSS, shadcn/ui, Radix UI.
-* **Gráficos & Mapas:** Recharts, FullCalendar.
-* **Backend & Base de Datos:** Supabase (PostgreSQL, Auth, Realtime, Storage).
-* **Gestión de Estado & Data Fetching:** TanStack Query.
-* **Utilidades:** date-fns, dayjs, papaparse (CSV), xlsx.
+---
 
-## 📋 Requisitos Previos
+## 🏗️ Arquitectura
 
-Asegúrate de tener instalado lo siguiente antes de comenzar:
+Este proyecto utiliza una **arquitectura dual de bases de datos**:
 
-* [Node.js](https://nodejs.org/) (v18 o superior recomendado)
-* [npm](https://www.npmjs.com/) (generalmente incluido con Node.js)
-* Cuenta y proyecto activo en [Supabase](https://supabase.com/)
+- **🔵 MAIN**: Core (autenticación, usuarios, permisos, instalaciones)
+- **🟢 PRODUCTIVITY**: Módulos de negocio (comercial, producción, logística)
 
-## 🔧 Instalación y Configuración
+Ambas bases de datos comparten la misma sesión de autenticación mediante un interceptor de fetch.
 
-Sigue estos pasos para levantar el entorno de desarrollo local:
+### Documentación Completa
 
-1.  **Clonar el repositorio:**
-    ```bash
-    git clone [https://github.com/tu-usuario/egea-main-control.git](https://github.com/tu-usuario/egea-main-control.git)
-    cd egea-main-control
-    ```
+- 📖 [ARCHITECTURE.md](./ARCHITECTURE.md) - Arquitectura del sistema
+- 📘 [SUPABASE_CLIENTS_GUIDE.md](./SUPABASE_CLIENTS_GUIDE.md) - Guía de uso de clientes Supabase
+- 📗 [DATABASE_STRUCTURE.md](./DATABASE_STRUCTURE.md) - Esquema de base de datos MAIN
 
-2.  **Instalar dependencias:**
-    ```bash
-    npm install
-    ```
+---
 
-3.  **Configurar variables de entorno:**
-    Crea un archivo `.env` en la raíz del proyecto basándote en `.env.example`:
-    ```env
-    VITE_SUPABASE_PROJECT_ID="tu-project-id"
-    VITE_SUPABASE_ANON_KEY="tu-anon-key"
-    VITE_SUPABASE_URL="[https://tu-project-id.supabase.co](https://tu-project-id.supabase.co)"
-    VITE_APP_VERSION="1.0.0-alpha"
-    ```
+## 🗂️ Estructura del Proyecto
 
-4.  **Base de Datos (Supabase):**
-    Asegúrate de aplicar las migraciones necesarias ubicadas en la carpeta `supabase/migrations` para mantener la estructura de la base de datos sincronizada.
-    ```bash
-    supabase migration up
-    ```
-
-5.  **Ejecutar el servidor de desarrollo:**
-    ```bash
-    npm run dev
-    ```
-
-## 📂 Estructura del Proyecto
-
-```text
-egea-main-control/
+```
+egea-Main-control/
 ├── src/
-│   ├── components/      # Componentes reutilizables (UI, Badges, etc.)
-│   ├── config/          # Configuraciones globales y de navegación
-│   ├── context/         # Contextos de React (Auth, Roles, etc.)
-│   ├── hooks/           # Custom hooks (lógica reutilizable)
-│   ├── pages/           # Vistas principales (Rutas de la aplicación)
-│   ├── integrations/    # Integraciones externas (Cliente Supabase)
-│   └── lib/             # Utilidades y funciones auxiliares
+│   ├── components/          # Componentes React
+│   │   ├── dashboard/       # Dashboard Admin
+│   │   ├── commercial/      # Módulo Comercial
+│   │   ├── installations/   # Módulo Instalaciones
+│   │   └── ...
+│   ├── hooks/               # Custom hooks
+│   ├── integrations/
+│   │   └── supabase/        # Clientes Supabase
+│   │       ├── client.ts    # ⚠️ Configuración de clientes
+│   │       ├── types.ts     # Tipos MAIN
+│   │       └── types-productivity.ts  # Tipos PRODUCTIVITY
+│   ├── pages/               # Páginas principales
+│   └── lib/                 # Utilidades
 ├── supabase/
-│   ├── migrations/      # Historial de cambios en la BD
-│   └── functions/       # Edge Functions
-└── public/              # Assets estáticos
+│   └── migrations/          # Migraciones SQL (MAIN)
+└── docs/                    # Documentación adicional
+```
+
+---
+
+## 💻 Uso de Clientes Supabase
+
+### Regla Simple
+
+```typescript
+// Para tablas de MAIN (usuarios, instalaciones, permisos)
+import { supabaseMain } from '@/integrations/supabase/client';
+
+// Para tablas de PRODUCTIVITY (comercial, producción, logística)
+import { supabaseProductivity } from '@/integrations/supabase/client';
+```
+
+### Tabla de Mapeo Rápido
+
+| Tabla | Cliente | Módulo |
+|-------|---------|--------|
+| `profiles`, `vehicles`, `screen_data` | `supabaseMain` | Core |
+| `comercial_orders`, `produccion_work_orders` | `supabaseProductivity` | Negocio |
+
+**Ver tabla completa**: [SUPABASE_CLIENTS_GUIDE.md](./SUPABASE_CLIENTS_GUIDE.md)
+
+---
+
+## 🔐 Autenticación
+
+La autenticación es manejada por `supabaseMain` y compartida automáticamente con `supabaseProductivity` mediante un interceptor de fetch.
+
+```typescript
+// Login (solo usar supabaseMain)
+const { data, error } = await supabaseMain.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'password'
+});
+
+// Logout
+await supabaseMain.auth.signOut();
+```
+
+---
+
+## 📦 Módulos Principales
+
+### 1. **Dashboard Admin**
+- Vista general de instalaciones y pedidos
+- Calendario con drag & drop
+- Estadísticas en tiempo real
+
+### 2. **Instalaciones**
+- Gestión de tareas de instalación
+- Asignación de operarios y vehículos
+- Calendario semanal
+
+### 3. **Comercial**
+- Gestión de pedidos
+- Seguimiento de estados
+- Documentación (presupuestos, pedidos)
+
+### 4. **Producción**
+- Órdenes de trabajo
+- Control de calidad
+- Etiquetado QR
+
+### 5. **Logística**
+- Gestión de envíos
+- Almacén
+- Tracking
+
+---
+
+## ⚙️ Variables de Entorno
+
+Crear archivo `.env` en la raíz:
+
+```env
+# MAIN Database
+VITE_SUPABASE_URL=https://your-main-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-main-anon-key
+
+# PRODUCTIVITY Database
+VITE_SUPABASE_PRODUCTIVITY_URL=https://your-productivity-project.supabase.co
+VITE_SUPABASE_PRODUCTIVITY_ANON_KEY=your-productivity-anon-key
+```
+
+---
+
+## 🛠️ Scripts Disponibles
+
+```bash
+# Desarrollo
+npm run dev              # Iniciar servidor de desarrollo
+
+# Build
+npm run build            # Compilar para producción
+npm run preview          # Preview de build
+
+# Linting
+npm run lint             # Ejecutar ESLint
+```
+
+---
+
+## ⚠️ Notas Importantes
+
+### Warning "Multiple GoTrueClient instances"
+
+Este warning es **esperado y benigno**. Aparece porque usamos dos bases de datos Supabase, pero es seguro porque:
+- Solo MAIN maneja autenticación
+- PRODUCTIVITY usa interceptor de fetch
+- No hay conflicto de datos
+
+**Más info**: Ver comentarios en `src/integrations/supabase/client.ts`
+
+### RLS (Row Level Security)
+
+Ambas bases de datos implementan RLS. Asegúrate de estar autenticado para acceder a los datos.
+
+---
+
+## 📚 Documentación Adicional
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - Arquitectura completa del sistema
+- [SUPABASE_CLIENTS_GUIDE.md](./SUPABASE_CLIENTS_GUIDE.md) - Guía detallada de clientes
+- [DATABASE_STRUCTURE.md](./DATABASE_STRUCTURE.md) - Esquema de base de datos
+
+---
+
+## 🤝 Contribuir
+
+### Añadir Nueva Tabla
+
+1. **Decidir base de datos**: ¿MAIN (core) o PRODUCTIVITY (negocio)?
+2. **Crear migración**: En el proyecto Supabase correspondiente
+3. **Regenerar tipos**: `supabase gen types typescript`
+4. **Usar cliente correcto**: `supabaseMain` o `supabaseProductivity`
+5. **Actualizar documentación**: Añadir a tabla de mapeo
+
+**Ver guía completa**: [SUPABASE_CLIENTS_GUIDE.md#añadir-nueva-tabla](./SUPABASE_CLIENTS_GUIDE.md#-añadir-nueva-tabla)
+
+---
+
+## 🐛 Solución de Problemas
+
+### Error: "relation does not exist"
+
+**Causa**: Usar el cliente incorrecto para una tabla.
+
+**Solución**: Verificar en [SUPABASE_CLIENTS_GUIDE.md](./SUPABASE_CLIENTS_GUIDE.md) qué cliente usar.
+
+### Error: "table does not exist"
+
+**Causa**: Mismo problema, cliente incorrecto.
+
+**Solución**: Consultar tabla de mapeo.
+
+---
+
+## 📞 Soporte
+
+- **Documentación**: Ver archivos `.md` en la raíz del proyecto
+- **Issues**: [GitHub Issues](https://github.com/NeuralStories/egea-Main-control/issues)
+
+---
+
+## 📄 Licencia
+
+Propietario: Egea Productivity  
+Todos los derechos reservados.
+
+---
+
+**Última actualización**: 9 de enero de 2026  
+**Versión**: 2.0

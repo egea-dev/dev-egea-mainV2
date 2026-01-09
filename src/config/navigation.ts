@@ -66,7 +66,7 @@ const sistemasItems: AppNavItem[] = [
 
 
 const mainNav: AppNavEntry[] = [
-
+  { type: "item", path: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { type: "item", path: "/admin/installations", label: "Instalaciones", icon: CalendarCheck },
   { type: "item", path: "/admin/calendario-global", label: "Calendario Global", icon: CalendarCheck },
   { type: "item", path: "/admin/comercial", label: "Comercial", icon: ShoppingCart },

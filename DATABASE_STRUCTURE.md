@@ -4,7 +4,67 @@
 
 Esta documentación describe la estructura completa de la base de datos PostgreSQL para la aplicación Egea Productivity, diseñada para gestionar tareas, usuarios, vehículos y comunicaciones de manera eficiente y segura.
 
-## 📋 Tablas Principales
+## 🔀 Arquitectura Dual: MAIN + PRODUCTIVITY
+
+> **IMPORTANTE**: Este proyecto utiliza **dos bases de datos Supabase separadas** para mantener una arquitectura modular.
+
+### Bases de Datos
+
+#### 🔵 MAIN Database
+**Propósito**: Core de la aplicación (autenticación, usuarios, permisos, recursos, instalaciones)
+
+**Tablas**:
+- `profiles` - Perfiles de usuario
+- `vehicles` - Vehículos
+- `templates` - Plantillas de pantallas
+- `screens` - Configuración de pantallas
+- `screen_data` - Datos de instalaciones
+- `screen_groups` - Grupos de pantallas
+- `task_profiles` - Asignación de operarios a tareas
+- `task_vehicles` - Asignación de vehículos a tareas
+- `role_permissions` - Permisos por rol
+- `detailed_tasks` - Vista optimizada de tareas
+
+**Cliente Supabase**: `supabaseMain` o `supabase` (alias)
+
+#### 🟢 PRODUCTIVITY Database
+**Propósito**: Módulos de negocio (comercial, producción, logística, almacén)
+
+**Tablas**:
+- `comercial_orders` - Pedidos comerciales
+- `produccion_work_orders` - Órdenes de trabajo
+- `materials` - Materiales
+- `logistics` - Logística y envíos
+- `order_documents` - Documentos de pedidos
+- `status_log` - Historial de estados
+
+**Cliente Supabase**: `supabaseProductivity`
+
+### Autenticación Compartida
+
+Ambas bases de datos **comparten la misma sesión de autenticación**:
+- `supabaseMain` maneja el login/logout
+- `supabaseProductivity` usa un interceptor de fetch que inyecta automáticamente el token de `supabaseMain`
+- **Row Level Security (RLS)** funciona en ambas bases de datos
+
+### Guía de Uso
+
+Para saber qué cliente usar en tu código, consulta [SUPABASE_CLIENTS_GUIDE.md](./SUPABASE_CLIENTS_GUIDE.md).
+
+**Regla rápida**:
+```typescript
+// Para tablas de MAIN (usuarios, instalaciones, permisos)
+import { supabaseMain } from '@/integrations/supabase/client';
+
+// Para tablas de PRODUCTIVITY (comercial, producción, logística)
+import { supabaseProductivity } from '@/integrations/supabase/client';
+```
+
+---
+
+## 📋 Tablas Principales (MAIN Database)
+
+> **Nota**: Las siguientes tablas están en la base de datos **MAIN**. Para tablas de PRODUCTIVITY, consulta la documentación específica de ese proyecto.
 
 ### 1. `profiles` - Perfiles de Usuario
 Gestiona la información de los usuarios del sistema.

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import PageShell from '@/components/layout/PageShell';
 import QRScanner from '@/components/common/QRScanner';
+import { RoleBasedRender } from '@/components/common/RoleBasedRender';
 import { toast } from 'sonner';
 import { printHtmlToIframe } from '@/utils/print';
 
@@ -482,52 +483,54 @@ export default function ShippingScanPage() {
     <PageShell title="Expedición y Logística" description="Control de salidas y gestión de envíos" className="space-y-0">
       <div className="flex flex-col gap-2">
         {/* ESCÁNER - PANTALLA COMPLETA EN MÓVIL */}
-        <div className="w-full">
-          {/* Escáner */}
-          <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2">
-            <div className="flex items-center gap-2 mb-2">
-              <QrCode className="w-5 h-5 text-indigo-400" />
-              <h3 className="text-white font-bold">Egea QR Cam</h3>
-            </div>
-            {!cameraActive ? (
-              <button
-                onClick={() => setCameraActive(true)}
-                className="w-full aspect-[3/4] min-h-[600px] bg-[#1A1D1F] rounded-lg border-2 border-dashed border-[#45474A] flex flex-col items-center justify-center gap-3 text-[#B5B8BA] hover:text-white hover:border-indigo-500/40 transition"
-              >
-                <Camera className="w-16 h-16" />
-                <span className="text-lg font-semibold">Activar cámara</span>
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <QRScanner onScan={handleScan} onClose={() => setCameraActive(false)} />
-                <button
-                  onClick={() => setCameraActive(false)}
-                  className="w-full py-3 bg-[#45474A] text-white rounded-lg hover:bg-[#6E6F71] transition font-medium"
-                >
-                  Cerrar cámara
-                </button>
+        <RoleBasedRender hideForRoles={['admin', 'manager']}>
+          <div className="w-full">
+            {/* Escáner */}
+            <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2">
+              <div className="flex items-center gap-2 mb-2">
+                <QrCode className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-white font-bold">Egea QR Cam</h3>
               </div>
-            )}
-          </div>
+              {!cameraActive ? (
+                <button
+                  onClick={() => setCameraActive(true)}
+                  className="w-full aspect-[3/4] min-h-[600px] bg-[#1A1D1F] rounded-lg border-2 border-dashed border-[#45474A] flex flex-col items-center justify-center gap-3 text-[#B5B8BA] hover:text-white hover:border-indigo-500/40 transition"
+                >
+                  <Camera className="w-16 h-16" />
+                  <span className="text-lg font-semibold">Activar cámara</span>
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <QRScanner onScan={handleScan} onClose={() => setCameraActive(false)} />
+                  <button
+                    onClick={() => setCameraActive(false)}
+                    className="w-full py-3 bg-[#45474A] text-white rounded-lg hover:bg-[#6E6F71] transition font-medium"
+                  >
+                    Cerrar cámara
+                  </button>
+                </div>
+              )}
+            </div>
 
-          {/* Input Manual Debajo */}
-          <div className="flex gap-2 mt-2">
-            <input
-              type="text"
-              placeholder="Código del pedido o escanea QR..."
-              className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
-              value={qrInput}
-              onChange={(e) => setQrInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
-            />
-            <button
-              onClick={() => handleScan(qrInput)}
-              className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold flex items-center justify-center min-w-[60px]"
-            >
-              <ArrowRight className="w-5 h-5" />
-            </button>
+            {/* Input Manual Debajo */}
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="Código del pedido o escanea QR..."
+                className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={qrInput}
+                onChange={(e) => setQrInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
+              />
+              <button
+                onClick={() => handleScan(qrInput)}
+                className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold flex items-center justify-center min-w-[60px]"
+              >
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-        </div>
+        </RoleBasedRender>
 
         {/* COLA DE ALMACÉN - DEBAJO EN MÓVIL, AL LADO EN DESKTOP */}
         <div className="w-full lg:flex-1">

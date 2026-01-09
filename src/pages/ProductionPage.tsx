@@ -3,6 +3,7 @@ import { supabaseProductivity } from '@/integrations/supabase';
 import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon, FileText } from 'lucide-react';
 import PageShell from '@/components/layout/PageShell';
 import QRScanner from '@/components/common/QRScanner';
+import { RoleBasedRender } from '@/components/common/RoleBasedRender';
 import { toast } from 'sonner';
 import { printHtmlToIframe } from '@/utils/print';
 
@@ -417,52 +418,54 @@ export function ProductionPage() {
     <PageShell title="Control de Producción" description="Fabricación, corte y confección" className="space-y-0">
       <div className="flex flex-col gap-2">
         {/* ESCÁNER - PANTALLA COMPLETA */}
-        <div className="w-full">
-          {/* Escáner */}
-          <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-lg p-2">
-            <div className="flex items-center gap-2 mb-2">
-              <QrCode className="w-5 h-5 text-[#FF6B35]" />
-              <h3 className="text-white font-bold">Escáner de producción</h3>
-            </div>
-            {!cameraActive ? (
-              <button
-                onClick={() => setCameraActive(true)}
-                className="w-full aspect-[3/4] min-h-[600px] bg-[#0D0F11] rounded-lg border-2 border-dashed border-[#2A2D31] flex flex-col items-center justify-center gap-3 text-[#B5B8BA] hover:text-white hover:border-[#FF6B35]/40 transition"
-              >
-                <Camera className="w-16 h-16" />
-                <span className="text-lg font-semibold">Activar cámara</span>
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <QRScanner onScan={handleScan} onClose={() => setCameraActive(false)} />
-                <button
-                  onClick={() => setCameraActive(false)}
-                  className="w-full py-3 bg-[#2A2D31] text-white rounded-lg hover:bg-[#3A3D41] transition font-medium"
-                >
-                  Cerrar cámara
-                </button>
+        <RoleBasedRender hideForRoles={['admin', 'manager']}>
+          <div className="w-full">
+            {/* Escáner */}
+            <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-lg p-2">
+              <div className="flex items-center gap-2 mb-2">
+                <QrCode className="w-5 h-5 text-[#FF6B35]" />
+                <h3 className="text-white font-bold">Escáner de producción</h3>
               </div>
-            )}
-          </div>
+              {!cameraActive ? (
+                <button
+                  onClick={() => setCameraActive(true)}
+                  className="w-full aspect-[3/4] min-h-[600px] bg-[#0D0F11] rounded-lg border-2 border-dashed border-[#2A2D31] flex flex-col items-center justify-center gap-3 text-[#B5B8BA] hover:text-white hover:border-[#FF6B35]/40 transition"
+                >
+                  <Camera className="w-16 h-16" />
+                  <span className="text-lg font-semibold">Activar cámara</span>
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <QRScanner onScan={handleScan} onClose={() => setCameraActive(false)} />
+                  <button
+                    onClick={() => setCameraActive(false)}
+                    className="w-full py-3 bg-[#2A2D31] text-white rounded-lg hover:bg-[#3A3D41] transition font-medium"
+                  >
+                    Cerrar cámara
+                  </button>
+                </div>
+              )}
+            </div>
 
-          {/* Input Manual Debajo */}
-          <div className="flex gap-2 mt-2">
-            <input
-              type="text"
-              placeholder="Código del pedido o escanea QR..."
-              className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-[#FF6B35] outline-none"
-              value={qrInput}
-              onChange={(e) => setQrInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
-            />
-            <button
-              onClick={() => handleScan(qrInput)}
-              className="px-5 py-3 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition font-semibold flex items-center justify-center min-w-[60px]"
-            >
-              <ArrowRight className="w-5 h-5" />
-            </button>
+            {/* Input Manual Debajo */}
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="Código del pedido o escanea QR..."
+                className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-[#FF6B35] outline-none"
+                value={qrInput}
+                onChange={(e) => setQrInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
+              />
+              <button
+                onClick={() => handleScan(qrInput)}
+                className="px-5 py-3 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition font-semibold flex items-center justify-center min-w-[60px]"
+              >
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-        </div>
+        </RoleBasedRender>
 
         {/* COLA DE PRODUCCIÓN - DEBAJO */}
         <div className="w-full lg:flex-1">

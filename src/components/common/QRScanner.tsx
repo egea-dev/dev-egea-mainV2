@@ -32,27 +32,40 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
         const startCamera = async () => {
             try {
-                console.log('🎥 Iniciando cámara con HTTPS...');
+                console.log('🎥 Iniciando cámara...');
                 setIsLoading(true);
                 setError('');
 
                 // Verificar que getUserMedia está disponible
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error('getUserMedia no disponible. Asegúrate de estar usando HTTPS.');
+                    throw new Error('getUserMedia no disponible. Asegúrate de estar usando HTTPS o localhost.');
                 }
 
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
+                // Intentar primero con cámara trasera (ideal para escanear)
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: { ideal: 'environment' },
+                            width: { ideal: 1280, min: 640 },
+                            height: { ideal: 720, min: 480 }
+                        }
+                    });
+                } catch (err) {
+                    // Fallback: intentar con cualquier cámara disponible
+                    console.log('⚠️ Cámara trasera no disponible, usando cámara frontal...');
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            width: { ideal: 1280, min: 640 },
+                            height: { ideal: 720, min: 480 }
+                        }
+                    });
+                }
 
                 if (!mounted || !videoRef.current) return;
 
                 videoRef.current.srcObject = stream;
                 videoRef.current.setAttribute('playsinline', 'true');
+                videoRef.current.setAttribute('webkit-playsinline', 'true');
                 await videoRef.current.play();
 
                 setIsLoading(false);
@@ -70,6 +83,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
                     errorMessage = 'No se encontró cámara en el dispositivo.';
                 } else if (err.name === 'NotReadableError') {
                     errorMessage = 'La cámara está siendo usada por otra aplicación.';
+                } else if (err.message?.includes('HTTPS') || err.message?.includes('getUserMedia')) {
+                    errorMessage = 'Se requiere HTTPS o localhost para usar la cámara.';
                 } else {
                     errorMessage = err.message || 'Error desconocido';
                 }
@@ -94,11 +109,12 @@ const QRScanner: React.FC<QRScannerProps> = ({
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
+                    // Intentar detectar QR con diferentes configuraciones
                     const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: 'dontInvert',
+                        inversionAttempts: 'attemptBoth', // Intentar con inversión para mejor detección
                     });
 
-                    if (code) {
+                    if (code && code.data) {
                         console.log('✅ QR detectado:', code.data);
                         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                         onScan(code.data);

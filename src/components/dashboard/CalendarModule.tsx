@@ -39,7 +39,7 @@ import { getTaskStateColor } from '@/lib/constants';
 import { getOrderStatusLabel } from '@/lib/order-status';
 import { useDashboardCalendarData, CalendarMode } from '@/hooks/use-dashboard-data';
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseProductivity } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrders } from '@/hooks/use-orders';
 import { OrderCard } from '@/components/commercial/OrderCard';
@@ -231,8 +231,8 @@ export const CalendarModule = ({
 
         try {
             if (mode === 'commercial') {
-                // Update order delivery_date
-                const { error } = await supabase
+                // Update order delivery_date in PRODUCTIVITY database
+                const { error } = await supabaseProductivity
                     .from('comercial_orders')
                     .update({ delivery_date: newDate })
                     .eq('id', itemToMove.id);
