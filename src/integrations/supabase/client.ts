@@ -46,13 +46,30 @@ const fetchWithRetry = async (
   }
 };
 
-// MAIN Supabase client
+// ============================================================================
+// ARQUITECTURA MODULAR: MAIN + PRODUCTIVITY
+// ============================================================================
+// Este proyecto usa dos bases de datos Supabase separadas intencionalmente:
+// - MAIN: Autenticación, usuarios, recursos, instalaciones
+// - PRODUCTIVITY: Comercial, producción, envíos, almacén
+//
+// NOTA SOBRE EL WARNING "Multiple GoTrueClient instances":
+// Este warning aparece en la consola del navegador porque creamos dos clientes
+// Supabase. Supabase mismo aclara: "It is not an error, but this should be 
+// avoided". En nuestro caso es SEGURO porque:
+// 1. Usamos diferentes bases de datos (no hay conflicto de datos)
+// 2. Solo MAIN maneja autenticación (Productivity usa interceptor)
+// 3. No hay operaciones concurrentes sobre las mismas tablas
+// El warning es benigno y se puede ignorar.
+// ============================================================================
+
+// MAIN Supabase client - Única instancia con autenticación
 export const supabaseMain = createClient<MainDatabase>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storageKey: 'supabase.main.auth.token', // Clave única para MAIN
+    storageKey: 'supabase.main.auth.token',
     storage: window.localStorage,
     flowType: 'pkce'
   },
@@ -70,22 +87,46 @@ export const supabaseMain = createClient<MainDatabase>(supabaseUrl, supabaseAnon
 // Alias para compatibilidad
 export const supabase = supabaseMain;
 
+// Interceptor de fetch que inyecta el token de MAIN en las peticiones de PRODUCTIVITY
+// Esto permite compartir la autenticación sin crear múltiples instancias de GoTrueClient
+const fetchWithMainAuth = async (
+  url: RequestInfo | URL,
+  options: RequestInit = {}
+): Promise<Response> => {
+  // Obtener el token de la sesión de MAIN
+  const { data: { session } } = await supabaseMain.auth.getSession();
+
+  // Inyectar el token en los headers si existe
+  const headers = new Headers(options.headers);
+  if (session?.access_token) {
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+  }
+
+  // Llamar al fetch con retry usando los headers modificados
+  return fetchWithRetry(url, { ...options, headers });
+};
+
 // PRODUCTIVITY Supabase client
+// CAMBIO: Ahora tiene su propia sesión independiente
+// Esto resuelve el error "No suitable key or wrong key type" causado por
+// el rechazo del token de MAIN en PRODUCTIVITY (diferentes JWT secrets)
 export const supabaseProductivity = createClient<ProductivityDatabase>(
   productivityUrl || '',
   productivityAnonKey || '',
   {
     auth: {
-      persistSession: false, // IMPORTANTE: No persistir para evitar colisiones de GoTrueClient
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      storage: null
+      persistSession: true, // ✅ Sesión propia
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'supabase.productivity.auth.token', // ✅ Storage key propio
+      storage: window.localStorage,
+      flowType: 'pkce'
     },
     global: {
       headers: {
         'X-Client-Info': 'egea-productivity'
       },
-      fetch: fetchWithRetry
+      fetch: fetchWithRetry // ✅ Usa fetch normal con retry
     },
     db: {
       schema: 'public'

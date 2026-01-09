@@ -29,6 +29,8 @@ export default function CommercialPage() {
   const { data: profile } = useProfile();
 
   const [newOrderModal, setNewOrderModal] = useState(false);
+  const [importOrderModal, setImportOrderModal] = useState(false);
+  const [importOrderNumber, setImportOrderNumber] = useState("");
   const [comment, setComment] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [viewMode, setViewMode] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
@@ -149,6 +151,42 @@ export default function CommercialPage() {
     }
   };
 
+  const handleImportOrder = async () => {
+    if (!importOrderNumber.trim()) {
+      toast.error("Ingresa un número de pedido");
+      return;
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Usuario no autenticado");
+      return;
+    }
+
+    const newOrder = {
+      order_number: importOrderNumber.trim(),
+      created_by: user.id,
+      admin_code: "",
+      customer_name: "Cliente Importado",
+      fabric: "Lino",
+      quantity_total: 0,
+      status: "PENDIENTE_PAGO" as OrderStatus,
+      lines: [],
+      documents: [],
+    };
+
+    try {
+      await createOrder.mutateAsync(newOrder);
+      setImportOrderModal(false);
+      setImportOrderNumber("");
+      toast.success(`Pedido ${importOrderNumber} importado exitosamente`);
+    } catch (error) {
+      console.error("Error importing order:", error);
+    }
+  };
+
   const changeStatus = async (order: any, newStatus: OrderStatus) => {
     if (!comment) {
       toast.error("Comentario obligatorio");
@@ -201,9 +239,9 @@ export default function CommercialPage() {
           >
             <LayoutList className="w-4 h-4" />
             Pedidos activos
-          <Badge variant="secondary" className="ml-1 text-xs">
-            {activeOrders.length}
-          </Badge>
+            <Badge variant="secondary" className="ml-1 text-xs">
+              {activeOrders.length}
+            </Badge>
           </button>
           <button
             onClick={() => setViewMode("ARCHIVED")}
@@ -269,7 +307,7 @@ export default function CommercialPage() {
                     </div>
                     {(order.delivery_region || order.region) && (
                       <div>
-                      <p className="text-xs text-muted-foreground uppercase font-medium">Region</p>
+                        <p className="text-xs text-muted-foreground uppercase font-medium">Region</p>
                         <p className="text-sm text-muted-foreground">{order.delivery_region || order.region}</p>
                       </div>
                     )}
@@ -313,24 +351,107 @@ export default function CommercialPage() {
 
       {newOrderModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="border-border/60 bg-card/90 w-full max-w-lg">
+            <CardHeader>
+              <div className="w-12 h-12 bg-primary/15 rounded-full flex items-center justify-center mb-4">
+                <Package className="w-6 h-6 text-primary" />
+              </div>
+              <CardTitle className="text-xl text-foreground">¿Cómo deseas crear el pedido?</CardTitle>
+              <CardDescription className="text-muted-foreground">
+                Elige el método de creación que prefieras
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <Button
+                  variant="outline"
+                  className="h-auto flex-col gap-3 p-6 hover:border-primary hover:bg-primary/5"
+                  onClick={handleCreateOrder}
+                  disabled={createOrder.isPending}
+                >
+                  <Plus className="w-8 h-8 text-primary" />
+                  <div className="text-center">
+                    <div className="font-semibold text-base mb-1">Generar pedido</div>
+                    <div className="text-xs text-muted-foreground">
+                      Crear un nuevo pedido desde cero
+                    </div>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto flex-col gap-3 p-6 hover:border-primary hover:bg-primary/5"
+                  onClick={() => {
+                    setNewOrderModal(false);
+                    setImportOrderModal(true);
+                  }}
+                >
+                  <Package className="w-8 h-8 text-primary" />
+                  <div className="text-center">
+                    <div className="font-semibold text-base mb-1">Añadir desde otra plataforma</div>
+                    <div className="text-xs text-muted-foreground">
+                      Importar pedido existente
+                    </div>
+                  </div>
+                </Button>
+              </div>
+              <div className="flex justify-end">
+                <Button variant="ghost" onClick={() => setNewOrderModal(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {importOrderModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <Card className="border-border/60 bg-card/90 w-full max-w-md">
             <CardHeader>
               <div className="w-12 h-12 bg-primary/15 rounded-full flex items-center justify-center mb-4">
                 <Package className="w-6 h-6 text-primary" />
               </div>
-              <CardTitle className="text-xl text-foreground">Crear nuevo pedido</CardTitle>
+              <CardTitle className="text-xl text-foreground">Importar Pedido</CardTitle>
               <CardDescription className="text-muted-foreground">
-                Se insertara un nuevo registro en la base de datos de Egea.
+                Ingresa el número de pedido de otra plataforma
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex justify-end gap-3">
-                <Button variant="ghost" onClick={() => setNewOrderModal(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleCreateOrder} disabled={createOrder.isPending}>
-                  {createOrder.isPending ? "Generando..." : "Generar pedido"}
-                </Button>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Número de Pedido
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: EXT-2025-001"
+                    className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                    value={importOrderNumber}
+                    onChange={(e) => setImportOrderNumber(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleImportOrder()}
+                    autoFocus
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Este número se usará como identificador del pedido
+                  </p>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setImportOrderModal(false);
+                      setImportOrderNumber("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleImportOrder}
+                    disabled={createOrder.isPending || !importOrderNumber.trim()}
+                  >
+                    {createOrder.isPending ? "Importando..." : "Importar Pedido"}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
