@@ -188,19 +188,57 @@ export default function CommercialPage() {
   };
 
   const changeStatus = async (order: any, newStatus: OrderStatus) => {
+    // 1. Comentario obligatorio
     if (!comment) {
       toast.error("Comentario obligatorio");
       return;
     }
 
+    // 2. Validación para PAGADO (envío a producción)
     if (newStatus === "PAGADO") {
       const check = validateOrderReadyForProduction(order);
+
+      // Si no es válido, verificar permisos
       if (!check.valid) {
-        toast.error(`No se puede validar el pedido:\n${check.error}`);
-        return;
+        const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
+
+        // Bloquear usuarios normales
+        if (!isAdminOrManager) {
+          toast.error(
+            `NO SE PUEDE ENVIAR A PRODUCCIÓN:\n${check.error}\n\nCompleta la documentación y referencia antes de validar.`
+          );
+          return;
+        }
+
+        // Permitir override a admins/managers con confirmación
+        if (isAdminOrManager) {
+          const confirmed = window.confirm(
+            `⚠️ ADVERTENCIA ADMIN:\n\n${check.error}\n\n¿Deseas FORZAR el envío a producción de todos modos?\n\nNota que se registrará: "${comment}"`
+          );
+
+          if (!confirmed) {
+            return;
+          }
+
+          // Agregar prefijo [OVERRIDE ADMIN] al comentario para trazabilidad
+          try {
+            await updateOrderStatus.mutateAsync({
+              orderId: order.id,
+              status: newStatus,
+              comment: `[OVERRIDE ADMIN] ${comment}`,
+            });
+            setComment("");
+            toast.success("Pedido forzado a producción (override admin)");
+            return;
+          } catch (error) {
+            console.error("Error updating status:", error);
+            return;
+          }
+        }
       }
     }
 
+    // 3. Actualizar estado normalmente (validación OK o estado diferente a PAGADO)
     try {
       await updateOrderStatus.mutateAsync({
         orderId: order.id,
