@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   ScrollText,
   Activity,
+  AlertTriangle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -50,6 +51,7 @@ const procesosItems: AppNavItem[] = [
   { type: "item", path: "/admin/produccion", label: "Produccion", icon: Factory },
   { type: "item", path: "/admin/envios", label: "Envíos", icon: Package },
   { type: "item", path: "/admin/almacen", label: "Almacen", icon: Package },
+  { type: "item", path: "/admin/incidencias", label: "Incidencias", icon: AlertTriangle },
 ];
 
 const actividadItems: AppNavItem[] = [

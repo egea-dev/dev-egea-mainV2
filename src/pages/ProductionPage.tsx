@@ -4,8 +4,18 @@ import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, Alert
 import PageShell from '@/components/layout/PageShell';
 import QRScanner from '@/components/common/QRScanner';
 import { RoleBasedRender } from '@/components/common/RoleBasedRender';
+import { MobileAlert, AlertType } from '@/components/common/MobileAlert';
+import { IncidentReportButton } from '@/components/incidents/IncidentReportButton';
+import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
 import { toast } from 'sonner';
-import { printHtmlToIframe } from '@/utils/print';
+import { printHtmlToIframe, printZplToNetworkPrinter } from '@/utils/print';
+
+const ZEBRA_PRINTER_IP = "192.168.1.236";
+
+function escapeZpl(str: string): string {
+  if (!str) return "";
+  return str.replace(/_/g, " ").replace(/\\/g, "\\\\").replace(/\^/g, " ").replace(/~/g, " ");
+}
 
 const getDueBadge = (order: Order) => {
   if (!order.due_date) {
@@ -82,6 +92,44 @@ export function ProductionPage() {
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [isPersisting, setIsPersisting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+
+  // Estado para alertas móviles
+  const [alertState, setAlertState] = useState<{
+    isOpen: boolean;
+    type: AlertType;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
+
+  const showAlert = (type: AlertType, title: string, message: string, onConfirm?: () => void) => {
+    setAlertState({
+      isOpen: true,
+      type,
+      title,
+      message,
+      onConfirm
+    });
+  };
+
+  const closeAlert = () => {
+    if (alertState.onConfirm) alertState.onConfirm();
+    setAlertState(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleIncidentClick = () => {
+    if (!scannedOrder) {
+      toast.error('Debes seleccionar o escanear un pedido para reportar una incidencia');
+      return;
+    }
+    setIsIncidentModalOpen(true);
+  };
 
   // Cargar órdenes al montar
   React.useEffect(() => {
@@ -168,9 +216,12 @@ export function ProductionPage() {
       setCameraActive(false);
       setQrInput('');
       setPackagesInput(order.packages_count || 1);
+      // Solo toast para éxito, no interrumpe flujo
       toast.success(`Orden ${orderNum} cargada`);
     } else {
-      toast.error(`Pedido no encontrado: ${orderNum}`);
+      // Alerta bloqueante para error de escaneo
+      showAlert('error', 'Pedido no encontrado', `El código ${orderNum} no existe en el sistema actual.`);
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
     }
   };
 
@@ -283,6 +334,58 @@ export function ProductionPage() {
     } catch (error) {
       console.error('❌ Error:', error);
       toast.error('Error al generar etiqueta');
+    }
+  };
+
+
+
+  const printZebraLabel = async () => {
+    if (!scannedOrder) return;
+
+    const orderNumber = escapeZpl(scannedOrder.order_number);
+    const customer = escapeZpl(scannedOrder.customer_name || 'Sin cliente');
+    const contact = escapeZpl(scannedOrder.contact_name || '-');
+    const address = escapeZpl(scannedOrder.delivery_address || 'Sin direccion');
+    const region = escapeZpl(scannedOrder.region || '-');
+    const packages = String(packagesInput);
+    const units = String(scannedOrder.quantity_total || 0);
+    const qrContent = scannedOrder.qr_payload || scannedOrder.order_number;
+
+    // ZPL para Etiqueta 60mm x 86mm (aprox 480x688 dots @ 203dpi)
+    const zpl = `
+^XA
+^PW480
+^LL688
+^PON
+^CI28
+^FO0,20^A0N,25,25^FB480,1,0,C^FDPRODUCCION^FS
+^FO0,50^A0N,30,30^FB480,1,0,C^FDDECORACIONES EGEA^FS
+^FO0,90^A0N,20,20^FB480,1,0,C^FDwww.decoracionesegea.com^FS
+^FO0,120^GB480,40,40^FS
+^FO0,130^A0N,25,25^FR^FB480,1,0,C^FDETIQUETA DE ENVIO^FS
+^FO0,180^A0N,50,50^FB480,1,0,C^FD${orderNumber}^FS
+^FO20,250^A0N,25,25^FDCliente: ${customer}^FS
+^FO20,280^A0N,25,25^FDContacto: ${contact}^FS
+^FO20,310^A0N,25,25^FDDireccion: ${address}^FS
+^FO20,340^A0N,25,25^FDRegion: ${region}^FS
+^FO120,400^BQN,2,6^FDQA,${qrContent}^FS
+^FO0,580^A0N,40,40^FB480,1,0,C^FDBULTOS: ${packages}^FS
+^FO0,630^A0N,30,30^FB480,1,0,C^FDTotal Unidades: ${units}^FS
+^XZ
+    `;
+
+    console.log('🦓 Enviando ZPL a IP:', ZEBRA_PRINTER_IP);
+
+    try {
+      await printZplToNetworkPrinter({
+        ip: ZEBRA_PRINTER_IP,
+        zpl: zpl
+      });
+      toast.success('Enviado a Zebra (192.168.1.236)');
+      await confirmProductionFinish();
+    } catch (error) {
+      console.error('Error Zebra:', error);
+      toast.error('Error conexión Zebra, revisa que esté encendida');
     }
   };
 
@@ -415,8 +518,21 @@ export function ProductionPage() {
   };
 
   return (
-    <PageShell title="Control de Producción" description="Fabricación, corte y confección" className="space-y-0">
-      <div className="flex flex-col gap-2">
+    <PageShell
+      title="Producción y Corte"
+      description="Control de fabricación y corte de material"
+      actions={
+        <div className="flex gap-2">
+          {scannedOrder && (
+            <IncidentReportButton
+              onClick={handleIncidentClick}
+              size="sm"
+            />
+          )}
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-2 relative">
         {/* ESCÁNER - PANTALLA COMPLETA */}
         <RoleBasedRender hideForRoles={['admin', 'manager']}>
           <div className="w-full">
@@ -621,7 +737,15 @@ export function ProductionPage() {
                           className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
                         >
                           <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
-                          <span className="whitespace-nowrap">Etiqueta 60x86mm</span>
+                          <span className="whitespace-nowrap">Etiqueta PDF</span>
+                        </button>
+                        <button
+                          onClick={printZebraLabel}
+                          disabled={isPersisting}
+                          className="flex-1 py-4 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
+                        >
+                          <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
+                          <span className="whitespace-nowrap">Zebra (Red)</span>
                         </button>
                         <button
                           onClick={printA4Document}
@@ -699,6 +823,12 @@ export function ProductionPage() {
                       <Printer className="w-4 h-4 flex-shrink-0" />
                       <span className="whitespace-nowrap">Reimprimir</span>
                     </button>
+                    <button
+                      onClick={printZebraLabel}
+                      className="flex-1 py-3 px-3 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
+                    >
+                      <Printer className="w-4 h-4 flex-shrink-0" />
+                    </button>
                     <div className="flex-[2] py-3 px-3 bg-[#0D0F11] text-emerald-400 rounded-lg font-semibold text-xs sm:text-sm text-center border border-emerald-500/30 flex items-center justify-center gap-2">
                       <CheckCircle className="w-4 h-4 flex-shrink-0" />
                       <span className="truncate">Listo ({scannedOrder.packages_count} Bultos)</span>
@@ -718,6 +848,23 @@ export function ProductionPage() {
           )}
         </div>
       </div>
+
+      <MobileAlert
+        isOpen={alertState.isOpen}
+        type={alertState.type}
+        title={alertState.title}
+        message={alertState.message}
+        onConfirm={closeAlert}
+      />
+
+      {scannedOrder && (
+        <IncidentReportModal
+          isOpen={isIncidentModalOpen}
+          onClose={() => setIsIncidentModalOpen(false)}
+          orderId={scannedOrder.id}
+          orderNumber={scannedOrder.order_number}
+        />
+      )}
     </PageShell>
   );
 }

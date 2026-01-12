@@ -38,6 +38,7 @@ import KioskDisplayPage from "./pages/KioskDisplayPage";
 import PlantBoardPage from "./pages/PlantBoardPage";
 import ShippingBoardPage from "./pages/ShippingBoardPage";
 import OperatorProfilePage from "./pages/OperatorProfilePage";
+import IncidentsPage from "./pages/IncidentsPage";
 
 // --- LAYOUTS Y COMPONENTES PRINCIPALES ---
 import AdminLayout from "./pages/AdminLayout";
@@ -147,6 +148,11 @@ const App = () => (
               <Route path="envios" element={
                 <PermissionGuardEnhanced resource="envios" action="view">
                   <ShippingScanPage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="incidencias" element={
+                <PermissionGuardEnhanced resource="admin" action="view">
+                  <IncidentsPage />
                 </PermissionGuardEnhanced>
               } />
             </Route>

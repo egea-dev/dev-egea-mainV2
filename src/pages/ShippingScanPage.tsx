@@ -22,6 +22,10 @@ import QRScanner from '@/components/common/QRScanner';
 import { RoleBasedRender } from '@/components/common/RoleBasedRender';
 import { toast } from 'sonner';
 import { printHtmlToIframe } from '@/utils/print';
+import { MobileAlert, AlertType } from '@/components/common/MobileAlert';
+import { TrackingToggle } from '@/components/shipping/TrackingToggle';
+import { IncidentReportButton } from '@/components/incidents/IncidentReportButton';
+import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
 
 // Tipos
 interface Order {
@@ -60,6 +64,7 @@ interface Order {
   documents?: Array<{
     type: string;
   }>;
+  tracking_pending?: boolean;
 }
 
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
@@ -93,18 +98,45 @@ export default function ShippingScanPage() {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [scannedPackagesCount, setScannedPackagesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasTrackingNow, setHasTrackingNow] = useState(true);
+  const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
 
-  // Cargar órdenes al montar
-  useEffect(() => {
-    loadOrders();
-  }, []);
+  // Estado para alertas móviles
+  const [alertState, setAlertState] = useState<{
+    isOpen: boolean;
+    type: AlertType;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
-  useEffect(() => {
-    if (scannedOrder) {
-      setScannedPackagesCount(scannedOrder.scanned_packages || 0);
-      setTrackingNumber(scannedOrder.tracking_number || '');
+  const showAlert = (type: AlertType, title: string, message: string, onConfirm?: () => void) => {
+    setAlertState({
+      isOpen: true,
+      type,
+      title,
+      message,
+      onConfirm
+    });
+  };
+
+  const closeAlert = () => {
+    if (alertState.onConfirm) alertState.onConfirm();
+    setAlertState(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const handleIncidentClick = () => {
+    if (!scannedOrder) {
+      toast.error('Debes seleccionar o escanear un pedido para reportar una incidencia');
+      return;
     }
-  }, [scannedOrder]);
+    setIsIncidentModalOpen(true);
+  };
 
   const loadOrders = async () => {
     try {
@@ -134,6 +166,11 @@ export default function ShippingScanPage() {
       setIsLoading(false);
     }
   };
+
+  // Cargar órdenes al montar
+  useEffect(() => {
+    loadOrders();
+  }, []);
 
   const pendingOrders = useMemo(() => {
     console.log('🔍 Filtrando órdenes para envío...');
@@ -188,7 +225,7 @@ export default function ShippingScanPage() {
     }
 
     if (scannedOrder && scannedOrder.order_number !== orderNum && scannedPackagesCount > 0 && scannedPackagesCount < (scannedOrder.packages_count || 1)) {
-      alert("⛔ ¡ALTO! Estás escaneando un pedido diferente mientras el actual está incompleto.\\n\\nNo mezcles pedidos. Termina el actual o sal manualmente para pausarlo.");
+      showAlert('error', '¡ALTO!', 'Estás escaneando un pedido diferente mientras el actual está incompleto. No mezcles pedidos.', () => { });
       return;
     }
 
@@ -228,12 +265,12 @@ export default function ShippingScanPage() {
     const totalPackages = scannedOrder.packages_count || 1;
 
     if (scannedPackagesCount < totalPackages) {
-      alert(`Debes verificar todos los bultos (${scannedPackagesCount}/${totalPackages}) escaneando el QR.`);
+      showAlert('warning', 'Pedido Incompleto', `Debes verificar todos los bultos (${scannedPackagesCount}/${totalPackages}) escaneando el QR antes de validar.`);
       return;
     }
 
-    if (!trackingNumber.trim()) {
-      alert('El número de tracking es OBLIGATORIO para validar la salida.');
+    if (hasTrackingNow && !trackingNumber.trim()) {
+      showAlert('error', 'Falta Tracking', 'Has indicado que tienes el número de tracking, pero el campo está vacío.');
       return;
     }
 
@@ -241,12 +278,19 @@ export default function ShippingScanPage() {
       status: 'ENVIADO',
       quantity_shipped: scannedOrder.quantity_total,
       needs_shipping_validation: false,
-      tracking_number: trackingNumber,
+      tracking_number: hasTrackingNow ? trackingNumber : null,
+      tracking_pending: !hasTrackingNow,
       shipping_date: new Date().toISOString()
     };
 
     await persistOrderUpdate(scannedOrder.id, updatedOrder);
-    toast.success(`Salida validada. Tracking: ${trackingNumber}`);
+
+    // Alerta de éxito si se envió sin tracking
+    if (!hasTrackingNow) {
+      toast.success('Salida marcada como PENDIENTE DE TRACKING');
+    } else {
+      toast.success(`Salida validada. Tracking: ${trackingNumber}`);
+    }
     setScannedOrder(null);
   };
 
@@ -480,7 +524,21 @@ export default function ShippingScanPage() {
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
   return (
-    <PageShell title="Expedición y Logística" description="Control de salidas y gestión de envíos" className="space-y-0">
+    <PageShell
+      title="Expedición y Logística"
+      description="Control de salidas y gestión de envíos"
+      className="space-y-0"
+      actions={
+        <div className="flex gap-2">
+          {scannedOrder && (
+            <IncidentReportButton
+              onClick={handleIncidentClick}
+              size="sm"
+            />
+          )}
+        </div>
+      }
+    >
       <div className="flex flex-col gap-2">
         {/* ESCÁNER - PANTALLA COMPLETA EN MÓVIL */}
         <RoleBasedRender hideForRoles={['admin', 'manager']}>
@@ -797,17 +855,26 @@ export default function ShippingScanPage() {
                       Validación de Salida
                     </h3>
                     <div className="flex flex-col gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-[#8B8D90] uppercase mb-2">
-                          Número de Tracking <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full bg-[#1A1D1F] border border-[#45474A] text-white p-4 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-mono text-lg tracking-wide placeholder-[#6E6F71]"
-                          placeholder="Escanea o escribe el ID de envío..."
-                          value={trackingNumber}
-                          onChange={(e) => setTrackingNumber(e.target.value)}
+                      {/* Componente Toggle + Input de Tracking */}
+                      <div className="bg-[#1A1D1F] p-4 rounded-xl border border-[#45474A]">
+                        <TrackingToggle
+                          hasTracking={hasTrackingNow}
+                          onToggle={setHasTrackingNow}
+                          className="mb-4"
                         />
+
+                        {hasTrackingNow && (
+                          <div>
+                            <label className="text-xs text-[#8B8D90] font-bold uppercase mb-2 block">Número de Tracking</label>
+                            <input
+                              type="text"
+                              value={trackingNumber}
+                              onChange={(e) => setTrackingNumber(e.target.value)}
+                              placeholder="Escanea o escribe el tracking final..."
+                              className="w-full bg-[#323438] border border-[#45474A] rounded-lg p-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-mono tracking-wide"
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -876,6 +943,24 @@ export default function ShippingScanPage() {
           )}
         </div>
       </div>
-    </PageShell>
+
+
+      <MobileAlert
+        isOpen={alertState.isOpen}
+        type={alertState.type}
+        title={alertState.title}
+        message={alertState.message}
+        onConfirm={closeAlert}
+      />
+
+      {scannedOrder && (
+        <IncidentReportModal
+          isOpen={isIncidentModalOpen}
+          onClose={() => setIsIncidentModalOpen(false)}
+          orderId={scannedOrder.id}
+          orderNumber={scannedOrder.order_number}
+        />
+      )}
+    </PageShell >
   );
 }

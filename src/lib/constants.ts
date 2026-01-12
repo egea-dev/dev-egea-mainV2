@@ -59,6 +59,7 @@ export const TASK_STATES = {
   TERMINADO: 'terminado',
   INCIDENTE: 'incidente',
   ARREGLO: 'arreglo',
+  PENDIENTE_VALIDAR: 'pendiente de validar',
 } as const;
 
 export type TaskState = typeof TASK_STATES[keyof typeof TASK_STATES];
@@ -71,6 +72,7 @@ export const TASK_STATE_COLORS: Record<TaskState, string> = {
   [TASK_STATES.TERMINADO]: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
   [TASK_STATES.INCIDENTE]: 'bg-red-500/15 text-red-300 border-red-500/40',
   [TASK_STATES.ARREGLO]: 'bg-orange-500/15 text-orange-300 border-orange-500/40',
+  [TASK_STATES.PENDIENTE_VALIDAR]: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/40',
 };
 
 export const TASK_STATE_LABELS: Record<TaskState, string> = {
@@ -81,6 +83,7 @@ export const TASK_STATE_LABELS: Record<TaskState, string> = {
   [TASK_STATES.TERMINADO]: 'Terminado',
   [TASK_STATES.INCIDENTE]: 'Incidente',
   [TASK_STATES.ARREGLO]: 'Arreglo',
+  [TASK_STATES.PENDIENTE_VALIDAR]: 'Pendiente de Validar',
 };
 
 // =====================================================================

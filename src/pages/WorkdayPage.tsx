@@ -13,12 +13,14 @@ import { useProfile, useTasksByDate } from "@/hooks/use-supabase";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getTaskStateColor, getTaskStateLabel } from "@/lib/constants";
 import type { Task } from "@/types";
 import { useWorkSession } from "@/hooks/use-work-session";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Clock, MapPin, AlertTriangle, Info, CheckCircle2, CalendarCheck } from "lucide-react";
 import { buildMapsSearchUrl } from "@/utils/maps";
 import { WeeklyCalendar } from "@/components/calendar/WeeklyCalendar";
+import { IncidentReportModal } from "@/components/incidents/IncidentReportModal";
 
 dayjs.extend(relativeTime);
 dayjs.locale("es");
@@ -86,7 +88,12 @@ export default function WorkdayPage() {
 
   const [detailsTask, setDetailsTask] = useState<Task | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+
   const [calendarTaskDays, setCalendarTaskDays] = useState<Date[]>([]);
+
+  // Estado para reporte de incidencias
+  const [incidentModalOpen, setIncidentModalOpen] = useState(false);
+  const [selectedTaskForIncident, setSelectedTaskForIncident] = useState<Task | null>(null);
 
   // Filtrar solo tareas NO terminadas/validadas
   // ESTO INCLUYE TAREAS DE CUALQUIER FECHA (30 dic, 31 dic, etc.)
@@ -284,39 +291,10 @@ export default function WorkdayPage() {
   };
 
   // Reportar incidencia
-  const handleReportIncident = async (task: Task) => {
-    if (!profile?.id) return;
-
-    try {
-      // @ts-ignore - Tipos de Supabase no coinciden con schema real
-      const { error } = await supabase.from("communication_logs").insert({
-        type: "incidencia",
-        recipient: "panel-admin",
-        subject: `Incidencia en ${String(task.data?.site ?? task.data?.location ?? "tarea")}`,
-        message: `El operario ${profile.full_name ?? "usuario"} ha reportado una incidencia`,
-        status: "pending",
-        metadata: {
-          profile_id: profile.id,
-          profile_name: profile.full_name ?? "usuario",
-          task_id: task.id,
-          task_site: String(task.data?.site ?? task.data?.location ?? "N/A"),
-          task_location: String(task.data?.location ?? "N/A"),
-          source: "workday",
-          reported_at: new Date().toISOString(),
-        },
-        created_by: profile.id,
-      });
-
-      if (error) {
-        console.error("Error reporting incident:", error);
-        toast.error("No se pudo reportar la incidencia");
-      } else {
-        toast.success("Incidencia reportada al administrador");
-      }
-    } catch (error) {
-      console.error("Error reporting incident:", error);
-      toast.error("Error al reportar incidencia");
-    }
+  // Reportar incidencia - Abre modal
+  const handleReportIncident = (task: Task) => {
+    setSelectedTaskForIncident(task);
+    setIncidentModalOpen(true);
   };
 
   // Abrir ubicación en Maps
@@ -350,10 +328,9 @@ export default function WorkdayPage() {
                 {task.data?.site ?? task.data?.location ?? "Tarea asignada"}
               </h3>
               <Badge
-                variant={task.state === "terminado" ? "secondary" : "default"}
-                className="uppercase text-xs shrink-0"
+                className={cn("uppercase text-xs shrink-0 capitalize", getTaskStateColor(task.state))}
               >
-                {task.state ?? "pendiente"}
+                {getTaskStateLabel(task.state)}
               </Badge>
             </div>
 
@@ -726,8 +703,8 @@ export default function WorkdayPage() {
 
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Estado</p>
-                <Badge variant="default" className="uppercase">
-                  {detailsTask?.state ?? "pendiente"}
+                <Badge className={cn("uppercase text-xs shrink-0 capitalize", getTaskStateColor(detailsTask?.state))}>
+                  {getTaskStateLabel(detailsTask?.state)}
                 </Badge>
               </div>
 
@@ -816,6 +793,20 @@ export default function WorkdayPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Modal de Reporte de Incidencias */}
+      {selectedTaskForIncident && (
+        <IncidentReportModal
+          isOpen={incidentModalOpen}
+          onClose={() => {
+            setIncidentModalOpen(false);
+            setSelectedTaskForIncident(null);
+          }}
+          system="main"
+          itemId={selectedTaskForIncident.id}
+          itemLabel={String(selectedTaskForIncident.data?.site ?? selectedTaskForIncident.data?.location ?? "Tarea")}
+        />
+      )}
+
       {/* Dialog de Lista de Tareas */}
       <Dialog open={taskListOpen} onOpenChange={setTaskListOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh]">
@@ -836,13 +827,8 @@ export default function WorkdayPage() {
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold">{String(task.data?.site ?? "Sin ubicación")}</h4>
-                            <Badge variant={
-                              task.state === "pendiente" ? "secondary" :
-                                task.state === "en_curso" ? "default" :
-                                  task.state === "pendiente de validar" ? "outline" :
-                                    "secondary"
-                            }>
-                              {task.state}
+                            <Badge className={cn("uppercase text-xs shrink-0 capitalize", getTaskStateColor(task.state))}>
+                              {getTaskStateLabel(task.state)}
                             </Badge>
                           </div>
 
@@ -881,6 +867,7 @@ export default function WorkdayPage() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-    </div >
+    </div>
   );
 }
+
