@@ -349,26 +349,46 @@ export function ProductionPage() {
     const units = String(scannedOrder.quantity_total || 0);
     const qrContent = scannedOrder.qr_payload || scannedOrder.order_number;
 
-    // ZPL para Etiqueta 60mm x 86mm (aprox 480x688 dots @ 203dpi)
+    // ZPL para Etiqueta 10x15cm (4x6 pulgadas = 812x1218 dots @ 203dpi)
     const zpl = `
 ^XA
-^PW480
-^LL688
+^PW812
+^LL1218
 ^PON
 ^CI28
-^FO0,20^A0N,25,25^FB480,1,0,C^FDPRODUCCION^FS
-^FO0,50^A0N,30,30^FB480,1,0,C^FDDECORACIONES EGEA^FS
-^FO0,90^A0N,20,20^FB480,1,0,C^FDwww.decoracionesegea.com^FS
-^FO0,120^GB480,40,40^FS
-^FO0,130^A0N,25,25^FR^FB480,1,0,C^FDETIQUETA DE ENVIO^FS
-^FO0,180^A0N,50,50^FB480,1,0,C^FD${orderNumber}^FS
-^FO20,250^A0N,25,25^FDCliente: ${customer}^FS
-^FO20,280^A0N,25,25^FDContacto: ${contact}^FS
-^FO20,310^A0N,25,25^FDDireccion: ${address}^FS
-^FO20,340^A0N,25,25^FDRegion: ${region}^FS
-^FO120,400^BQN,2,6^FDQA,${qrContent}^FS
-^FO0,580^A0N,40,40^FB480,1,0,C^FDBULTOS: ${packages}^FS
-^FO0,630^A0N,30,30^FB480,1,0,C^FDTotal Unidades: ${units}^FS
+
+~SD15
+^LH0,0
+
+^FO50,40^A0N,60,60^FB712,1,0,C^FDPRODUCCION^FS
+^FO50,110^A0N,70,70^FB712,1,0,C^FDDECORACIONES EGEA^FS
+^FO50,190^A0N,40,40^FB712,1,0,C^FDwww.decoracionesegea.com^FS
+
+^FO50,260^GB712,80,80^FS
+^FO50,270^A0N,50,50^FR^FB712,1,0,C^FDETIQUETA DE ENVIO^FS
+
+^FO50,380^A0N,90,90^FB712,1,0,C^FD${orderNumber}^FS
+
+^FO50,500^GB712,2,2^FS
+
+^FO60,530^A0N,45,45^FDCliente:^FS
+^FO60,585^A0N,40,40^FB692,2,0,L^FD${customer}^FS
+
+^FO60,670^A0N,45,45^FDContacto:^FS
+^FO60,725^A0N,40,40^FD${contact}^FS
+
+^FO60,790^A0N,45,45^FDDireccion:^FS
+^FO60,845^A0N,35,35^FB692,2,0,L^FD${address}^FS
+
+^FO60,930^A0N,45,45^FDRegion: ^FD${region}^FS
+
+^FO256,1000^BQN,2,8^FDQA,${qrContent}^FS
+
+^FO50,1080^GB712,2,2^FS
+
+^FO50,1100^A0N,60,60^FB712,1,0,C^FDBULTOS: ${packages}^FS
+^FO50,1170^A0N,45,45^FB712,1,0,C^FDTotal Unidades: ${units}^FS
+
 ^XZ
     `;
 
