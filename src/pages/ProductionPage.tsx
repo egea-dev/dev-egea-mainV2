@@ -376,7 +376,7 @@ export function ProductionPage() {
 
     try {
       // Enviar al servidor proxy en Raspberry Pi
-      const response = await fetch('http://192.168.1.236:3001/print', {
+      const response = await fetch('http://192.168.1.236:3002/print', {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: zpl
