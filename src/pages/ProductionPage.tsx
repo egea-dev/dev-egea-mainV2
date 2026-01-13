@@ -375,8 +375,8 @@ export function ProductionPage() {
     console.log('🦓 Enviando ZPL al servidor proxy en Raspberry Pi (HTTPS)');
 
     try {
-      // Enviar al servidor proxy HTTPS en Raspberry Pi
-      const response = await fetch('https://192.168.1.236:3001/print', {
+      // Enviar al servidor proxy HTTPS en Raspberry Pi (puerto 3003)
+      const response = await fetch('https://192.168.1.236:3003/print', {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: zpl
