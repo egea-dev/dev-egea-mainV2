@@ -366,10 +366,10 @@ export function ProductionPage() {
 
 ^FO50,320^A0N,75,75^FB695,1,0,C^FD${orderNumber}^FS
 
-^FO50,430^A0N,40,40^FB695,1,0,C^FDCliente: ${customer}^FS
-^FO50,485^A0N,40,40^FB695,1,0,C^FDContacto: ${contact}^FS
-^FO50,540^A0N,38,38^FB695,2,0,C^FDDireccion: ${address}^FS
-^FO50,620^A0N,40,40^FB695,1,0,C^FDRegion: ${region}^FS
+^FO60,430^A0N,40,40^FDCliente: ${customer}^FS
+^FO60,485^A0N,40,40^FDContacto: ${contact}^FS
+^FO60,540^A0N,38,38^FB695,2,0,L^FDDireccion: ${address}^FS
+^FO60,620^A0N,40,40^FDRegion: ${region}^FS
 
 ^FO220,700^BQN,2,8^FDQA,${qrContent}^FS
 
