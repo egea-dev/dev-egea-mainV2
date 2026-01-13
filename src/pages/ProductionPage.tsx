@@ -366,12 +366,12 @@ export function ProductionPage() {
 
 ^FO50,320^A0N,75,75^FB695,1,0,C^FD${orderNumber}^FS
 
-^FO60,430^A0N,40,40^FDCliente: ${customer}^FS
-^FO60,485^A0N,40,40^FDContacto: ${contact}^FS
-^FO60,540^A0N,40,40^FDDireccion: ${address}^FS
-^FO60,595^A0N,40,40^FDRegion: ${region}^FS
+^FO50,430^A0N,40,40^FB695,1,0,C^FDCliente: ${customer}^FS
+^FO50,485^A0N,40,40^FB695,1,0,C^FDContacto: ${contact}^FS
+^FO50,540^A0N,38,38^FB695,2,0,C^FDDireccion: ${address}^FS
+^FO50,620^A0N,40,40^FB695,1,0,C^FDRegion: ${region}^FS
 
-^FO220,670^BQN,2,8^FDQA,${qrContent}^FS
+^FO220,700^BQN,2,8^FDQA,${qrContent}^FS
 
 ^FO50,980^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
 ^FO50,1050^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
