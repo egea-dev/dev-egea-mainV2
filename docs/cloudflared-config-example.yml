@@ -1,0 +1,10 @@
+tunnel: <TU-TUNNEL-ID>
+credentials-file: /home/pi/.cloudflared/<TU-TUNNEL-ID>.json
+
+ingress:
+  # Ruta para la impresora Zebra
+  - hostname: printer.egeadev.cloud
+    service: http://192.168.1.236:500
+  
+  # Ruta por defecto (obligatoria)
+  - service: http_status:404
