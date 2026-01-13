@@ -373,8 +373,8 @@ export function ProductionPage() {
 
 ^FO220,700^BQN,2,8^FDQA,${qrContent}^FS
 
-^FO50,980^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
-^FO50,1050^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
+^FO50,1010^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
+^FO50,1080^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
 
 ^XZ
     `;
