@@ -349,59 +349,32 @@ export function ProductionPage() {
     const units = String(scannedOrder.quantity_total || 0);
     const qrContent = scannedOrder.qr_payload || scannedOrder.order_number;
 
-    // ZPL para Etiqueta 10x15cm exactos
-    // 10cm = 3.94 pulgadas = 795 dots @ 203dpi
-    // 15cm = 5.91 pulgadas = 1200 dots @ 203dpi
-    // Márgenes: 20 dots cada lado
+    // ZPL para Etiqueta 10x15cm (795x1200 dots @ 203dpi)
     const zpl = `
 ^XA
-
-^MMT
 ^PW795
 ^LL1200
+^PON
+^CI28
 
-^FO0,0^GB795,1200,2^FS
+^FO50,30^A0N,50,50^FB695,1,0,C^FDPRODUCCION^FS
+^FO50,90^A0N,60,60^FB695,1,0,C^FDDECORACIONES EGEA^FS
+^FO50,160^A0N,35,35^FB695,1,0,C^FDwww.decoracionesegea.com^FS
 
-^CF0,50
-^FO40,30^FDDecoraciones Egea^FS
+^FO50,220^GB695,60,60^FS
+^FO50,230^A0N,45,45^FR^FB695,1,0,C^FDETIQUETA DE ENVIO^FS
 
-^CF0,35
-^FO40,90^FDwww.decoracionesegea.com^FS
+^FO50,320^A0N,75,75^FB695,1,0,C^FD${orderNumber}^FS
 
-^FO40,140^GB715,3,3^FS
+^FO60,430^A0N,40,40^FDCliente: ${customer}^FS
+^FO60,485^A0N,40,40^FDContacto: ${contact}^FS
+^FO60,540^A0N,40,40^FDDireccion: ${address}^FS
+^FO60,595^A0N,40,40^FDRegion: ${region}^FS
 
-^CF0,80
-^FO40,160^FDPEDIDO: ${orderNumber}^FS
+^FO220,670^BQN,2,8^FDQA,${qrContent}^FS
 
-^FO40,260^GB715,2,2^FS
-
-^CF0,40
-^FO40,280^FDCliente:^FS
-^CF0,35
-^FO40,330^FB715,3,0,L,0^FD${customer}^FS
-
-^CF0,40
-^FO40,430^FDContacto: ${contact}^FS
-
-^CF0,40
-^FO40,480^FDDireccion:^FS
-^CF0,30
-^FO40,530^FB715,4,0,L,0^FD${address}^FS
-
-^CF0,40
-^FO40,660^FDRegion: ${region}^FS
-
-^FO40,720^GB715,2,2^FS
-
-^FO240,750^BQN,2,10^FDQA,${qrContent}^FS
-
-^FO40,1030^GB715,2,2^FS
-
-^CF0,60
-^FO40,1050^FDBULTOS: ${packages}^FS
-
-^CF0,45
-^FO40,1130^FDUnidades: ${units}^FS
+^FO50,980^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
+^FO50,1050^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
 
 ^XZ
     `;
