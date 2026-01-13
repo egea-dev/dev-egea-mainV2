@@ -10,8 +10,9 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0",
     port: 8083,
-    // https: true, // Deshabilitado temporalmente para facilitar acceso móvil
+    https: true, // HTTPS necesario para usar cámara (getUserMedia)
   },
+  // basicSsl() para desarrollo con HTTPS
   plugins: [react(), basicSsl()],
   resolve: {
     alias: {

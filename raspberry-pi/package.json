@@ -1,0 +1,14 @@
+{
+    "name": "zebra-proxy-server",
+    "version": "1.0.0",
+    "description": "Servidor proxy para impresora Zebra - Recibe HTTPS y reenvía a HTTP",
+    "main": "zebra-proxy-server.js",
+    "scripts": {
+        "start": "node zebra-proxy-server.js",
+        "pm2": "pm2 start zebra-proxy-server.js --name zebra-printer"
+    },
+    "dependencies": {
+        "express": "^4.18.2",
+        "cors": "^2.8.5"
+    }
+}
