@@ -8,9 +8,7 @@ import { MobileAlert, AlertType } from '@/components/common/MobileAlert';
 import { IncidentReportButton } from '@/components/incidents/IncidentReportButton';
 import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
 import { toast } from 'sonner';
-import { printHtmlToIframe, printZplToNetworkPrinter } from '@/utils/print';
-
-const ZEBRA_PRINTER_IP = "192.168.1.236";
+import { printHtmlToIframe } from '@/utils/print';
 
 function escapeZpl(str: string): string {
   if (!str) return "";
@@ -374,18 +372,26 @@ export function ProductionPage() {
 ^XZ
     `;
 
-    console.log('🦓 Enviando ZPL a IP:', ZEBRA_PRINTER_IP);
+    console.log('🦓 Enviando ZPL al servidor proxy en Raspberry Pi');
 
     try {
-      await printZplToNetworkPrinter({
-        ip: ZEBRA_PRINTER_IP,
-        zpl: zpl
+      // Enviar al servidor proxy en Raspberry Pi
+      const response = await fetch('http://192.168.1.236:3001/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: zpl
       });
-      toast.success('Enviado a Zebra (192.168.1.236)');
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al imprimir');
+      }
+
+      toast.success('Etiqueta enviada a impresora Zebra');
       await confirmProductionFinish();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error Zebra:', error);
-      toast.error('Error conexión Zebra, revisa que esté encendida');
+      toast.error(`Error: ${error.message || 'No se pudo conectar con la impresora'}`);
     }
   };
 
