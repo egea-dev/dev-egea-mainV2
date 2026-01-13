@@ -362,7 +362,7 @@ export function ProductionPage() {
 ^FO50,190^A0N,35,35^FB695,1,0,C^FDwww.decoracionesegea.com^FS
 
 ^FO50,250^GB695,60,60^FS
-^FO50,260^A0N,45,45^FR^FB695,1,0,C^FDETIQUETA DE ENVÍO^FS
+^FO60,260^A0N,45,45^FR^FB685,1,0,C^FDETIQUETA DE ENVÍO^FS
 
 ^FO50,350^A0N,75,75^FB695,1,0,C^FD${orderNumber}^FS
 
@@ -371,7 +371,7 @@ export function ProductionPage() {
 ^FO60,570^A0N,38,38^FB695,2,0,L^FDDirección: ${address}^FS
 ^FO60,650^A0N,40,40^FDRegión: ${region}^FS
 
-^FO247,730^BQN,2,8^FDQA,${qrContent}^FS
+^FO220,730^BQN,2,8^FDQA,${qrContent}^FS
 
 ^FO50,1040^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
 ^FO50,1110^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
