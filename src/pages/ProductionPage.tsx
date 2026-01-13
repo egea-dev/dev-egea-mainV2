@@ -349,50 +349,66 @@ export function ProductionPage() {
     const units = String(scannedOrder.quantity_total || 0);
     const qrContent = scannedOrder.qr_payload || scannedOrder.order_number;
 
-    // ZPL para Etiqueta 10x15cm (4x6 pulgadas = 812x1218 dots @ 203dpi)
+    // ZPL para Etiqueta 10x15cm exactos
+    // 10cm = 3.94 pulgadas = 795 dots @ 203dpi
+    // 15cm = 5.91 pulgadas = 1200 dots @ 203dpi
+    // Márgenes: 20 dots cada lado
     const zpl = `
 ^XA
-^PW812
-^LL1218
-^PON
-^CI28
 
-~SD15
-^LH0,0
+^MMT
+^PW795
+^LL1200
 
-^FO50,40^A0N,60,60^FB712,1,0,C^FDPRODUCCION^FS
-^FO50,110^A0N,70,70^FB712,1,0,C^FDDECORACIONES EGEA^FS
-^FO50,190^A0N,40,40^FB712,1,0,C^FDwww.decoracionesegea.com^FS
+^FO0,0^GB795,1200,2^FS
 
-^FO50,260^GB712,80,80^FS
-^FO50,270^A0N,50,50^FR^FB712,1,0,C^FDETIQUETA DE ENVIO^FS
+^CF0,50
+^FO40,30^FDDecoraciones Egea^FS
 
-^FO50,380^A0N,90,90^FB712,1,0,C^FD${orderNumber}^FS
+^CF0,35
+^FO40,90^FDwww.decoracionesegea.com^FS
 
-^FO50,500^GB712,2,2^FS
+^FO40,140^GB715,3,3^FS
 
-^FO60,530^A0N,45,45^FDCliente:^FS
-^FO60,585^A0N,40,40^FB692,2,0,L^FD${customer}^FS
+^CF0,80
+^FO40,160^FDPEDIDO: ${orderNumber}^FS
 
-^FO60,670^A0N,45,45^FDContacto:^FS
-^FO60,725^A0N,40,40^FD${contact}^FS
+^FO40,260^GB715,2,2^FS
 
-^FO60,790^A0N,45,45^FDDireccion:^FS
-^FO60,845^A0N,35,35^FB692,2,0,L^FD${address}^FS
+^CF0,40
+^FO40,280^FDCliente:^FS
+^CF0,35
+^FO40,330^FB715,3,0,L,0^FD${customer}^FS
 
-^FO60,930^A0N,45,45^FDRegion: ^FD${region}^FS
+^CF0,40
+^FO40,430^FDContacto: ${contact}^FS
 
-^FO256,1000^BQN,2,8^FDQA,${qrContent}^FS
+^CF0,40
+^FO40,480^FDDireccion:^FS
+^CF0,30
+^FO40,530^FB715,4,0,L,0^FD${address}^FS
 
-^FO50,1080^GB712,2,2^FS
+^CF0,40
+^FO40,660^FDRegion: ${region}^FS
 
-^FO50,1100^A0N,60,60^FB712,1,0,C^FDBULTOS: ${packages}^FS
-^FO50,1170^A0N,45,45^FB712,1,0,C^FDTotal Unidades: ${units}^FS
+^FO40,720^GB715,2,2^FS
+
+^FO240,750^BQN,2,10^FDQA,${qrContent}^FS
+
+^FO40,1030^GB715,2,2^FS
+
+^CF0,60
+^FO40,1050^FDBULTOS: ${packages}^FS
+
+^CF0,45
+^FO40,1130^FDUnidades: ${units}^FS
 
 ^XZ
     `;
 
     console.log('🦓 Enviando ZPL al servidor proxy en Raspberry Pi (HTTPS)');
+    console.log('📍 URL:', 'https://192.168.1.236:3003/print');
+    console.log('📦 Tamaño ZPL:', zpl.length, 'bytes');
 
     try {
       // Enviar al servidor proxy HTTPS en Raspberry Pi (puerto 3003)
@@ -402,16 +418,36 @@ export function ProductionPage() {
         body: zpl
       });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+
       if (!response.ok) {
-        const error = await response.json();
+        const errorText = await response.text();
+        console.error('❌ Error response:', errorText);
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { error: errorText };
+        }
         throw new Error(error.error || 'Error al imprimir');
       }
+
+      const result = await response.json();
+      console.log('✅ Resultado:', result);
 
       toast.success('Etiqueta enviada a impresora Zebra');
       await confirmProductionFinish();
     } catch (error: any) {
-      console.error('Error Zebra:', error);
-      toast.error(`Error: ${error.message || 'No se pudo conectar con la impresora'}`);
+      console.error('💥 Error completo:', error);
+      console.error('💥 Error name:', error.name);
+      console.error('💥 Error message:', error.message);
+
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        toast.error('No se puede conectar al servidor de impresión. Verifica que estés en la misma red WiFi.');
+      } else {
+        toast.error(`Error: ${error.message || 'No se pudo conectar con la impresora'}`);
+      }
     }
   };
 
