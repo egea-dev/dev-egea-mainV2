@@ -108,7 +108,7 @@ export const useUpdateOrderStatus = () => {
             const { data: { user } } = await supabaseMain.auth.getUser();
             const userId = user?.id || 'unknown';
 
-            const updates: Partial<Order> = { status: nextStatus };
+            const updates: any = { status: nextStatus };
             const now = new Date().toISOString();
 
             if (nextStatus === "EN_PROCESO") {
@@ -142,7 +142,7 @@ export const useUpdateOrderStatus = () => {
             // Update order status
             const { data, error } = await supabase
                 .from('comercial_orders')
-                .update(updates)
+                .update(updates as any)
                 .eq('id', orderId)
                 .select()
                 .single();
@@ -161,7 +161,7 @@ export const useUpdateOrderStatus = () => {
                     new_status: nextStatus,
                     comment,
                     changed_by: userId
-                });
+                } as any);
 
             if (logError) {
                 console.error("Error creating status log:", logError);
@@ -176,6 +176,38 @@ export const useUpdateOrderStatus = () => {
         },
         onError: (error: any) => {
             toast.error(`Error al actualizar estado: ${error.message}`);
+        }
+    });
+};
+
+export const useUpdateOrder = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (order: Partial<Order>) => {
+            if (!order.id) throw new Error("ID de pedido requerido para actualizar");
+
+            const { data, error } = await supabase
+                .from('comercial_orders')
+                .update(order as any)
+                .eq('id', order.id)
+                .select()
+                .single();
+
+            if (error) {
+                console.error("Error updating order:", error);
+                throw error;
+            }
+
+            return data as Order;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            // toast.success("Cambios guardados correctamente"); // Opcional, ya que el modal suele mostrar alert
+        },
+        onError: (error: any) => {
+            console.error("Mutation Error:", error);
+            toast.error(`Error al guardar cambios: ${error.message}`);
         }
     });
 };

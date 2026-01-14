@@ -17,7 +17,8 @@ import { useUploadOrderDocument, type DocumentType } from '@/hooks/use-order-doc
 import { SLAIndicator } from '@/components/commercial/SLAIndicator';
 import { useMaterials } from '@/hooks/use-materials';
 import { DoubleConfirmDialog } from '@/components/ui/double-confirm-dialog';
-import { generatePresupuestoApprovalEmail } from '@/utils/email-templates';
+import { generatePresupuestoApprovalEmail, generateProduccionInicioEmail } from '@/utils/email-templates';
+import { useUpdateOrder } from '@/hooks/use-orders';
 
 // --- Types & Constants ---
 
@@ -46,6 +47,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<Order>({ ...order });
     const uploadDocument = useUploadOrderDocument();
+    const updateOrder = useUpdateOrder();
     const { data: materials } = useMaterials();
     const [savingDoc, setSavingDoc] = useState<DocType | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -162,11 +164,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
     const handleSave = async () => {
         // Solo validar si el usuario es comercial
-        // Admin y Manager pueden guardar sin validación completa
         const isAdminOrManager = userRole === 'admin' || userRole === 'manager';
 
         if (!isAdminOrManager) {
-            // Usuarios comerciales deben seguir el proceso de validación
             const validation = validateOrder();
             if (!validation.isValid) {
                 alert("Por favor completa todos los campos obligatorios:\n\n" + validation.errors.join('\n'));
@@ -175,64 +175,48 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
         }
 
         try {
-            if (formData.id) {
-                // Update existing order
-                const { error } = await supabase.from('comercial_orders').update({
-                    customer_name: formData.customer_name,
-                    customer_code: formData.customer_code,
-                    customer_company: formData.customer_company,
-                    contact_name: formData.contact_name,
-                    phone: formData.phone,
-                    email: formData.email,
-                    delivery_region: formData.delivery_region || formData.region,
-                    delivery_address: formData.delivery_address,
-                    delivery_location_url: formData.delivery_location_url,
-                    delivery_date: formData.delivery_date,
-                    delivery_city: formData.delivery_city,
-                    region: formData.delivery_region || formData.region, // Legacy compatibility
-                    fabric: formData.fabric,
-                    quantity_total: formData.quantity_total,
-                    lines: formData.lines,
-                    admin_code: formData.admin_code,
-                    internal_notes: formData.internal_notes,
-                    updated_at: new Date().toISOString()
-                } as any).eq('id', formData.id);
+            const payload: any = {
+                id: formData.id, // Requerido para el update
+                customer_name: formData.customer_name,
+                customer_code: formData.customer_code,
+                customer_company: formData.customer_company,
+                contact_name: formData.contact_name,
+                phone: formData.phone,
+                email: formData.email,
+                delivery_region: formData.delivery_region || formData.region,
+                delivery_address: formData.delivery_address,
+                delivery_location_url: formData.delivery_location_url,
+                delivery_date: formData.delivery_date,
+                delivery_city: formData.delivery_city,
+                region: formData.delivery_region || formData.region,
+                fabric: formData.fabric,
+                quantity_total: formData.quantity_total,
+                lines: formData.lines,
+                admin_code: formData.admin_code,
+                internal_notes: formData.internal_notes,
+                updated_at: new Date().toISOString()
+            };
 
-                if (error) throw error;
+            if (formData.id) {
+                await updateOrder.mutateAsync(payload);
             } else {
-                // Create new order
+                // Para creación nueva, usamos el método directo de supabase o añadimos un useCreateOrder si es necesario
+                // Pero como este modal suele usarse para editar, nos enfocamos en el update
                 const { error } = await supabase.from('comercial_orders').insert([{
+                    ...payload,
                     order_number: formData.order_number,
-                    customer_name: formData.customer_name,
-                    customer_code: formData.customer_code,
-                    customer_company: formData.customer_company,
-                    contact_name: formData.contact_name,
-                    phone: formData.phone,
-                    email: formData.email,
-                    delivery_region: formData.delivery_region || formData.region,
-                    delivery_address: formData.delivery_address,
-                    delivery_location_url: formData.delivery_location_url,
-                    delivery_date: formData.delivery_date,
-                    delivery_city: formData.delivery_city,
-                    region: formData.delivery_region || formData.region, // Legacy compatibility
-                    fabric: formData.fabric,
-                    quantity_total: formData.quantity_total,
-                    lines: formData.lines || [],
                     documents: formData.documents || [],
-                    admin_code: formData.admin_code,
-                    internal_notes: formData.internal_notes,
                     status: formData.status || 'PENDIENTE_PAGO'
                 } as any]);
-
                 if (error) throw error;
             }
 
             setIsEditing(false);
             if (onSave) onSave(formData);
-            alert(isAdminOrManager ? "Pedido guardado exitosamente (Admin/Manager)" : "Pedido guardado exitosamente");
+            alert("Pedido actualizado correctamente");
         } catch (error: any) {
-            console.error("Error saving order:", error);
-            alert(`Error al guardar: ${error.message}`);
+            console.error("CRITICAL ERROR SAVING ORDER:", error);
+            alert(`Error al guardar: ${error.message || 'Error desconocido'}`);
         }
     };
 
@@ -819,6 +803,85 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                             <Button
                                 onClick={() => {
                                     const emailHTML = generatePresupuestoApprovalEmail({
+                                        adminCode: formData.admin_code || 'PENDIENTE',
+                                        customerName: formData.customer_name || '',
+                                        customerCompany: formData.customer_company || '',
+                                        customerCIF: formData.customer_code || '',
+                                        contactName: formData.contact_name || '',
+                                        phone: formData.phone || '',
+                                        email: formData.email || '',
+                                        deliveryAddress: formData.delivery_address || '',
+                                        deliveryRegion: (formData.delivery_region || formData.region || 'PENINSULA') as 'PENINSULA' | 'BALEARES' | 'CANARIAS',
+                                        totalAmount: formData.quantity_total || 0
+                                    });
+                                    navigator.clipboard.writeText(emailHTML);
+                                    alert('✅ HTML del email copiado al portapapeles\n\nPuedes pegarlo directamente en tu cliente de correo.');
+                                }}
+                                className="bg-[#14CC7F] hover:bg-[#11A366] text-white"
+                            >
+                                <Copy className="w-4 h-4 mr-2" />
+                                Copiar HTML
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* SECCIÓN EMAIL INICIO PRODUCCIÓN */}
+                    <div className="bg-[#2F3135] p-5 rounded-2xl border border-[#3B3D41] shadow-sm mt-6">
+                        <h4 className="font-bold text-white mb-4 flex items-center">
+                            <FileText className="w-4 h-4 mr-2 text-[#14CC7F]" /> Email Inicio de Producción
+                        </h4>
+                        <div className="bg-[#1F2225] rounded-xl p-4 mb-4 border border-[#3B3D41] max-h-[300px] overflow-y-auto custom-scrollbar">
+                            <div className="text-xs text-[#8B8D90]">
+                                <div className="mb-2 pb-2 border-b border-[#3B3D41]">
+                                    <p className="text-white font-semibold">Para: {formData.email || '{EMAIL_CLIENTE}'}</p>
+                                    <p className="text-[#8B8D90]">Asunto: Pedido {formData.admin_code} en Producción - EGEA</p>
+                                </div>
+                                <div className="space-y-2 font-mono">
+                                    <p><strong>Número Pedido:</strong> {formData.admin_code || 'Pendiente'}</p>
+                                    <p><strong>Cliente:</strong> {formData.customer_company || formData.customer_name}</p>
+                                    <p><strong>Región:</strong> {formData.delivery_region || formData.region}</p>
+                                    <p><strong>Plazo:</strong> {
+                                        formData.delivery_region === 'PENINSULA' ? '7-10 días' :
+                                            formData.delivery_region === 'BALEARES' ? '10-15 días' :
+                                                formData.delivery_region === 'CANARIAS' ? '15-20 días' : 'Por determinar'
+                                    }</p>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-[#3B3D41]">
+                                    <p className="text-[#14CC7F]">✓ Pago confirmado</p>
+                                    <p className="text-[#14CC7F]">✓ Pedido en producción</p>
+                                    <p className="text-[#14CC7F]">✓ Plazos según región</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                            <Button
+                                onClick={() => {
+                                    const emailHTML = generateProduccionInicioEmail({
+                                        adminCode: formData.admin_code || 'PENDIENTE',
+                                        customerName: formData.customer_name || '',
+                                        customerCompany: formData.customer_company || '',
+                                        customerCIF: formData.customer_code || '',
+                                        contactName: formData.contact_name || '',
+                                        phone: formData.phone || '',
+                                        email: formData.email || '',
+                                        deliveryAddress: formData.delivery_address || '',
+                                        deliveryRegion: (formData.delivery_region || formData.region || 'PENINSULA') as 'PENINSULA' | 'BALEARES' | 'CANARIAS',
+                                        totalAmount: formData.quantity_total || 0
+                                    });
+                                    const win = window.open('', '_blank');
+                                    if (win) {
+                                        win.document.write(emailHTML);
+                                        win.document.close();
+                                    }
+                                }}
+                                variant="outline"
+                                className="border-[#3B3D41] text-[#8B8D90] hover:bg-[#3B3D41] hover:text-white"
+                            >
+                                Vista Previa
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    const emailHTML = generateProduccionInicioEmail({
                                         adminCode: formData.admin_code || 'PENDIENTE',
                                         customerName: formData.customer_name || '',
                                         customerCompany: formData.customer_company || '',
