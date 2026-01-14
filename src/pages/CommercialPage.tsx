@@ -42,18 +42,7 @@ export default function CommercialPage() {
   const archivedOrders = orders.filter((o) => o.status === "ENTREGADO" || o.status === "CANCELADO");
   const displayedOrders = viewMode === "ACTIVE" ? activeOrders : archivedOrders;
 
-  const BYPASS_KEYWORDS = ["Mario", "Hacchi", "Manuel", "Carlos"];
-
-  const validateOrderReadyForProduction = (order: any): { valid: boolean; error?: string; bypassed?: boolean } => {
-    // Detectar palabras clave para bypass automático
-    const customerName = order.customer_name || "";
-    const adminCode = order.admin_code || "";
-    const searchText = `${customerName} ${adminCode}`.toLowerCase();
-
-    const hasBypassKeyword = BYPASS_KEYWORDS.some(keyword =>
-      searchText.includes(keyword.toLowerCase())
-    );
-
+  const validateOrderReadyForProduction = (order: any): { valid: boolean; error?: string } => {
     // Validaciones básicas (siempre requeridas)
     if (!order.admin_code || order.admin_code.trim() === "") {
       return {
@@ -67,48 +56,6 @@ export default function CommercialPage() {
         valid: false,
         error: "Falta el nombre del cliente",
       };
-    }
-
-    // Si tiene palabra clave, bypass de validación de documentos
-    if (hasBypassKeyword) {
-      // Solo validar campos esenciales, NO documentos
-      if (!order.lines || order.lines.length === 0) {
-        return {
-          valid: false,
-          error: "El desglose de medidas esta vacio (anade al menos 1 linea)",
-        };
-      }
-
-      const regionValue = order.delivery_region || order.region;
-      if (!regionValue) {
-        return {
-          valid: false,
-          error: "Falta definir la region de entrega",
-        };
-      }
-
-      if (!order.delivery_date) {
-        return {
-          valid: false,
-          error: "Falta definir la fecha de entrega",
-        };
-      }
-
-      if (!order.delivery_address || order.delivery_address.trim() === "") {
-        return {
-          valid: false,
-          error: "Falta la direccion de entrega",
-        };
-      }
-
-      if (!order.quantity_total || order.quantity_total <= 0) {
-        return {
-          valid: false,
-          error: "La cantidad total debe ser mayor que cero",
-        };
-      }
-
-      return { valid: true, bypassed: true };
     }
 
     // Validación completa (con documentos) para pedidos normales
@@ -242,6 +189,8 @@ export default function CommercialPage() {
     }
   };
 
+  const BYPASS_KEYWORDS = ["Mario", "Hacchi", "Manuel", "Carlos"];
+
   const changeStatus = async (order: any, newStatus: OrderStatus) => {
     // 1. Comentario obligatorio (individual por pedido)
     const orderComment = comments[order.id] || "";
@@ -255,12 +204,26 @@ export default function CommercialPage() {
     if (newStatus === "PAGADO") {
       const check = validateOrderReadyForProduction(order);
 
-      // Si fue bypassed por palabra clave
-      if (check.valid && check.bypassed) {
+      // Detectar palabras clave en el COMENTARIO
+      const hasKeywordInComment = BYPASS_KEYWORDS.some(keyword =>
+        orderComment.toLowerCase().includes(keyword.toLowerCase())
+      );
+
+      // Si hay palabra clave en comentario, verificar que sea admin/manager
+      if (hasKeywordInComment) {
+        const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
+
+        if (!isAdminOrManager) {
+          toast.error(
+            "⚠️ ACCESO DENEGADO\n\nSolo Admin/Manager pueden usar palabras clave de bypass.\n\nCompleta la documentación o contacta con un administrador."
+          );
+          return;
+        }
+
+        // Admin/Manager con palabra clave → bypass automático
         const confirmed = window.confirm(
-          `✅ BYPASS DETECTADO\n\nSe detectó palabra clave autorizada (Mario/Hacchi/Manuel/Carlos).\n\n` +
-          `El pedido se enviará a producción SIN documentos.\n\n` +
-          `¿Confirmas el envío?\n\nNota: "${orderComment}"`
+          `✅ BYPASS DETECTADO (Admin/Manager)\n\nPalabra clave autorizada en nota: "${orderComment}"\n\n` +
+          `El pedido se enviará a producción SIN validar documentos.\n\n¿Confirmas el envío?`
         );
 
         if (!confirmed) {
@@ -282,7 +245,7 @@ export default function CommercialPage() {
         }
       }
 
-      // Si no es válido, verificar permisos
+      // Si no es válido y NO hay palabra clave
       if (!check.valid) {
         const isAdminOrManager = profile?.role === 'admin' || profile?.role === 'manager';
 
