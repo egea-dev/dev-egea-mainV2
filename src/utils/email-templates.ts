@@ -28,7 +28,7 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
 
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #803746, #a05252); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <img src="logo-placeholder.png" alt="EGEA" style="height: 50px; margin: 0 auto 15px; display: block;" />
+        <img src="https://egea-cortinas-two.vercel.app/logo-placeholder.png" alt="EGEA" style="height: 50px; margin: 0 auto 15px; display: block;" />
         <h1 style="color: white; margin: 0; font-size: 26px; font-weight: bold;">PRESUPUESTO PARA APROBACIÓN</h1>
         <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 14px;">Sistemas de cortinas para profesionales</p>
       </div>
@@ -165,7 +165,7 @@ export function generateProduccionInicioEmail(data: OrderEmailData): string {
 
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #803746, #a05252); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <img src="logo-placeholder.png" alt="EGEA" style="height: 50px; margin: 0 auto 15px; display: block;" />
+        <img src="https://egea-cortinas-two.vercel.app/logo-placeholder.png" alt="EGEA" style="height: 50px; margin: 0 auto 15px; display: block;" />
         <h1 style="color: white; margin: 0; font-size: 26px; font-weight: bold;">PEDIDO EN PRODUCCIÓN</h1>
         <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 14px;">Sistemas de cortinas para profesionales</p>
       </div>
