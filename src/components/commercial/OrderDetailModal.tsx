@@ -41,7 +41,7 @@ interface OrderDetailModalProps {
 // --- Utils ---
 // --- Component ---
 
-export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpen, onClose, onSave, canDelete = false, onDelete }) => {
+export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpen, onClose, onSave, canDelete = false, onDelete, userRole }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState<Order>({ ...order });
     const uploadDocument = useUploadOrderDocument();
@@ -160,11 +160,17 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
     const triggerFileSelect = (type: DocType) => fileInputsRef.current[type]?.click();
 
     const handleSave = async () => {
-        // Validation using the complete validation function
-        const validation = validateOrder();
-        if (!validation.isValid) {
-            alert("Por favor completa todos los campos obligatorios:\n\n" + validation.errors.join('\n'));
-            return;
+        // Solo validar si el usuario es comercial
+        // Admin y Manager pueden guardar sin validación completa
+        const isAdminOrManager = userRole === 'admin' || userRole === 'manager';
+
+        if (!isAdminOrManager) {
+            // Usuarios comerciales deben seguir el proceso de validación
+            const validation = validateOrder();
+            if (!validation.isValid) {
+                alert("Por favor completa todos los campos obligatorios:\n\n" + validation.errors.join('\n'));
+                return;
+            }
         }
 
         try {
@@ -174,6 +180,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                     customer_name: formData.customer_name,
                     customer_code: formData.customer_code,
                     customer_company: formData.customer_company,
+                    contact_name: formData.contact_name,
+                    phone: formData.phone,
+                    email: formData.email,
                     delivery_region: formData.delivery_region || formData.region,
                     delivery_address: formData.delivery_address,
                     delivery_location_url: formData.delivery_location_url,
@@ -196,6 +205,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                     customer_name: formData.customer_name,
                     customer_code: formData.customer_code,
                     customer_company: formData.customer_company,
+                    contact_name: formData.contact_name,
+                    phone: formData.phone,
+                    email: formData.email,
                     delivery_region: formData.delivery_region || formData.region,
                     delivery_address: formData.delivery_address,
                     delivery_location_url: formData.delivery_location_url,
@@ -216,7 +228,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
             setIsEditing(false);
             if (onSave) onSave(formData);
-            alert("Pedido guardado exitosamente");
+            alert(isAdminOrManager ? "Pedido guardado exitosamente (Admin/Manager)" : "Pedido guardado exitosamente");
         } catch (error: any) {
             console.error("Error saving order:", error);
             alert(`Error al guardar: ${error.message}`);
