@@ -17,7 +17,6 @@ import { useUploadOrderDocument, type DocumentType } from '@/hooks/use-order-doc
 import { SLAIndicator } from '@/components/commercial/SLAIndicator';
 import { useMaterials } from '@/hooks/use-materials';
 import { DoubleConfirmDialog } from '@/components/ui/double-confirm-dialog';
-import { generatePresupuestoApprovalEmail } from '@/utils/email-templates';
 
 // --- Types & Constants ---
 
