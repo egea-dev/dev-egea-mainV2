@@ -5,6 +5,27 @@
 -- Fecha: 14 de enero de 2026
 -- =====================================================================
 
+-- Crear función para generar número de work order si no existe
+CREATE OR REPLACE FUNCTION public.generate_work_order_number()
+RETURNS TEXT AS $$
+DECLARE
+    year_code TEXT;
+    sequence_num INTEGER;
+    new_number TEXT;
+BEGIN
+    year_code := to_char(NOW(), 'YY');
+    
+    SELECT COALESCE(MAX(CAST(SUBSTRING(work_order_number FROM 5 FOR 4) AS INTEGER)), 0) + 1
+    INTO sequence_num
+    FROM public.produccion_work_orders
+    WHERE work_order_number LIKE 'WO-' || year_code || '%';
+    
+    new_number := 'WO-' || year_code || '-' || LPAD(sequence_num::TEXT, 4, '0');
+    
+    RETURN new_number;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Eliminar trigger antiguo
 DROP TRIGGER IF EXISTS tr_create_work_order ON public.comercial_orders;
 DROP FUNCTION IF EXISTS public.create_work_order_from_order();
