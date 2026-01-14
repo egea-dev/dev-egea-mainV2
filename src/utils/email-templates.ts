@@ -34,7 +34,7 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
     <tr>
       <td style="padding: 12px; border: 1px solid #e5e7eb;">${index + 1}</td>
       <td style="padding: 12px; border: 1px solid #e5e7eb;">${line.width}cm x ${line.height}cm</td>
-      <td style="padding: 12px; border: 1px solid #e5e7eb;">${line.type}</td>
+      <td style="padding: 12px; border: 1px solid #e5e7eb;">${line.material || 'N/A'}</td>
       <td style="padding: 12px; border: 1px solid #e5e7eb;">${line.quantity}</td>
     </tr>
   `).join('');
