@@ -17,7 +17,12 @@ import { useUploadOrderDocument, type DocumentType } from '@/hooks/use-order-doc
 import { SLAIndicator } from '@/components/commercial/SLAIndicator';
 import { useMaterials } from '@/hooks/use-materials';
 import { DoubleConfirmDialog } from '@/components/ui/double-confirm-dialog';
-import { generatePresupuestoApprovalEmail, generateProduccionInicioEmail } from '@/utils/email-templates';
+import {
+    generatePresupuestoApprovalEmail,
+    generatePresupuestoApprovalSubject,
+    generateProduccionInicioEmail,
+    generateProduccionInicioSubject
+} from '@/utils/email-templates';
 import { useUpdateOrder } from '@/hooks/use-orders';
 
 // --- Types & Constants ---
@@ -761,18 +766,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                 <div className="text-xs text-[#8B8D90]">
                                     <div className="mb-2 pb-2 border-b border-[#3B3D41]">
                                         <p className="text-white font-semibold">Para: {formData.email || '{EMAIL_CLIENTE}'}</p>
-                                        <p className="text-[#8B8D90]">Asunto: ✅ Presupuesto Listo - Pedido {formData.admin_code} - EGEA</p>
+                                        <p className="text-[#8B8D90]">
+                                            Asunto: {generatePresupuestoApprovalSubject(formData.admin_code || 'PENDIENTE')}
+                                        </p>
                                     </div>
                                     <div className="space-y-2 font-mono">
-                                        <p>📋 <strong>Número Pedido:</strong> {formData.admin_code || 'Pendiente'}</p>
-                                        <p>👤 <strong>Cliente:</strong> {formData.customer_company || formData.customer_name}</p>
-                                        <p>📍 <strong>Región:</strong> {formData.delivery_region || formData.region}</p>
-                                        <p>📦 <strong>Total:</strong> {formData.quantity_total || 0} uds</p>
+                                        <p><strong>Número Pedido:</strong> {formData.admin_code || 'Pendiente'}</p>
+                                        <p><strong>Cliente:</strong> {formData.customer_company || formData.customer_name}</p>
+                                        <p><strong>Región:</strong> {formData.delivery_region || formData.region}</p>
+                                        <p><strong>Total:</strong> {formData.quantity_total || 0} uds</p>
                                     </div>
                                     <div className="mt-3 pt-3 border-t border-[#3B3D41]">
-                                        <p className="text-[#14CC7F]">✅ Email profesional con logo EGEA</p>
-                                        <p className="text-[#14CC7F]">✅ Presupuesto adjunto en PDF</p>
-                                        <p className="text-[#14CC7F]">✅ Instrucciones de pago con comprobante</p>
+                                        <p className="text-[#14CC7F]">Email profesional con logo EGEA</p>
+                                        <p className="text-[#14CC7F]">Presupuesto adjunto en PDF</p>
+                                        <p className="text-[#14CC7F]">Instrucciones de pago con comprobante</p>
                                     </div>
                                 </div>
                             </div>
@@ -800,7 +807,19 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     variant="outline"
                                     className="border-[#3B3D41] text-[#8B8D90] hover:bg-[#3B3D41] hover:text-white"
                                 >
-                                    👁️ Vista Previa
+                                    Vista Previa
+                                </Button>
+                                <Button
+                                    onClick={() => {
+                                        const subject = generatePresupuestoApprovalSubject(formData.admin_code || 'PENDIENTE');
+                                        navigator.clipboard.writeText(subject);
+                                        alert('Asunto copiado al portapapeles.');
+                                    }}
+                                    variant="outline"
+                                    className="border-[#3B3D41] text-[#8B8D90] hover:bg-[#3B3D41] hover:text-white"
+                                >
+                                    <Copy className="w-4 h-4 mr-2" />
+                                    Copiar asunto
                                 </Button>
                                 <Button
                                     onClick={() => {
@@ -817,7 +836,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             totalAmount: formData.quantity_total || 0
                                         });
                                         navigator.clipboard.writeText(emailHTML);
-                                        alert('✅ HTML del email copiado al portapapeles\n\nPuedes pegarlo directamente en tu cliente de correo.');
+                                        alert('HTML del email copiado al portapapeles.\n\nPuedes pegarlo directamente en tu cliente de correo.');
                                     }}
                                     className="bg-[#14CC7F] hover:bg-[#11A366] text-white"
                                 >
@@ -836,16 +855,18 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                 <div className="text-xs text-[#8B8D90]">
                                     <div className="mb-2 pb-2 border-b border-[#3B3D41]">
                                         <p className="text-white font-semibold">Para: {formData.email || '{EMAIL_CLIENTE}'}</p>
-                                        <p className="text-[#8B8D90]">Asunto: Pedido {formData.admin_code} en Producción - EGEA</p>
+                                        <p className="text-[#8B8D90]">
+                                            Asunto: {generateProduccionInicioSubject(formData.admin_code || 'PENDIENTE')}
+                                        </p>
                                     </div>
                                     <div className="space-y-2 font-mono">
                                         <p><strong>Número Pedido:</strong> {formData.admin_code || 'Pendiente'}</p>
                                         <p><strong>Cliente:</strong> {formData.customer_company || formData.customer_name}</p>
                                         <p><strong>Región:</strong> {formData.delivery_region || formData.region}</p>
                                         <p><strong>Plazo:</strong> {
-                                            formData.delivery_region === 'PENINSULA' ? '7-10 días' :
-                                                formData.delivery_region === 'BALEARES' ? '10-15 días' :
-                                                    formData.delivery_region === 'CANARIAS' ? '15-20 días' : 'Por determinar'
+                                            formData.delivery_region === 'BALEARES' ? '7 días' :
+                                                formData.delivery_region === 'PENINSULA' ? '10 días' :
+                                                    formData.delivery_region === 'CANARIAS' ? '15 días' : 'Por determinar'
                                         }</p>
                                     </div>
                                     <div className="mt-3 pt-3 border-t border-[#3B3D41]">
@@ -883,6 +904,18 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                 </Button>
                                 <Button
                                     onClick={() => {
+                                        const subject = generateProduccionInicioSubject(formData.admin_code || 'PENDIENTE');
+                                        navigator.clipboard.writeText(subject);
+                                        alert('Asunto copiado al portapapeles.');
+                                    }}
+                                    variant="outline"
+                                    className="border-[#3B3D41] text-[#8B8D90] hover:bg-[#3B3D41] hover:text-white"
+                                >
+                                    <Copy className="w-4 h-4 mr-2" />
+                                    Copiar asunto
+                                </Button>
+                                <Button
+                                    onClick={() => {
                                         const emailHTML = generateProduccionInicioEmail({
                                             adminCode: formData.admin_code || 'PENDIENTE',
                                             customerName: formData.customer_name || '',
@@ -896,7 +929,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                             totalAmount: formData.quantity_total || 0
                                         });
                                         navigator.clipboard.writeText(emailHTML);
-                                        alert('✅ HTML del email copiado al portapapeles\n\nPuedes pegarlo directamente en tu cliente de correo.');
+                                        alert('HTML del email copiado al portapapeles.\n\nPuedes pegarlo directamente en tu cliente de correo.');
                                     }}
                                     className="bg-[#14CC7F] hover:bg-[#11A366] text-white"
                                 >
