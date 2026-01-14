@@ -31,7 +31,7 @@ export default function CommercialPage() {
   const [newOrderModal, setNewOrderModal] = useState(false);
   const [importOrderModal, setImportOrderModal] = useState(false);
   const [importOrderNumber, setImportOrderNumber] = useState("");
-  const [comment, setComment] = useState("");
+  const [comments, setComments] = useState<Record<string, string>>({});
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [viewMode, setViewMode] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -42,7 +42,19 @@ export default function CommercialPage() {
   const archivedOrders = orders.filter((o) => o.status === "ENTREGADO" || o.status === "CANCELADO");
   const displayedOrders = viewMode === "ACTIVE" ? activeOrders : archivedOrders;
 
-  const validateOrderReadyForProduction = (order: any): { valid: boolean; error?: string } => {
+  const BYPASS_KEYWORDS = ["Mario", "Hacchi", "Manuel", "Carlos"];
+
+  const validateOrderReadyForProduction = (order: any): { valid: boolean; error?: string; bypassed?: boolean } => {
+    // Detectar palabras clave para bypass automático
+    const customerName = order.customer_name || "";
+    const adminCode = order.admin_code || "";
+    const searchText = `${customerName} ${adminCode}`.toLowerCase();
+
+    const hasBypassKeyword = BYPASS_KEYWORDS.some(keyword =>
+      searchText.includes(keyword.toLowerCase())
+    );
+
+    // Validaciones básicas (siempre requeridas)
     if (!order.admin_code || order.admin_code.trim() === "") {
       return {
         valid: false,
@@ -50,6 +62,56 @@ export default function CommercialPage() {
       };
     }
 
+    if (!order.customer_name || order.customer_name.trim() === "") {
+      return {
+        valid: false,
+        error: "Falta el nombre del cliente",
+      };
+    }
+
+    // Si tiene palabra clave, bypass de validación de documentos
+    if (hasBypassKeyword) {
+      // Solo validar campos esenciales, NO documentos
+      if (!order.lines || order.lines.length === 0) {
+        return {
+          valid: false,
+          error: "El desglose de medidas esta vacio (anade al menos 1 linea)",
+        };
+      }
+
+      const regionValue = order.delivery_region || order.region;
+      if (!regionValue) {
+        return {
+          valid: false,
+          error: "Falta definir la region de entrega",
+        };
+      }
+
+      if (!order.delivery_date) {
+        return {
+          valid: false,
+          error: "Falta definir la fecha de entrega",
+        };
+      }
+
+      if (!order.delivery_address || order.delivery_address.trim() === "") {
+        return {
+          valid: false,
+          error: "Falta la direccion de entrega",
+        };
+      }
+
+      if (!order.quantity_total || order.quantity_total <= 0) {
+        return {
+          valid: false,
+          error: "La cantidad total debe ser mayor que cero",
+        };
+      }
+
+      return { valid: true, bypassed: true };
+    }
+
+    // Validación completa (con documentos) para pedidos normales
     const hasPresupuesto = order.documents?.some((d: any) => d.type === "PRESUPUESTO");
     const hasPedido = order.documents?.some((d: any) => d.type === "PEDIDO_ACEPTADO");
 
@@ -69,13 +131,6 @@ export default function CommercialPage() {
       return {
         valid: false,
         error: "Falta subir el Pedido Aceptado",
-      };
-    }
-
-    if (!order.customer_name || order.customer_name.trim() === "") {
-      return {
-        valid: false,
-        error: "Falta el nombre del cliente",
       };
     }
 
@@ -188,8 +243,10 @@ export default function CommercialPage() {
   };
 
   const changeStatus = async (order: any, newStatus: OrderStatus) => {
-    // 1. Comentario obligatorio
-    if (!comment) {
+    // 1. Comentario obligatorio (individual por pedido)
+    const orderComment = comments[order.id] || "";
+
+    if (!orderComment) {
       toast.error("Comentario obligatorio");
       return;
     }
@@ -197,6 +254,33 @@ export default function CommercialPage() {
     // 2. Validación para PAGADO (envío a producción)
     if (newStatus === "PAGADO") {
       const check = validateOrderReadyForProduction(order);
+
+      // Si fue bypassed por palabra clave
+      if (check.valid && check.bypassed) {
+        const confirmed = window.confirm(
+          `✅ BYPASS DETECTADO\n\nSe detectó palabra clave autorizada (Mario/Hacchi/Manuel/Carlos).\n\n` +
+          `El pedido se enviará a producción SIN documentos.\n\n` +
+          `¿Confirmas el envío?\n\nNota: "${orderComment}"`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          await updateOrderStatus.mutateAsync({
+            orderId: order.id,
+            status: newStatus,
+            comment: `[BYPASS AUTORIZADO] ${orderComment}`,
+          });
+          setComments(prev => ({ ...prev, [order.id]: "" }));
+          toast.success("Pedido enviado a producción (bypass autorizado)");
+          return;
+        } catch (error) {
+          console.error("Error updating status:", error);
+          return;
+        }
+      }
 
       // Si no es válido, verificar permisos
       if (!check.valid) {
@@ -213,7 +297,7 @@ export default function CommercialPage() {
         // Permitir override a admins/managers con confirmación
         if (isAdminOrManager) {
           const confirmed = window.confirm(
-            `⚠️ ADVERTENCIA ADMIN:\n\n${check.error}\n\n¿Deseas FORZAR el envío a producción de todos modos?\n\nNota que se registrará: "${comment}"`
+            `⚠️ ADVERTENCIA ADMIN:\n\n${check.error}\n\n¿Deseas FORZAR el envío a producción de todos modos?\n\nNota que se registrará: "${orderComment}"`
           );
 
           if (!confirmed) {
@@ -225,9 +309,9 @@ export default function CommercialPage() {
             await updateOrderStatus.mutateAsync({
               orderId: order.id,
               status: newStatus,
-              comment: `[OVERRIDE ADMIN] ${comment}`,
+              comment: `[OVERRIDE ADMIN] ${orderComment}`,
             });
-            setComment("");
+            setComments(prev => ({ ...prev, [order.id]: "" }));
             toast.success("Pedido forzado a producción (override admin)");
             return;
           } catch (error) {
@@ -243,9 +327,9 @@ export default function CommercialPage() {
       await updateOrderStatus.mutateAsync({
         orderId: order.id,
         status: newStatus,
-        comment,
+        comment: orderComment,
       });
-      setComment("");
+      setComments(prev => ({ ...prev, [order.id]: "" }));
     } catch (error) {
       console.error("Error updating status:", error);
     }
@@ -367,8 +451,11 @@ export default function CommercialPage() {
                           type="text"
                           placeholder="Nota..."
                           className="h-7 w-24 text-xs"
-                          value={comment}
-                          onChange={(e) => setComment(e.target.value)}
+                          value={comments[order.id] || ""}
+                          onChange={(e) => setComments(prev => ({
+                            ...prev,
+                            [order.id]: e.target.value
+                          }))}
                         />
                         <Button
                           size="sm"
