@@ -408,6 +408,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                         />
                                     </div>
 
+                                    {/* EMAIL */}
+                                    <div>
+                                        <label className="text-xs text-[#8B8D90] uppercase font-bold">Email</label>
+                                        <Input
+                                            name="email"
+                                            type="email"
+                                            value={formData.email || ''}
+                                            onChange={handleChange}
+                                            disabled={!isEditing}
+                                            placeholder="correo@ejemplo.com"
+                                            className="bg-muted/30 border-border/60 text-foreground"
+                                        />
+                                    </div>
+
                                     {/* DIRECCIÓN DE ENTREGA */}
                                     <div>
                                         <label className="text-xs text-[#8B8D90] uppercase font-bold">Dirección de Entrega</label>
