@@ -65,7 +65,7 @@ export const useUpdateOrderStatus = () => {
             // Get current order to track old status and apply business rules
             const { data: currentOrder, error: currentError } = await supabase
                 .from('comercial_orders')
-                .select('status, delivery_region, region, delivery_date, shipped_date, delivered_date, packages_count, scanned_packages, tracking_number, needs_shipping_validation, lines')
+                .select('status, delivery_region, region, delivery_date, packages_count, scanned_packages, tracking_number, needs_shipping_validation, lines')
                 .eq('id', orderId)
                 .single();
 
@@ -144,11 +144,11 @@ export const useUpdateOrderStatus = () => {
             }
 
             if (nextStatus === "ENVIADO") {
-                updates.shipped_date = currentOrder?.shipped_date || now;
+                // Removed shipped_date - column doesn't exist in DB
             }
 
             if (nextStatus === "ENTREGADO") {
-                updates.delivered_date = currentOrder?.delivered_date || now;
+                // Removed delivered_date - column doesn't exist in DB
             }
 
             // Update order status
