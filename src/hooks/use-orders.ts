@@ -65,7 +65,7 @@ export const useUpdateOrderStatus = () => {
             // Get current order to track old status and apply business rules
             const { data: currentOrder, error: currentError } = await supabase
                 .from('comercial_orders')
-                .select('status, delivery_region, region, delivery_date, production_start_date, shipped_date, delivered_date, packages_count, scanned_packages, tracking_number, needs_shipping_validation, lines')
+                .select('status, delivery_region, region, delivery_date, shipped_date, delivered_date, packages_count, scanned_packages, tracking_number, needs_shipping_validation, lines')
                 .eq('id', orderId)
                 .single();
 
@@ -124,7 +124,7 @@ export const useUpdateOrderStatus = () => {
             const now = new Date().toISOString();
 
             if (nextStatus === "EN_PROCESO") {
-                updates.production_start_date = currentOrder?.production_start_date || now;
+                // Removed production_start_date - column doesn't exist in DB
 
                 if (!currentOrder?.delivery_date) {
                     try {
