@@ -557,6 +557,7 @@ export default function CommercialPage() {
             setSelectedOrder(null);
           }}
           onSave={() => setSelectedOrder(null)}
+          userRole={profile?.role}
         />
       )}
     </PageShell>
