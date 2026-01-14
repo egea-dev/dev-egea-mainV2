@@ -1,36 +1,36 @@
 // Plantillas de email para el sistema de pedidos
 
 interface OrderEmailData {
-    orderNumber: string;
-    customerName: string;
-    customerCompany: string;
-    customerCIF: string;
-    contactName: string;
-    phone: string;
-    email: string;
-    deliveryAddress: string;
-    deliveryRegion: 'PENINSULA' | 'BALEARES' | 'CANARIAS';
-    lines: Array<{
-        width: number;
-        height: number;
-        type: string;
-        quantity: number;
-    }>;
-    totalAmount: number;
-    presupuestoUrl?: string;
+  orderNumber: string;
+  customerName: string;
+  customerCompany: string;
+  customerCIF: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  deliveryAddress: string;
+  deliveryRegion: 'PENINSULA' | 'BALEARES' | 'CANARIAS';
+  lines: Array<{
+    width: string | number;
+    height: string | number;
+    material?: string;
+    quantity: number;
+  }>;
+  totalAmount: number;
+  presupuestoUrl?: string;
 }
 
 /**
  * Genera el HTML del email de envío de presupuesto para aprobación
  */
 export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
-    const regionNames = {
-        PENINSULA: 'Península',
-        BALEARES: 'Baleares',
-        CANARIAS: 'Canarias'
-    };
+  const regionNames = {
+    PENINSULA: 'Península',
+    BALEARES: 'Baleares',
+    CANARIAS: 'Canarias'
+  };
 
-    const linesHTML = data.lines.map((line, index) => `
+  const linesHTML = data.lines.map((line, index) => `
     <tr>
       <td style="padding: 12px; border: 1px solid #e5e7eb;">${index + 1}</td>
       <td style="padding: 12px; border: 1px solid #e5e7eb;">${line.width}cm x ${line.height}cm</td>
@@ -39,7 +39,7 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
     </tr>
   `).join('');
 
-    return `
+  return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
 
       <!-- Header -->
@@ -183,5 +183,5 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
  * Genera el subject del email
  */
 export function generatePresupuestoApprovalSubject(orderNumber: string): string {
-    return `✅ Presupuesto Listo para Aprobación - Pedido ${orderNumber} - EGEA`;
+  return `✅ Presupuesto Listo para Aprobación - Pedido ${orderNumber} - EGEA`;
 }
