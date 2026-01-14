@@ -872,7 +872,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                         });
                                         const win = window.open('', '_blank');
                                         if (win) {
-                                            win.document.write(emailHTML);
+                                            win.document.write(`<base href="${window.location.origin}/">` + emailHTML);
                                             win.document.close();
                                         }
                                     }}
