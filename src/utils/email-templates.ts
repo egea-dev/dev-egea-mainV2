@@ -58,9 +58,9 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
 
         <!-- Reference Number -->
         <div style="background: #f9fafb; border: 2px solid #803746; border-radius: 8px; padding: 20px; margin-bottom: 25px; text-align: center;">
-          <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Número de Referencia:</p>
-          <p style="margin: 0; font-size: 28px; font-weight: bold; color: #803746; font-family: monospace;">${data.orderNumber}</p>
-          <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 12px;">Conserva este número para cualquier consulta</p>
+          <p style="margin: 0 0 5px 0; color: #6b7280; font-size: 14px;">Número de Pedido:</p>
+          <p style="margin: 0; font-size: 28px; font-weight: bold; color: #803746; font-family: monospace;">${data.customerCIF}</p>
+          <p style="margin: 10px 0 0 0; color: #6b7280; font-size: 12px;">Conserva este número para cualquier consulta y para realizar el pago</p>
         </div>
 
         <!-- Professional Data -->
@@ -100,20 +100,9 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
 
         <!-- Measurements -->
         <div style="margin-bottom: 25px;">
-          <h3 style="color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 15px;">Detalle de Medidas</h3>
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="background: #f9fafb;">
-                <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb; font-weight: 600; color: #374151;">#</th>
-                <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb; font-weight: 600; color: #374151;">Medidas</th>
-                <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb; font-weight: 600; color: #374151;">Tipo</th>
-                <th style="padding: 12px; text-align: left; border: 1px solid #e5e7eb; font-weight: 600; color: #374151;">Cant.</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${linesHTML}
-            </tbody>
-          </table>
+          <p style="color: #6b7280; font-size: 14px; margin: 0;">
+            📄 <strong>Presupuesto adjunto en PDF</strong> con el detalle completo de medidas y especificaciones técnicas.
+          </p>
         </div>
 
         <!-- Total -->
@@ -137,17 +126,17 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
         <div style="background: #dcfce7; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
           <h4 style="color: #166534; margin: 0 0 10px 0;">✅ Para Aprobar este Presupuesto</h4>
           <ol style="margin: 0; padding-left: 20px; color: #374151;">
-            <li style="margin-bottom: 8px;"><strong>Revisa</strong> todos los detalles y medidas del presupuesto adjunto</li>
-            <li style="margin-bottom: 8px;"><strong>Responde a este email</strong> con tu confirmación indicando el número de pedido <strong>${data.orderNumber}</strong></li>
-            <li style="margin-bottom: 8px;"><strong>Realiza el pago</strong> según las instrucciones que te enviaremos</li>
-            <li>Una vez confirmado el pago, <strong>procesaremos tu pedido inmediatamente</strong></li>
+            <li style="margin-bottom: 8px;"><strong>Revisa</strong> el presupuesto adjunto en PDF con todos los detalles y medidas</li>
+            <li style="margin-bottom: 8px;"><strong>Responde a este email</strong> confirmando tu aprobación e indicando el número de pedido <strong>${data.customerCIF}</strong></li>
+            <li style="margin-bottom: 8px;"><strong>Realiza el pago</strong> y adjunta el comprobante de pago al correo de respuesta con la referencia <strong>${data.customerCIF}</strong></li>
+            <li>Una vez recibido el comprobante de pago, <strong>procesaremos tu pedido inmediatamente</strong></li>
           </ol>
         </div>
 
         <!-- Payment Instructions -->
         <div style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 25px;">
           <p style="margin: 0; color: #374151; font-size: 14px;">
-            💳 <strong>Para realizar el pago:</strong> Escribe a <strong>pedidos@decoracionesegea.com</strong> indicando el número de pedido <strong>${data.orderNumber}</strong>. Te enviaremos los datos bancarios y las instrucciones de pago.
+            💳 <strong>Para solicitar los datos de pago:</strong> Escribe a <strong>pedidos@decoracionesegea.com</strong> indicando el número de pedido <strong>${data.customerCIF}</strong>. Te enviaremos los datos bancarios.
           </p>
         </div>
 
