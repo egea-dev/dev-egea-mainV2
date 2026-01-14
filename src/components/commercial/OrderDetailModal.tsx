@@ -36,6 +36,7 @@ interface OrderDetailModalProps {
     onSave?: (updatedOrder: Order) => void;
     canDelete?: boolean;
     onDelete?: (orderId: string) => void | Promise<void>;
+    userRole?: string; // Añadido para control de permisos
 }
 
 // --- Utils ---
