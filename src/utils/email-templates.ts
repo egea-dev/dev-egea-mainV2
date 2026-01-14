@@ -28,7 +28,7 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
 
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #803746, #a05252); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <img src="https://egea-cortinas-two.vercel.app/image/egea-evolucio-g.png" alt="EGEA" style="height: 50px; margin: 0 auto 15px; display: block;" />
+        <img src="logo-placeholder.png" alt="EGEA" style="height: 50px; margin: 0 auto 15px; display: block;" />
         <h1 style="color: white; margin: 0; font-size: 26px; font-weight: bold;">PRESUPUESTO PARA APROBACIÓN</h1>
         <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 14px;">Sistemas de cortinas para profesionales</p>
       </div>
@@ -89,13 +89,6 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
           </p>
         </div>
 
-        <!-- Total -->
-        <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <p style="margin: 0; font-size: 16px; color: #374151;">Total del Presupuesto:</p>
-            <p style="margin: 0; font-size: 28px; font-weight: bold; color: #803746;">${data.totalAmount.toFixed(2)} €</p>
-          </div>
-        </div>
 
         <!-- Approval Instructions -->
         <div style="background: #dcfce7; border: 1px solid #86efac; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
@@ -127,16 +120,15 @@ export function generatePresupuestoApprovalEmail(data: OrderEmailData): string {
 
       <!-- Footer -->
       <div style="background: #374151; color: white; padding: 25px; text-align: center; border-radius: 0 0 10px 10px;">
-        <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: 600;">¿Tienes dudas o necesitas asesoramiento?</p>
-        <p style="margin: 0 0 15px 0; color: #d1d5db; font-size: 14px;">Nuestro equipo de atención al cliente está aquí para ayudarte:</p>
+        <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: 600;">¿Necesitas hacer alguna consulta?</p>
+        <p style="margin: 0 0 15px 0; color: #d1d5db; font-size: 14px;">Nuestro equipo está disponible para ayudarte:</p>
         <div style="margin-bottom: 15px;">
-          <p style="margin: 0 0 5px 0; color: #fbbf24; font-weight: 500;">📧 Email: pedidos@decoracionesegea.com</p>
-          <p style="margin: 0; color: #fbbf24; font-weight: 500;">📞 Teléfono: +34 601 904 680</p>
+          <p style="margin: 0 0 5px 0; color: #fbbf24; font-weight: 500;">Email: pedidos@decoracionesegea.com</p>
+          <p style="margin: 0; color: #fbbf24; font-weight: 500;">Teléfono: +34 601 904 680</p>
         </div>
         <p style="margin: 0 0 10px 0; color: #9ca3af; font-size: 12px;">Horario de atención: Lunes a Viernes, 9:00-14:00h</p>
         <hr style="border: 1px solid #4b5563; margin: 15px 0;">
         <p style="margin: 0; color: #9ca3af; font-size: 12px;">© 2026 DECORACIONES EGEA S.L. - Todos los derechos reservados</p>
-        <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 10px;">Este correo ha sido generado automáticamente. Por favor, responde a pedidos@decoracionesegea.com para cualquier consulta.</p>
       </div>
 
     </div>
@@ -173,7 +165,7 @@ export function generateProduccionInicioEmail(data: OrderEmailData): string {
 
       <!-- Header -->
       <div style="background: linear-gradient(135deg, #803746, #a05252); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <img src="https://egea-cortinas-two.vercel.app/image/egea-evolucio-g.png" alt="EGEA" style="height: 50px; margin: 0 auto 15px; display: block;" />
+        <img src="logo-placeholder.png" alt="EGEA" style="height: 50px; margin: 0 auto 15px; display: block;" />
         <h1 style="color: white; margin: 0; font-size: 26px; font-weight: bold;">PEDIDO EN PRODUCCIÓN</h1>
         <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 14px;">Sistemas de cortinas para profesionales</p>
       </div>
@@ -184,7 +176,7 @@ export function generateProduccionInicioEmail(data: OrderEmailData): string {
         <!-- Agradecimiento -->
         <div style="text-align: center; margin-bottom: 30px;">
           <h2 style="color: #803746; margin: 0 0 10px 0;">Pago Recibido Correctamente</h2>
-          <p style="color: #6b7280; font-size: 16px; margin: 0;">Hemos recibido tu pago y tu pedido ya está en proceso de producción.</p>
+          <p style="color: #6b7280; font-size: 16px; margin: 0;">Gracias, hemos recibido tu pago y tu pedido ya está en proceso de producción.</p>
         </div>
 
         <!-- Reference Number -->

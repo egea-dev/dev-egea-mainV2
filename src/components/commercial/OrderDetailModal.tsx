@@ -753,7 +753,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                     {/* SECCIÓN EMAIL PRESUPUESTO */}
                     <div className="bg-[#2F3135] p-5 rounded-2xl border border-[#3B3D41] shadow-sm mt-6">
                         <h4 className="font-bold text-white mb-4 flex items-center">
-                            <FileText className="w-4 h-4 mr-2 text-[#14CC7F]" /> 📧 Email Presupuesto para Aprobación
+                            <FileText className="w-4 h-4 mr-2 text-[#14CC7F]" /> Email Presupuesto para Aprobación
                         </h4>
                         <div className="bg-[#1F2225] rounded-xl p-4 mb-4 border border-[#3B3D41] max-h-[300px] overflow-y-auto custom-scrollbar">
                             <div className="text-xs text-[#8B8D90]">
