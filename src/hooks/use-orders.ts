@@ -65,7 +65,7 @@ export const useUpdateOrderStatus = () => {
             // Get current order to track old status and apply business rules
             const { data: currentOrder, error: currentError } = await supabase
                 .from('comercial_orders')
-                .select('status, delivery_region, region, delivery_date, packages_count, scanned_packages, tracking_number, needs_shipping_validation, lines')
+                .select('status, delivery_region, region, delivery_date, lines')
                 .eq('id', orderId)
                 .single();
 
@@ -97,99 +97,83 @@ export const useUpdateOrderStatus = () => {
             } else if (currentStatus !== nextStatus) {
                 const currentIndex = ORDER_STATUS_FLOW.indexOf(currentStatus);
                 const nextIndex = ORDER_STATUS_FLOW.indexOf(nextStatus);
-                const allowsDirectShipping =
-                    currentStatus === "EN_PROCESO" &&
-                    nextStatus === "ENVIADO" &&
-                    currentOrder?.needs_shipping_validation;
+                // Removed validation for ENVIADO status - columns don't exist
+                // (packages_count, scanned_packages, tracking_number, needs_shipping_validation)
 
-                if (!allowsDirectShipping && nextIndex !== currentIndex + 1) {
-                    throw new Error("Transicion de estado no permitida");
-                }
-            }
+                // Get authenticated user from MAIN
+                const { data: { user } } = await supabaseMain.auth.getUser();
+                const userId = user?.id || 'unknown';
 
-            if (nextStatus === "ENVIADO") {
-                const totalPackages = Number(currentOrder?.packages_count) || Math.max(currentOrder?.lines?.length || 0, 1);
-                const scanned = Number(currentOrder?.scanned_packages) || 0;
-                const tracking = (currentOrder?.tracking_number || "").trim();
-                if (!tracking || scanned < totalPackages) {
-                    throw new Error("Faltan bultos escaneados o numero de tracking");
-                }
-            }
+                const updates: Partial<Order> = { status: nextStatus };
+                const now = new Date().toISOString();
 
-            // Get authenticated user from MAIN
-            const { data: { user } } = await supabaseMain.auth.getUser();
-            const userId = user?.id || 'unknown';
+                if (nextStatus === "EN_PROCESO") {
+                    // Removed production_start_date - column doesn't exist in DB
 
-            const updates: Partial<Order> = { status: nextStatus };
-            const now = new Date().toISOString();
-
-            if (nextStatus === "EN_PROCESO") {
-                // Removed production_start_date - column doesn't exist in DB
-
-                if (!currentOrder?.delivery_date) {
-                    try {
-                        const { data: slaConfig } = await supabase
-                            .from("comercial_sla_config")
-                            .select("days")
-                            .eq("region", currentOrder?.delivery_region || currentOrder?.region || null)
-                            .maybeSingle();
-                        const days = Number(slaConfig?.days) || 7;
-                        const target = new Date();
-                        target.setDate(target.getDate() + days);
-                        updates.delivery_date = target.toISOString().slice(0, 10);
-                    } catch (slaError) {
-                        console.warn("No se pudo cargar SLA para calcular fecha de entrega", slaError);
+                    if (!currentOrder?.delivery_date) {
+                        try {
+                            const { data: slaConfig } = await supabase
+                                .from("comercial_sla_config")
+                                .select("days")
+                                .eq("region", currentOrder?.delivery_region || currentOrder?.region || null)
+                                .maybeSingle();
+                            const days = Number(slaConfig?.days) || 7;
+                            const target = new Date();
+                            target.setDate(target.getDate() + days);
+                            updates.delivery_date = target.toISOString().slice(0, 10);
+                        } catch (slaError) {
+                            console.warn("No se pudo cargar SLA para calcular fecha de entrega", slaError);
+                        }
                     }
                 }
-            }
 
-            if (nextStatus === "ENVIADO") {
-                // Removed shipped_date - column doesn't exist in DB
-            }
+                if (nextStatus === "ENVIADO") {
+                    // Removed shipped_date - column doesn't exist in DB
+                }
 
-            if (nextStatus === "ENTREGADO") {
-                // Removed delivered_date - column doesn't exist in DB
-            }
+                if (nextStatus === "ENTREGADO") {
+                    // Removed delivered_date - column doesn't exist in DB
+                }
 
-            // Update order status
-            const { data, error } = await supabase
-                .from('comercial_orders')
-                .update(updates)
-                .eq('id', orderId)
-                .select()
-                .single();
+                // Update order status
+                const { data, error } = await supabase
+                    .from('comercial_orders')
+                    .update(updates)
+                    .eq('id', orderId)
+                    .select()
+                    .single();
 
-            if (error) {
-                console.error("Error updating order status:", error);
-                throw error;
-            }
+                if (error) {
+                    console.error("Error updating order status:", error);
+                    throw error;
+                }
 
-            // Insert log entry
-            const { error: logError } = await supabase
-                .from('comercial_order_status_log')
-                .insert({
-                    order_id: orderId,
-                    old_status: currentOrder?.status || null,
-                    new_status: nextStatus,
-                    comment,
-                    changed_by: userId
-                });
+                // Insert log entry
+                const { error: logError } = await supabase
+                    .from('comercial_order_status_log')
+                    .insert({
+                        order_id: orderId,
+                        old_status: currentOrder?.status || null,
+                        new_status: nextStatus,
+                        comment,
+                        changed_by: userId
+                    });
 
-            if (logError) {
-                console.error("Error creating status log:", logError);
-                // Don't throw - log is secondary to status update
-            }
+                if (logError) {
+                    console.error("Error creating status log:", logError);
+                    // Don't throw - log is secondary to status update
+                }
 
-            return data as Order;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
-            toast.success("Estado actualizado exitosamente");
-        },
-        onError: (error: any) => {
-            toast.error(`Error al actualizar estado: ${error.message}`);
-        }
-    });
+                return data as Order;
+            },
+            onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ['orders'] });
+                toast.success("Estado actualizado exitosamente");
+            },
+                onError: (error: any) => {
+                    toast.error(`Error al actualizar estado: ${error.message}`);
+                }
+        });
 };
 
 export const useDeleteOrder = () => {
