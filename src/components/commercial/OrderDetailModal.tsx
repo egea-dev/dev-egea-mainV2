@@ -56,10 +56,12 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
     const { data: materials } = useMaterials();
     const [savingDoc, setSavingDoc] = useState<DocType | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const isAdminOrManager = userRole === 'admin' || userRole === 'manager';
     const fileInputsRef = useRef<Record<DocType, HTMLInputElement | null>>({
         PRESUPUESTO: null,
         PEDIDO_ACEPTADO: null
     });
+    const qrContainerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -169,8 +171,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
     const handleSave = async () => {
         // Solo validar si el usuario es comercial
-        const isAdminOrManager = userRole === 'admin' || userRole === 'manager';
-
         if (!isAdminOrManager) {
             const validation = validateOrder();
             if (!validation.isValid) {
@@ -230,6 +230,43 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
     const hasDoc = (type: DocType) => (formData.documents || []).some(d => d.type === type);
     const getDoc = (type: DocType) => (formData.documents || []).find(d => d.type === type);
     const isValidForPDF = () => validation.isValid;
+    const canPrint = isAdminOrManager && Boolean(formData.order_number);
+
+    const handlePrintLabel = () => {
+        if (!qrContainerRef.current) {
+            alert("No se pudo generar la etiqueta.");
+            return;
+        }
+        const svg = qrContainerRef.current.querySelector("svg");
+        if (!svg) {
+            alert("No se pudo generar el QR.");
+            return;
+        }
+        const win = window.open("", "_blank");
+        if (!win) return;
+        win.document.write(`
+            <html>
+                <head>
+                    <title>Etiqueta Produccion</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 24px; text-align: center; }
+                        .label { display: inline-block; padding: 16px; border: 1px solid #ddd; }
+                        .code { margin-top: 12px; font-size: 12px; color: #555; font-family: monospace; }
+                    </style>
+                </head>
+                <body>
+                    <div class="label">
+                        ${svg.outerHTML}
+                        <div class="code">${formData.order_number || "INT-XXXX"}</div>
+                    </div>
+                </body>
+            </html>
+        `);
+        win.document.close();
+        win.focus();
+        win.print();
+        win.close();
+    };
 
     return (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md backdrop-brightness-50 flex items-start justify-center z-50 px-4 pb-4 animate-in fade-in duration-200">
@@ -697,9 +734,9 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     <h4 className="font-bold text-white">Etiqueta de Produccion</h4>
                                 </div>
 
-                                <div className="flex flex-col items-center gap-4">
-                                    <div className="bg-white p-4 rounded-2xl shadow-lg">
-                                        <QRCodeGenerator order={formData} />
+                                    <div className="flex flex-col items-center gap-4">
+                                        <div className="bg-white p-4 rounded-2xl shadow-lg">
+                                        <QRCodeGenerator order={formData} containerRef={qrContainerRef} />
                                     </div>
 
                                     <div className="w-full bg-muted/40 rounded-xl border border-border/60 p-3 space-y-2">
@@ -728,15 +765,28 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     </div>
 
                                     <Button
-                                        disabled={!isValidForPDF()}
+                                        onClick={handlePrintLabel}
+                                        disabled={!canPrint}
+                                        className="w-full bg-muted/40 hover:bg-muted/60 text-foreground border border-border/60 disabled:opacity-50"
+                                    >
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        IMPRIMIR ETIQUETA
+                                    </Button>
+                                    <Button
+                                        disabled={!canPrint}
                                         className="w-full bg-muted/40 hover:bg-muted/60 text-foreground border border-border/60 disabled:opacity-50"
                                     >
                                         <FileText className="w-4 h-4 mr-2" />
                                         GENERAR ORDEN PDF
                                     </Button>
-                                    {!validation.isValid && (
+                                    {!isAdminOrManager && (
                                         <p className="text-xs text-[#8B8D90] text-center mt-2">
-                                            Completa la informacion obligatoria para habilitar la orden.
+                                            Solo admin y manager pueden imprimir o generar PDFs.
+                                        </p>
+                                    )}
+                                    {isAdminOrManager && !validation.isValid && (
+                                        <p className="text-xs text-[#8B8D90] text-center mt-2">
+                                            La informacion incompleta puede generar una etiqueta incorrecta.
                                         </p>
                                     )}
                                 </div>

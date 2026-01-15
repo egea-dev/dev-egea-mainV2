@@ -137,68 +137,120 @@ export function ProductionPage() {
   const loadOrders = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Cargando órdenes de producción...');
+      console.log('Loading production orders...');
+
+      const isMissingRelation = (error: any) => {
+        const message = String(error?.message || '');
+        return message.includes('does not exist') || message.includes('relation') || message.includes('schema');
+      };
 
       const { data: ordersData, error: ordersError } = await supabaseProductivity
         .from('produccion_work_orders')
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('📦 Órdenes recibidas:', ordersData);
-      console.log('❌ Error:', ordersError);
+      console.log('Orders received:', ordersData);
+      console.log('Orders error:', ordersError);
 
       if (ordersError) throw ordersError;
 
       if (ordersData && ordersData.length > 0) {
-        const { data: linesData } = await supabaseProductivity
-          .from('produccion_work_order_lines')
-          .select('*')
-          .in('work_order_id', ordersData.map((o: any) => o.id));
+        let linesData: any[] | null = null;
+        try {
+          const linesResponse = await supabaseProductivity
+            .from('produccion_work_order_lines')
+            .select('*')
+            .in('work_order_id', ordersData.map((o: any) => o.id));
+          linesData = linesResponse.data as any[] | null;
+        } catch (lineError) {
+          console.warn('Work order lines unavailable:', lineError);
+        }
 
-        console.log('📏 Líneas recibidas:', linesData);
+        const normalizeStatus = (raw?: string) => {
+          const normalized = (raw || "").toUpperCase();
+          const map: Record<string, string> = {
+            EN_CORTE: "CORTE",
+            EN_CONFECCION: "CONFECCION",
+            EN_CONTROL_CALIDAD: "CONTROL_CALIDAD",
+            TERMINADO: "LISTO_ENVIO"
+          };
+          return map[normalized] || normalized;
+        };
 
         const ordersWithLines = ordersData.map((order: any) => {
           const specs = order.technical_specs || {};
+          const normalizedStatus = normalizeStatus(order.status);
+          const dueDate = order.due_date || order.estimated_completion || null;
+          const processStartAt = order.process_start_at || order.started_at || null;
           return {
             ...order,
-            fabric: specs.fabric || 'Estándar',
-            color: specs.color || 'N/D',
-            quantity_total: specs.quantity || 1, // Fallback if not in column
+            order_number: order.order_number || order.work_order_number || order.id,
+            status: normalizedStatus,
+            fabric: specs.fabric || order.fabric || 'Estandar',
+            color: specs.color || order.color || 'N/D',
+            quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
+            due_date: dueDate,
+            process_start_at: processStartAt,
             lines: linesData?.filter((line: any) => line.work_order_id === order.id) || []
           };
         });
 
-        console.log('✅ Órdenes procesadas:', ordersWithLines);
         setOrders(ordersWithLines);
       } else {
-        console.log('⚠️ No hay órdenes en la base de datos');
         setOrders([]);
       }
     } catch (error: any) {
-      console.error('💥 Error loading orders:', error);
-      toast.error('Error al cargar órdenes: ' + error.message);
-      setOrders([]); // Asegurar que se setee aunque haya error
+      console.error('Error loading orders:', error);
+      toast.error('Error al cargar ordenes: ' + error.message);
+      setOrders([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const productionQueue = useMemo(() => {
-    return orders
-      .filter(order => ['EN_PROCESO', 'PAGADO', 'PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'].includes(order.status))
-      .sort((a, b) => {
-        const aDate = a.due_date ? new Date(a.due_date).getTime() : Infinity;
-        const bDate = b.due_date ? new Date(b.due_date).getTime() : Infinity;
-        return aDate - bDate;
-      });
-  }, [orders]);
+    const productionQueue = useMemo(() => {
+      const now = Date.now();
+      return orders
+        .filter(order => {
+          const allowed = ['EN_PROCESO', 'PAGADO', 'PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'];
+          if (!allowed.includes(order.status)) return false;
+          if (order.status !== 'LISTO_ENVIO') return true;
+          if (!order.updated_at) return true;
+          const updatedAt = new Date(order.updated_at).getTime();
+          return now - updatedAt <= 30 * 60 * 1000;
+        })
+        .sort((a, b) => {
+          const aDate = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+          const bDate = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+          return aDate - bDate;
+        });
+    }, [orders]);
 
   const persistOrderUpdate = async (orderId: string, patch: Partial<Order>) => {
-    setOrders((prev: Order[]) => prev.map(o => o.id === orderId ? { ...o, ...patch } as Order : o));
-    setScannedOrder(prev => prev && prev.id === orderId ? { ...prev, ...patch } as Order : prev);
-    try {
-      // @ts-ignore
-      const { error } = await supabaseProductivity.from('produccion_work_orders').update(patch).eq('id', orderId);
+      setOrders((prev: Order[]) => prev.map(o => o.id === orderId ? { ...o, ...patch } as Order : o));
+      setScannedOrder(prev => prev && prev.id === orderId ? { ...prev, ...patch } as Order : prev);
+      try {
+        const payload: any = { ...patch };
+        if (Object.prototype.hasOwnProperty.call(payload, 'due_date')) {
+          payload.estimated_completion = payload.due_date || null;
+          delete payload.due_date;
+        }
+        if (Object.prototype.hasOwnProperty.call(payload, 'process_start_at')) {
+          payload.started_at = payload.process_start_at || null;
+          delete payload.process_start_at;
+        }
+        if (Object.prototype.hasOwnProperty.call(payload, 'sla_days')) {
+          delete payload.sla_days;
+        }
+
+        // @ts-ignore
+        const { error } = await supabaseProductivity
+          .from('produccion_work_orders')
+          .update(payload)
+          .eq('id', orderId)
+          .select('id')
+          .maybeSingle();
+
       if (error) throw error;
       await loadOrders();
     } catch (error: any) {
@@ -252,7 +304,7 @@ export function ProductionPage() {
 
     const labelWidth = '60mm';
     const labelHeight = '86mm';
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(scannedOrder.qr_payload || scannedOrder.order_number)}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=420x420&ecc=H&data=${encodeURIComponent(scannedOrder.qr_payload || scannedOrder.order_number)}`;
 
     const orderNumber = escapeHtml(scannedOrder.order_number);
     const customerName = escapeHtml(scannedOrder.customer_name || 'Sin cliente');
@@ -297,7 +349,7 @@ export function ProductionPage() {
             .info { width: 100%; border: 0.3mm solid #999; background: #f2f2f2; padding: 2mm; font-size: 2mm; line-height: 1.4; text-align: left; margin-bottom: 2mm; }
             .info-row { margin-bottom: 0.8mm; }
             .info-label { font-weight: 900; text-transform: uppercase; }
-            .qr { width: 28mm; height: 28mm; margin: 1mm 0; border: 0.4mm solid #111; }
+            .qr { width: 40mm; height: 40mm; margin: 2mm auto; border: 0.4mm solid #111; display: block; }
             .counts { border: 0.4mm solid #111; font-weight: 900; font-size: 3.5mm; padding: 1.5mm; margin: 1mm 0; text-transform: uppercase; }
             .units { font-size: 2.5mm; }
           </style>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -13,6 +13,7 @@ import { OrderStatusBadge } from "@/components/badges";
 import { Package, Eye, Plus, LayoutList, History } from "lucide-react";
 import { useOrders, useCreateOrder, useUpdateOrderStatus, useDeleteOrder } from "@/hooks/use-orders";
 import { supabase } from "@/integrations/supabase/client";
+import { supabaseProductivity } from "@/integrations/supabase";
 import { cn } from "@/lib/utils";
 import { OrderDetailModal } from "@/components/commercial/OrderDetailModal";
 import { CalendarModule } from "@/components/dashboard/CalendarModule";
@@ -20,6 +21,7 @@ import { OrderStatus } from "@/types/commercial";
 import { toast } from "sonner";
 import PageShell from "@/components/layout/PageShell";
 import { useProfile } from "@/hooks/use-supabase";
+import { resolveOrderStatus } from "@/lib/order-status";
 
 export default function CommercialPage() {
   const { data: orders = [], isLoading } = useOrders();
@@ -27,6 +29,130 @@ export default function CommercialPage() {
   const updateOrderStatus = useUpdateOrderStatus();
   const deleteOrder = useDeleteOrder();
   const { data: profile } = useProfile();
+  const syncRanRef = useRef(false);
+
+  useEffect(() => {
+    if (syncRanRef.current) return;
+    if (!orders.length) return;
+
+    const syncMissingWorkOrders = async () => {
+      let failedCount = 0;
+      try {
+        const eligible = orders.filter((order) => {
+          const resolved = resolveOrderStatus(order.status);
+          const normalized = String(resolved || order.status || "")
+            .trim()
+            .toUpperCase();
+          return ["PAGADO", "EN_PROCESO", "PTE_ENVIO", "ENVIADO"].includes(normalized);
+        });
+
+        if (!eligible.length) return;
+
+        const resolvedRefs = eligible
+          .map((order) => {
+            const rawOrderNumber = String(order.order_number || "");
+            if (rawOrderNumber.toUpperCase().startsWith("INT-")) return rawOrderNumber;
+            return order.admin_code || rawOrderNumber || null;
+          })
+          .filter(Boolean);
+        const orderNumbers = eligible
+          .map((order) => order.order_number)
+          .filter(Boolean);
+        const adminCodes = eligible
+          .map((order) => order.admin_code)
+          .filter(Boolean);
+
+        let existing: any[] = [];
+        if (orderNumbers.length || adminCodes.length || resolvedRefs.length) {
+          const escapedOrders = orderNumbers
+            .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+            .join(",");
+          const escapedAdmins = adminCodes
+            .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+            .join(",");
+          const escapedResolved = resolvedRefs
+            .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+            .join(",");
+          const { data } = await supabaseProductivity
+            .from("produccion_work_orders")
+            .select("id, order_number, admin_code")
+            .or(
+              [
+                escapedOrders ? `order_number.in.(${escapedOrders})` : null,
+                escapedAdmins ? `admin_code.in.(${escapedAdmins})` : null,
+                escapedResolved ? `order_number.in.(${escapedResolved})` : null
+              ].filter(Boolean).join(",")
+            );
+          existing = data as any[] || [];
+        }
+
+        const existingSet = new Set(
+          (existing || []).flatMap((row: any) => [row.order_number, row.admin_code])
+        );
+
+        let createdCount = 0;
+        let lastErrorMessage: string | null = null;
+
+        for (const order of eligible) {
+          const rawOrderNumber = String(order.order_number || "");
+          const orderRef = rawOrderNumber.toUpperCase().startsWith("INT-")
+            ? rawOrderNumber
+            : (order.admin_code || rawOrderNumber || null);
+          const adminRef = order.admin_code;
+          if ((orderRef && existingSet.has(orderRef)) || (adminRef && existingSet.has(adminRef))) continue;
+          const firstLine = (order.lines || [])[0];
+          const fabric = order.fabric || firstLine?.material || "N/D";
+          const color = order.color || firstLine?.color || "N/D";
+          const quantity = Number(order.quantity_total) || 0;
+
+          const payload: any = {
+            order_number: orderRef || adminRef,
+            admin_code: adminRef || null,
+            customer_name: order.customer_company || order.customer_name || "Cliente",
+            status: "PENDIENTE",
+            region: order.delivery_region || order.region || "PENINSULA",
+            delivery_address: order.delivery_address || null,
+            contact_name: order.contact_name || null,
+            phone: order.phone || null,
+            fabric,
+            color,
+            quantity_total: quantity,
+            due_date: order.delivery_date || null,
+            notes: `Backfill desde comercial (${order.order_number || "SIN-REF"})`,
+            notes_internal: order.internal_notes || null
+          };
+
+          const { error } = await supabaseProductivity
+            .from("produccion_work_orders")
+            .insert([payload])
+            .select("id")
+            .single();
+
+          if (error) {
+            console.warn("No se pudo crear work order faltante:", error);
+            failedCount += 1;
+            lastErrorMessage = error.message || "Error desconocido";
+          } else {
+            createdCount += 1;
+          }
+        }
+
+        if (createdCount > 0) {
+          toast.success(`Sincronizadas ${createdCount} orden(es) de produccion`);
+        } else if (failedCount > 0) {
+          toast.error(lastErrorMessage || "No se pudieron sincronizar las ordenes de produccion");
+        }
+      } catch (error) {
+        console.warn("Fallo al sincronizar work orders:", error);
+      } finally {
+        if (failedCount === 0) {
+          syncRanRef.current = true;
+        }
+      }
+    };
+
+    void syncMissingWorkOrders();
+  }, [orders, profile?.role]);
 
   const [newOrderModal, setNewOrderModal] = useState(false);
   const [importOrderModal, setImportOrderModal] = useState(false);
@@ -38,8 +164,8 @@ export default function CommercialPage() {
 
   const canDeleteOrders = profile?.role === "admin" || profile?.role === "manager";
 
-  const activeOrders = orders.filter((o) => o.status !== "ENTREGADO" && o.status !== "CANCELADO");
-  const archivedOrders = orders.filter((o) => o.status === "ENTREGADO" || o.status === "CANCELADO");
+  const activeOrders = orders.filter((o) => !["ENVIADO", "ENTREGADO", "CANCELADO"].includes(String(o.status).trim().toUpperCase()));
+  const archivedOrders = orders.filter((o) => ["ENVIADO", "ENTREGADO", "CANCELADO"].includes(String(o.status).trim().toUpperCase()));
   const displayedOrders = viewMode === "ACTIVE" ? activeOrders : archivedOrders;
 
   const validateOrderReadyForProduction = (order: any): { valid: boolean; error?: string } => {
@@ -295,6 +421,8 @@ export default function CommercialPage() {
       setComments(prev => ({ ...prev, [order.id]: "" }));
     } catch (error) {
       console.error("Error updating status:", error);
+      const message = error instanceof Error ? error.message : "No se pudo actualizar el estado";
+      toast.error(message);
     }
   };
 
@@ -365,10 +493,10 @@ export default function CommercialPage() {
                 className="border-border/60 bg-card/80 hover:border-primary/30 transition-all cursor-move active:scale-95"
               >
                 <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex justify-between items-start">
+                      <div>
                       <CardTitle className="text-sm font-mono text-foreground">
-                        {order.order_number}
+                        {order.admin_code || order.order_number}
                       </CardTitle>
                       <CardDescription
                         className={cn(
@@ -376,7 +504,7 @@ export default function CommercialPage() {
                           order.admin_code ? "text-muted-foreground" : "text-red-400"
                         )}
                       >
-                        {order.admin_code || "FALTA REF. ADMIN"}
+                        {order.admin_code ? order.order_number : "FALTA REF. ADMIN"}
                       </CardDescription>
                     </div>
                     <OrderStatusBadge status={order.status} />
@@ -387,7 +515,7 @@ export default function CommercialPage() {
                     <div>
                       <p className="text-xs text-muted-foreground uppercase font-medium">Cliente</p>
                       <p className="text-sm text-foreground font-medium truncate">
-                        {order.customer_name}
+                        {order.customer_company || order.customer_name}
                       </p>
                     </div>
                     {(order.delivery_region || order.region) && (

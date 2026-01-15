@@ -269,34 +269,29 @@ export default function ShippingScanPage() {
       return;
     }
 
-    if (hasTrackingNow && !trackingNumber.trim()) {
-      showAlert('error', 'Falta Tracking', 'Has indicado que tienes el número de tracking, pero el campo está vacío.');
-      return;
-    }
-
-    const updatedOrder: Partial<Order> = {
-      status: 'ENVIADO',
-      quantity_shipped: scannedOrder.quantity_total,
-      needs_shipping_validation: false,
-      tracking_number: hasTrackingNow ? trackingNumber : null,
-      tracking_pending: !hasTrackingNow,
-      shipping_date: new Date().toISOString()
-    };
+      const updatedOrder: Partial<Order> = {
+        status: 'ENVIADO',
+        quantity_shipped: scannedOrder.quantity_total,
+        needs_shipping_validation: false,
+        tracking_number: trackingNumber.trim() || null,
+        tracking_pending: !trackingNumber.trim(),
+        shipping_date: new Date().toISOString()
+      };
 
     await persistOrderUpdate(scannedOrder.id, updatedOrder);
 
-    // Alerta de éxito si se envió sin tracking
-    if (!hasTrackingNow) {
-      toast.success('Salida marcada como PENDIENTE DE TRACKING');
-    } else {
-      toast.success(`Salida validada. Tracking: ${trackingNumber}`);
-    }
+      // Alerta de éxito si se envió sin tracking
+      if (!trackingNumber.trim()) {
+        toast.success('Salida marcada como PENDIENTE DE TRACKING');
+      } else {
+        toast.success(`Salida validada. Tracking: ${trackingNumber}`);
+      }
     setScannedOrder(null);
   };
 
-  const printManifest = () => {
-    if (!scannedOrder) return;
-    const logoUrl = '/egea-logo.png';
+    const printManifest = () => {
+      if (!scannedOrder) return;
+      const logoUrl = '/logo-placeholder.png';
     const safe = (value: string | number | null | undefined) => escapeHtml(String(value ?? '-'));
     const orderNumber = safe(scannedOrder.order_number);
     const adminCode = safe(scannedOrder.admin_code || '---');
@@ -772,14 +767,14 @@ export default function ShippingScanPage() {
                 </div>
 
                 {/* Bultos y Unidades */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-[#1A1D1F] rounded-lg border border-[#45474A]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-[#1A1D1F] md:border-[#45474A]">
                     <p className="text-xs text-[#8B8D90] font-bold uppercase mb-1 flex items-center">
                       <Package className="w-3 h-3 mr-1" /> Bultos Totales
                     </p>
                     <p className="font-medium text-[#B5B8BA]">{scannedOrder.packages_count || 1}</p>
                   </div>
-                  <div className="p-4 bg-[#1A1D1F] rounded-lg border border-[#45474A]">
+                  <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-[#1A1D1F] md:border-[#45474A]">
                     <p className="text-xs text-[#8B8D90] font-bold uppercase mb-1 flex items-center">
                       <Truck className="w-3 h-3 mr-1" /> Total Uds
                     </p>
@@ -817,7 +812,7 @@ export default function ShippingScanPage() {
 
                 {/* Notas internas */}
                 {scannedOrder.notes_internal && (
-                  <div className="bg-[#1A1D1F] border border-[#45474A] rounded-xl p-4">
+                  <div className="bg-transparent md:bg-[#1A1D1F] border border-transparent md:border-[#45474A] rounded-xl p-4">
                     <p className="text-xs text-[#8B8D90] uppercase font-bold mb-2">Notas internas</p>
                     <p className="text-sm text-[#B5B8BA] whitespace-pre-line">{scannedOrder.notes_internal}</p>
                   </div>
@@ -825,7 +820,7 @@ export default function ShippingScanPage() {
 
                 {/* Verificación de bultos */}
                 {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
-                  <div className="bg-[#1A1D1F] p-4 rounded-xl border border-[#45474A]">
+                  <div className="bg-transparent md:bg-[#1A1D1F] p-4 rounded-xl border border-transparent md:border-[#45474A]">
                     <div className="flex justify-between items-center mb-2">
                       <h4 className="font-bold text-[#FFFFFF] text-sm uppercase">Verificación de Bultos</h4>
                       <span className="font-mono text-[#B5B8BA]">{scannedPackagesCount} / {scannedOrder.packages_count || 1}</span>
@@ -882,7 +877,7 @@ export default function ShippingScanPage() {
 
                 {/* Estado ENVIADO */}
                 {scannedOrder.status === 'ENVIADO' && (
-                  <div className="bg-emerald-900/10 border border-emerald-500/30 p-6 rounded-xl flex items-center justify-between">
+                  <div className="bg-emerald-900/10 border border-emerald-500/30 p-6 rounded-xl flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
                         <CheckCircle className="w-6 h-6 text-emerald-500" />
@@ -894,7 +889,7 @@ export default function ShippingScanPage() {
                         </p>
                       </div>
                     </div>
-                    <button onClick={printManifest} className="px-4 py-2 bg-[#1A1D1F] border border-[#45474A] rounded-lg text-white hover:bg-[#45474A] flex items-center">
+                    <button onClick={printManifest} className="w-full md:w-auto px-4 py-2 bg-transparent md:bg-[#1A1D1F] border border-[#45474A] rounded-lg text-white hover:bg-[#45474A] flex items-center justify-center">
                       <FileOutput className="w-4 h-4 mr-2" />
                       Albarán
                     </button>
@@ -903,12 +898,12 @@ export default function ShippingScanPage() {
               </div>
 
               {/* Botones de acción */}
-              <div className="p-6 border-t border-[#45474A] bg-[#323438]">
+              <div className="p-6 border-t border-[#45474A] bg-transparent md:bg-[#323438]">
                 {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
                   <button
                     onClick={validateShipment}
-                    disabled={!trackingNumber || scannedPackagesCount < (scannedOrder.packages_count || 1)}
-                    className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center transition-all active:scale-95 ${trackingNumber && scannedPackagesCount >= (scannedOrder.packages_count || 1)
+                    disabled={scannedPackagesCount < (scannedOrder.packages_count || 1)}
+                    className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center transition-all active:scale-95 ${scannedPackagesCount >= (scannedOrder.packages_count || 1)
                       ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                       : 'bg-[#45474A] text-[#8B8D90] cursor-not-allowed border border-[#6E6F71]'
                       }`}

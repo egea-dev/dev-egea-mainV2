@@ -59,6 +59,7 @@ interface KioskScreen {
   name: string;
   location: string | null;
   kiosk_type: 'MONITOR' | 'TABLET' | 'TERMINAL' | null;
+  config?: any;
   is_active: boolean | null;
   last_ping: string | null;
   created_at: string | null;
@@ -129,6 +130,7 @@ const KioskPage = () => {
           name: screen.name,
           location: screen.location,
           kiosk_type: screen.kiosk_type,
+          config: { theme: "dark" },
           is_active: true
         }] as any)
         .select()
@@ -162,6 +164,23 @@ const KioskPage = () => {
     onError: (err: any) => toast.error("Error al eliminar: " + err.message)
   });
 
+  const updateThemeMutation = useMutation({
+    mutationFn: async ({ id, theme, config }: { id: string; theme: 'dark' | 'light'; config?: any }) => {
+      const baseConfig = (config && typeof config === 'object' && !Array.isArray(config)) ? config : {};
+      const { error } = await supabaseProductivity
+        .from("kiosk_screens")
+        .update({ config: { ...baseConfig, theme } })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["kiosk-screens"] });
+      toast.success("Modo actualizado");
+    },
+    onError: (err: any) => toast.error("Error al actualizar modo: " + err.message)
+  });
+
   // --- Helpers ---
   const getDaysElapsed = (createdAt: string | null) => {
     if (!createdAt) return 0;
@@ -175,6 +194,14 @@ const KioskPage = () => {
       case 'TABLET': return 'border-l-blue-500';
       default: return 'border-l-gray-600';
     }
+  };
+
+  const getScreenTheme = (screen: KioskScreen) => {
+    const config = screen.config;
+    if (config && typeof config === 'object' && !Array.isArray(config)) {
+      return config.theme === 'light' ? 'light' : 'dark';
+    }
+    return 'dark';
   };
 
   const getDestinationLabel = (kioskType: string | null) => {
@@ -310,7 +337,8 @@ const KioskPage = () => {
           <div className="px-8 py-4 bg-[#111] rounded-t-lg grid grid-cols-12 gap-4 text-gray-500 font-bold text-sm uppercase tracking-wider border-b border-white/5">
             <div className="col-span-3">Nombre / Ubicación</div>
             <div className="col-span-2">Tipo</div>
-            <div className="col-span-4">URL</div>
+            <div className="col-span-3">URL</div>
+            <div className="col-span-1">Modo</div>
             <div className="col-span-2">Estado</div>
             <div className="col-span-1 text-right">Acciones</div>
           </div>
@@ -358,7 +386,7 @@ const KioskPage = () => {
                     </div>
 
                     {/* COL 3: URL */}
-                    <div className="col-span-4">
+                    <div className="col-span-3">
                       <div className="flex items-center gap-2 bg-black/20 p-2 rounded border border-white/5">
                         <span className="text-xs text-gray-500 truncate flex-1 font-mono">{url}</span>
                         <Button
@@ -380,7 +408,29 @@ const KioskPage = () => {
                       </div>
                     </div>
 
-                    {/* COL 4: ESTADO */}
+                    {/* COL 4: MODO */}
+                    <div className="col-span-1">
+                      <Select
+                        value={getScreenTheme(screen)}
+                        onValueChange={(value) => {
+                          updateThemeMutation.mutate({
+                            id: screen.id,
+                            theme: value as 'dark' | 'light',
+                            config: screen.config
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="bg-black/20 border-white/10 h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#1A1D1F] border-white/10">
+                          <SelectItem value="dark">Actual</SelectItem>
+                          <SelectItem value="light">Claro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* COL 5: ESTADO */}
                     <div className="col-span-2 flex items-center justify-end gap-2">
                       <Badge variant="outline" className={screen.is_active ? "bg-emerald-900/40 text-emerald-200 border-emerald-700/50" : "bg-gray-900/40 text-gray-400 border-gray-700/50"}>
                         {screen.is_active ? 'ACTIVA' : 'INACTIVA'}
@@ -391,7 +441,7 @@ const KioskPage = () => {
                       </div>
                     </div>
 
-                    {/* COL 5: ACCIONES */}
+                    {/* COL 6: ACCIONES */}
                     <div className="col-span-1 flex justify-end">
                       <Button
                         variant="ghost"

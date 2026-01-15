@@ -19,7 +19,7 @@ export const isTerminalOrderStatus = (status: OrderStatus) =>
 
 export const resolveOrderStatus = (status?: string | null): OrderStatus | null => {
   if (!status) return null;
-  const normalized = status.toUpperCase();
+  const normalized = status.trim().toUpperCase();
   if (normalized in ORDER_STATUS_ALIASES) {
     return ORDER_STATUS_ALIASES[normalized];
   }

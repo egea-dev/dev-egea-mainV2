@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { useWorkOrders, useUpdateWorkOrderStatus } from "@/hooks/use-work-orders";
 import { WorkOrderStatus } from "@/types/production";
@@ -17,9 +18,9 @@ import {
     Timer,
 } from "lucide-react";
 import { toast } from "sonner";
-import PageShell from "@/components/layout/PageShell";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "react-router-dom";
+import { supabaseProductivity } from "@/integrations/supabase";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
     PENDIENTE: { label: "Pendiente", color: "bg-slate-500/10 text-slate-400 border-slate-500/30", icon: Timer },
@@ -37,9 +38,26 @@ const KioskDisplayPage: React.FC = () => {
     const [scannedId, setScannedId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<"scanner" | "list">("scanner");
     const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+    const [theme, setTheme] = useState<"dark" | "light">("dark");
 
-    const { data: workOrders, isLoading } = useWorkOrders();
+    const { data: workOrders } = useWorkOrders();
     const updateStatus = useUpdateWorkOrderStatus();
+
+    const { data: kioskConfig } = useQuery({
+        queryKey: ["kiosk-screen-config", token],
+        enabled: !!token,
+        refetchInterval: 30000,
+        queryFn: async () => {
+            const { data, error } = await supabaseProductivity
+                .from("kiosk_screens")
+                .select("config")
+                .eq("id", token)
+                .maybeSingle();
+
+            if (error) throw error;
+            return data?.config;
+        }
+    });
 
     const selectedOrder = workOrders?.find((o) => o.id === scannedId || o.order_number === scannedId);
 
@@ -61,6 +79,14 @@ const KioskDisplayPage: React.FC = () => {
             }
         };
     }, [activeTab]);
+
+    useEffect(() => {
+        if (kioskConfig && typeof kioskConfig === "object" && !Array.isArray(kioskConfig)) {
+            setTheme(kioskConfig.theme === "light" ? "light" : "dark");
+        } else {
+            setTheme("dark");
+        }
+    }, [kioskConfig]);
 
     function onScanSuccess(decodedText: string) {
         setScannedId(decodedText);
@@ -87,28 +113,45 @@ const KioskDisplayPage: React.FC = () => {
         }
     };
 
+    const isLight = theme === "light";
+    const colors = {
+        page: isLight ? "bg-white text-slate-900" : "bg-[#0D0F11] text-white",
+        headerMuted: isLight ? "text-slate-600" : "text-[#B5B8BA]",
+        token: isLight ? "text-emerald-700" : "text-emerald-500",
+        buttonActive: isLight ? "bg-slate-900 text-white" : "bg-white text-black",
+        buttonInactive: isLight ? "border-slate-300 text-slate-700" : "border-white/20 text-white",
+        card: isLight ? "border-slate-200 bg-white" : "border-white/10 bg-[#1A1D1F]",
+        cardHeader: isLight ? "border-b border-slate-200 bg-slate-50" : "border-b border-white/5 bg-black/20",
+        panel: isLight ? "bg-slate-50 border-slate-200" : "bg-black/20 border-white/5",
+        panelMuted: isLight ? "bg-slate-100/80" : "bg-black/40",
+        mutedText: isLight ? "text-slate-500" : "text-gray-500",
+        softText: isLight ? "text-slate-600" : "text-gray-400",
+        empty: isLight ? "border-slate-200 bg-slate-50 text-slate-500" : "border-white/10 bg-[#1A1D1F] text-gray-400",
+        ghostBtn: isLight ? "text-slate-500 hover:text-slate-900 hover:bg-slate-100" : "text-gray-400 hover:text-white hover:bg-white/5",
+    };
+
     return (
-        <div className="min-h-screen bg-[#0D0F11] text-white p-4">
+        <div className={cn("min-h-screen p-4", colors.page)}>
             {/* Simplified Header for Kiosk Display */}
             <header className="flex justify-between items-center mb-6 pl-2">
                 <div>
-                    <h1 className="text-xl font-bold uppercase tracking-widest text-[#B5B8BA]">
+                    <h1 className={cn("text-xl font-bold uppercase tracking-widest", colors.headerMuted)}>
                         Modo Kiosco
                     </h1>
-                    {token && <span className="text-xs text-emerald-500 font-mono">Terminal ID: {token.slice(0, 8)}</span>}
+                    {token && <span className={cn("text-xs font-mono", colors.token)}>Terminal ID: {token.slice(0, 8)}</span>}
                 </div>
                 <div className="flex gap-2">
                     <Button
                         variant={activeTab === "scanner" ? "default" : "outline"}
                         onClick={() => setActiveTab("scanner")}
-                        className={activeTab === "scanner" ? "bg-white text-black" : "border-white/20 text-white"}
+                        className={activeTab === "scanner" ? colors.buttonActive : colors.buttonInactive}
                     >
                         <QrCode className="mr-2 h-4 w-4" /> Escaner
                     </Button>
                     <Button
                         variant={activeTab === "list" ? "default" : "outline"}
                         onClick={() => setActiveTab("list")}
-                        className={activeTab === "list" ? "bg-white text-black" : "border-white/20 text-white"}
+                        className={activeTab === "list" ? colors.buttonActive : colors.buttonInactive}
                     >
                         <History className="mr-2 h-4 w-4" /> Cola
                     </Button>
@@ -117,13 +160,13 @@ const KioskDisplayPage: React.FC = () => {
 
             {activeTab === "scanner" && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-100px)]">
-                    <Card className="border-white/10 bg-[#1A1D1F] overflow-hidden flex flex-col">
-                        <CardHeader className="border-b border-white/5 bg-black/20 py-4">
-                            <CardTitle className="text-xs font-bold tracking-[0.2em] uppercase flex items-center text-white">
-                                <QrCode className="w-4 h-4 mr-2 text-emerald-500" /> Camara de reconocimiento
+                    <Card className={cn("overflow-hidden flex flex-col", colors.card)}>
+                        <CardHeader className={cn("py-4", colors.cardHeader)}>
+                            <CardTitle className={cn("text-xs font-bold tracking-[0.2em] uppercase flex items-center", isLight ? "text-slate-800" : "text-white")}>
+                                <QrCode className={cn("w-4 h-4 mr-2", colors.token)} /> Camara de reconocimiento
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="flex-1 p-0 flex items-center justify-center bg-black/40 relative">
+                        <CardContent className={cn("flex-1 p-0 flex items-center justify-center relative", colors.panelMuted)}>
                             {/* Container for scanner */}
                             <div id="reader" className="w-full h-full [&>div]:border-none [&>div>img]:hidden"></div>
                         </CardContent>
@@ -131,14 +174,14 @@ const KioskDisplayPage: React.FC = () => {
 
                     <div className="space-y-6 overflow-y-auto">
                         {selectedOrder ? (
-                            <Card className="border-white/10 bg-[#1A1D1F]">
+                            <Card className={colors.card}>
                                 <CardContent className="p-6">
                                     <div className="flex justify-between items-start mb-6">
                                         <div>
                                             <Badge className="bg-emerald-900/40 text-emerald-400 border-emerald-500/30 mb-2 px-3 py-1 text-[10px] tracking-widest font-bold uppercase">
                                                 Orden activa
                                             </Badge>
-                                            <h2 className="text-3xl font-bold tracking-tight text-white uppercase">
+                                            <h2 className={cn("text-3xl font-bold tracking-tight uppercase", isLight ? "text-slate-900" : "text-white")}>
                                                 {selectedOrder.order_number}
                                             </h2>
                                         </div>
@@ -155,14 +198,14 @@ const KioskDisplayPage: React.FC = () => {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 mb-6">
-                                        <div className="bg-black/20 p-4 rounded-2xl border border-white/5">
-                                            <p className="text-gray-500 text-[10px] font-bold tracking-widest uppercase mb-1">
+                                        <div className={cn("p-4 rounded-2xl border", colors.panel)}>
+                                            <p className={cn("text-[10px] font-bold tracking-widest uppercase mb-1", colors.mutedText)}>
                                                 Prioridad
                                             </p>
                                             <p
                                                 className={cn(
                                                     "text-lg font-bold",
-                                                    selectedOrder.priority > 0 ? "text-amber-400" : "text-gray-400"
+                                                    selectedOrder.priority > 0 ? "text-amber-400" : colors.softText
                                                 )}
                                             >
                                                 {selectedOrder.priority === 2
@@ -172,11 +215,11 @@ const KioskDisplayPage: React.FC = () => {
                                                         : "Normal"}
                                             </p>
                                         </div>
-                                        <div className="bg-black/20 p-4 rounded-2xl border border-white/5">
-                                            <p className="text-gray-500 text-[10px] font-bold tracking-widest uppercase mb-1">
+                                        <div className={cn("p-4 rounded-2xl border", colors.panel)}>
+                                            <p className={cn("text-[10px] font-bold tracking-widest uppercase mb-1", colors.mutedText)}>
                                                 Fecha inicio
                                             </p>
-                                            <p className="text-lg font-bold text-gray-400">
+                                            <p className={cn("text-lg font-bold", colors.softText)}>
                                                 {selectedOrder.start_date
                                                     ? new Date(selectedOrder.start_date).toLocaleDateString()
                                                     : "--/--/--"}
@@ -199,10 +242,15 @@ const KioskDisplayPage: React.FC = () => {
                                                         "h-20 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all",
                                                         isCurrent
                                                             ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
-                                                            : "bg-black/20 border-white/5 text-gray-400 hover:bg-white/5 hover:text-white"
+                                                            : cn(
+                                                                "text-gray-400 hover:text-white",
+                                                                isLight
+                                                                    ? "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                                                    : "bg-black/20 border-white/5"
+                                                            )
                                                     )}
                                                 >
-                                                    <Icon className={cn("w-6 h-6", isCurrent ? "text-emerald-400" : "text-gray-500")} />
+                                                    <Icon className={cn("w-6 h-6", isCurrent ? "text-emerald-400" : colors.mutedText)} />
                                                     <span className="text-[10px] font-black tracking-widest uppercase">
                                                         {config.label}
                                                     </span>
@@ -211,18 +259,18 @@ const KioskDisplayPage: React.FC = () => {
                                         })}
                                     </div>
 
-                                    <Button variant="ghost" onClick={() => setScannedId(null)} className="w-full mt-6 text-gray-400 hover:text-white hover:bg-white/5">
+                                    <Button variant="ghost" onClick={() => setScannedId(null)} className={cn("w-full mt-6", colors.ghostBtn)}>
                                         Cerrar y escanear de nuevo
                                     </Button>
                                 </CardContent>
                             </Card>
                         ) : (
-                            <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-3xl p-12 text-center bg-[#1A1D1F]">
-                                <div className="bg-black/20 p-8 rounded-full mb-6 ring-1 ring-white/5">
-                                    <QrCode className="w-16 h-16 text-gray-600" />
+                            <div className={cn("h-full flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-12 text-center", colors.empty)}>
+                                <div className={cn("p-8 rounded-full mb-6 ring-1", isLight ? "bg-slate-100 ring-slate-200" : "bg-black/20 ring-white/5")}>
+                                    <QrCode className={cn("w-16 h-16", isLight ? "text-slate-400" : "text-gray-600")} />
                                 </div>
-                                <h3 className="text-2xl font-bold text-gray-400 mb-2">Esperando orden</h3>
-                                <p className="text-gray-500 max-w-sm">
+                                <h3 className={cn("text-2xl font-bold mb-2", colors.softText)}>Esperando orden</h3>
+                                <p className={cn("max-w-sm", colors.mutedText)}>
                                     Acerca el codigo QR a la camara para cargar la orden.
                                 </p>
                             </div>
@@ -236,7 +284,11 @@ const KioskDisplayPage: React.FC = () => {
                     {workOrders?.map((order) => (
                         <Card
                             key={order.id}
-                            className="border-white/5 bg-[#1A1D1F] hover:border-emerald-500/30 transition-all cursor-pointer rounded-2xl overflow-hidden"
+                            className={cn(
+                                "rounded-2xl overflow-hidden transition-all cursor-pointer",
+                                colors.card,
+                                isLight ? "hover:border-emerald-400/40" : "hover:border-emerald-500/30"
+                            )}
                             onClick={() => {
                                 setScannedId(order.id);
                                 setActiveTab("scanner");
@@ -244,12 +296,12 @@ const KioskDisplayPage: React.FC = () => {
                         >
                             <CardContent className="p-5 flex items-center justify-between">
                                 <div className="flex items-center gap-6">
-                                    <div className="bg-black/20 p-4 rounded-xl">
-                                        <Package className="w-8 h-8 text-gray-500" />
+                                    <div className={cn("p-4 rounded-xl", colors.panel)}>
+                                        <Package className={cn("w-8 h-8", colors.mutedText)} />
                                     </div>
                                     <div>
-                                        <h4 className="text-2xl font-black uppercase text-white">{order.order_number}</h4>
-                                        <p className="text-gray-500 text-xs font-bold tracking-widest uppercase">
+                                        <h4 className={cn("text-2xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</h4>
+                                        <p className={cn("text-xs font-bold tracking-widest uppercase", colors.mutedText)}>
                                             {order.status} - Actualizado: {new Date(order.updated_at || Date.now()).toLocaleTimeString()}
                                         </p>
                                     </div>
@@ -258,7 +310,7 @@ const KioskDisplayPage: React.FC = () => {
                                     <Badge className={cn("px-3 py-1 rounded text-xs font-bold border", STATUS_CONFIG[order.status]?.color || "bg-muted text-muted-foreground border-border/60")}>
                                         {STATUS_CONFIG[order.status]?.label || order.status}
                                     </Badge>
-                                    <ArrowRight className="w-5 h-5 text-gray-600" />
+                                    <ArrowRight className={cn("w-5 h-5", colors.mutedText)} />
                                 </div>
                             </CardContent>
                         </Card>

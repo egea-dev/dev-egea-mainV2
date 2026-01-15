@@ -10,8 +10,10 @@ interface OrderCardProps {
         order_number: string;
         admin_code?: string;
         customer_name: string;
+        customer_company?: string;
         status: string;
         region?: string;
+        delivery_region?: string;
         delivery_date?: string;
         quantity_total?: number;
     };
@@ -27,13 +29,13 @@ export function OrderCard({ order, onViewDetails }: OrderCardProps) {
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-sm font-mono text-foreground font-semibold">
-                                {order.order_number}
+                                {order.admin_code || order.order_number}
                             </p>
                             <p className={cn(
                                 "text-xs mt-1",
                                 order.admin_code ? "text-muted-foreground" : "text-red-400"
                             )}>
-                                {order.admin_code || 'FALTA REF. ADMIN'}
+                                {order.admin_code ? order.order_number : 'FALTA REF. ADMIN'}
                             </p>
                         </div>
                         <OrderStatusBadge status={order.status} />
@@ -44,13 +46,13 @@ export function OrderCard({ order, onViewDetails }: OrderCardProps) {
                         <div>
                             <p className="text-xs text-muted-foreground uppercase font-medium">Cliente</p>
                             <p className="text-sm text-foreground font-medium truncate">
-                                {order.customer_name}
+                                {order.customer_company || order.customer_name}
                             </p>
                         </div>
-                        {order.region && (
+                        {(order.delivery_region || order.region) && (
                             <div>
                                 <p className="text-xs text-muted-foreground uppercase font-medium">Region</p>
-                                <p className="text-sm text-muted-foreground">{order.region}</p>
+                                <p className="text-sm text-muted-foreground">{order.delivery_region || order.region}</p>
                             </div>
                         )}
                     </div>

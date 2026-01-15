@@ -161,6 +161,8 @@ export const CalendarModule = ({
         return format(currentDate, 'MMMM yyyy', { locale: es });
     }, [currentDate, viewMode]);
 
+    const getDisplayOrderNumber = (order: any) => order.admin_code || order.order_number || '';
+
     const getDayData = (day: Date) => {
         if (mode === 'commercial') {
             return orders.filter(order => {
@@ -168,8 +170,8 @@ export const CalendarModule = ({
                 const orderDate = parseISO(order.delivery_date);
                 return isSameDay(orderDate, day);
             }).filter(order => !searchQuery ||
-                order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                order.customer_name.toLowerCase().includes(searchQuery.toLowerCase())
+                getDisplayOrderNumber(order).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (order.customer_company || order.customer_name || "").toLowerCase().includes(searchQuery.toLowerCase())
             );
         } else {
             return tasks.filter(task => {
@@ -292,7 +294,9 @@ export const CalendarModule = ({
                                 return isSameDay(parseISO(dateStr), day);
                             }).map((item: any) => ({
                                 id: item.id,
-                                title: mode === 'commercial' ? (item.customer_name || item.order_number) : (item.description || item.client?.full_name || "Tarea"),
+                                title: mode === 'commercial'
+                                    ? (item.customer_company || item.customer_name || getDisplayOrderNumber(item))
+                                    : (item.description || item.client?.full_name || "Tarea"),
                                 status: mode === 'commercial' ? item.status : (item.state === 'urgente' ? 'URGENTE' : 'NORMAL'),
                                 original: item
                             }));
@@ -600,11 +604,11 @@ export const CalendarModule = ({
                                                         >
                                                             <GripVertical className="w-2 h-2 opacity-50 flex-shrink-0" />
                                                             <div className={cn("w-1 h-1 rounded-full flex-shrink-0", statusStyle.badge)} />
-                                                            <span className="font-mono opacity-80">{item.order_number}</span>
-                                                            <span className="truncate flex-1 font-medium">{item.customer_name}</span>
-                                                        </div>
-                                                    );
-                                                } else {
+                                <span className="font-mono opacity-80">{getDisplayOrderNumber(item)}</span>
+                                <span className="truncate flex-1 font-medium">{item.customer_company || item.customer_name}</span>
+                            </div>
+                        );
+                    } else {
                                                     const isUrgent = item.state === 'urgente';
                                                     const stateClass = getTaskStateColor(item.state);
                                                     const dotClass = isUrgent ? "bg-amber-400" : "bg-slate-400";

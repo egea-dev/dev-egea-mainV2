@@ -189,15 +189,11 @@ const ShippingModule: React.FC = () => {
             alert(`Debes verificar todos los bultos (${scannedPackagesCount}/${total}) escaneando el QR repetidamente o manualmente.`);
             return;
         }
-        if (!trackingNumber.trim()) {
-            alert('El número de tracking es OBLIGATORIO para validar la salida.');
-            return;
-        }
-
         try {
+            const resolvedTracking = trackingNumber.trim() || null;
             await persistShipmentUpdate(selectedShipment.id, {
                 status: 'TRANSITO',
-                tracking_number: trackingNumber,
+                tracking_number: resolvedTracking,
                 shipment_date: new Date().toISOString() // Marcamos fecha de salida real
             });
             setShowRoadmap(true);
@@ -387,10 +383,10 @@ const ShippingModule: React.FC = () => {
                                 </Button>
                             </div>
 
-                            {/* Input Tracking Obligatorio */}
+                            {/* Input Tracking */}
                             <div className="w-full max-w-md bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                                    Número de Tracking (Obligatorio)
+                                    Número de Tracking (Opcional)
                                 </label>
                                 <div className="flex gap-2">
                                     <Input
@@ -413,14 +409,14 @@ const ShippingModule: React.FC = () => {
                         <div className="p-6 bg-slate-50 border-t border-slate-200">
                             <Button
                                 className={`w-full h-16 text-xl font-black uppercase tracking-widest rounded-xl shadow-lg transition-all
-                                    ${isComplete && trackingNumber
+                                    ${isComplete
                                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/20'
                                         : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
                                 onClick={handleValidateOutput}
-                                disabled={!isComplete || !trackingNumber}
+                                disabled={!isComplete}
                             >
                                 {isComplete
-                                    ? (trackingNumber ? 'VALIDAR SALIDA Y GENERAR ALBARÁN' : 'FALTA NÚMERO DE TRACKING')
+                                    ? 'VALIDAR SALIDA Y GENERAR ALBARÁN'
                                     : `FALTAN ${totalPackages - scannedPackagesCount} BULTOS POR VERIFICAR`}
                             </Button>
                         </div>

@@ -63,26 +63,41 @@ const fetchWithRetry = async (
 // El warning es benigno y se puede ignorar.
 // ============================================================================
 
+type GlobalSupabaseCache = typeof globalThis & {
+  __supabaseMain?: SupabaseClientType<MainDatabase>;
+  __supabaseProductivity?: SupabaseClientType<ProductivityDatabase>;
+};
+
+const globalSupabase = globalThis as GlobalSupabaseCache;
+
 // MAIN Supabase client - Única instancia con autenticación
-export const supabaseMain = createClient<MainDatabase>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storageKey: 'supabase.main.auth.token',
-    storage: window.localStorage,
-    flowType: 'pkce'
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'egea-main'
+const mainClient =
+  globalSupabase.__supabaseMain ??
+  createClient<MainDatabase>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'supabase.main.auth.token',
+      storage: window.localStorage,
+      flowType: 'pkce'
     },
-    fetch: fetchWithRetry
-  },
-  db: {
-    schema: 'public'
-  }
-});
+    global: {
+      headers: {
+        'X-Client-Info': 'egea-main'
+      },
+      fetch: fetchWithRetry
+    },
+    db: {
+      schema: 'public'
+    }
+  });
+
+if (import.meta.env.DEV) {
+  globalSupabase.__supabaseMain = mainClient;
+}
+
+export const supabaseMain = mainClient;
 
 // Alias para compatibilidad
 export const supabase = supabaseMain;
@@ -110,29 +125,37 @@ const fetchWithMainAuth = async (
 // CAMBIO: Ahora tiene su propia sesión independiente
 // Esto resuelve el error "No suitable key or wrong key type" causado por
 // el rechazo del token de MAIN en PRODUCTIVITY (diferentes JWT secrets)
-export const supabaseProductivity = createClient<ProductivityDatabase>(
-  productivityUrl || '',
-  productivityAnonKey || '',
-  {
-    auth: {
-      persistSession: true, // ✅ Sesión propia
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storageKey: 'supabase.productivity.auth.token', // ✅ Storage key propio
-      storage: window.localStorage,
-      flowType: 'pkce'
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'egea-productivity'
+const productivityClient =
+  globalSupabase.__supabaseProductivity ??
+  createClient<ProductivityDatabase>(
+    productivityUrl || '',
+    productivityAnonKey || '',
+    {
+      auth: {
+        persistSession: true, // ?o. Sesi??n propia
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'supabase.productivity.auth.token', // ?o. Storage key propio
+        storage: window.localStorage,
+        flowType: 'pkce'
       },
-      fetch: fetchWithRetry // ✅ Usa fetch normal con retry
-    },
-    db: {
-      schema: 'public'
+      global: {
+        headers: {
+          'X-Client-Info': 'egea-productivity'
+        },
+        fetch: fetchWithRetry // ?o. Usa fetch normal con retry
+      },
+      db: {
+        schema: 'public'
+      }
     }
-  }
-);
+  );
+
+if (import.meta.env.DEV) {
+  globalSupabase.__supabaseProductivity = productivityClient;
+}
+
+export const supabaseProductivity = productivityClient;
 
 // Hook para compatibilidad con código que usa useDualSupabase
 export const useDualSupabase = () => {

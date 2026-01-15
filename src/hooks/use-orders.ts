@@ -65,7 +65,7 @@ export const useUpdateOrderStatus = () => {
             // Get current order to track old status and apply business rules
             const { data: currentOrder, error: currentError } = await supabase
                 .from('comercial_orders')
-                .select('status, delivery_region, region, delivery_date, lines')
+                .select('status, delivery_region, region, delivery_date, lines, order_number, admin_code, customer_name, customer_company, contact_name, phone, delivery_address, delivery_city, email, fabric, quantity_total, internal_notes')
                 .eq('id', orderId)
                 .single();
 
@@ -104,12 +104,73 @@ export const useUpdateOrderStatus = () => {
                 }
             }
 
+            const firstLine = (currentOrder?.lines || [])[0];
+            const fabric = currentOrder?.fabric || firstLine?.material || "N/D";
+            const color = currentOrder?.color || firstLine?.color || "N/D";
+            const customerDisplay = currentOrder?.customer_company || currentOrder?.customer_name || "Cliente";
+            const region = currentOrder?.delivery_region || currentOrder?.region || "PENINSULA";
+            const quantity = Number(currentOrder?.quantity_total) || 0;
+            const orderNumber = currentOrder?.order_number || currentOrder?.admin_code || "SIN-REF";
+            const resolvedOrderNumber = (() => {
+                const rawOrderNumber = currentOrder?.order_number || "";
+                if (rawOrderNumber.toUpperCase().startsWith("INT-")) return rawOrderNumber;
+                return currentOrder?.admin_code || rawOrderNumber || "SIN-REF";
+            })();
+            const createProductionWorkOrder = async ({
+                status,
+                processStartAt,
+                dueDate,
+                slaDays
+            }: {
+                status: 'PENDIENTE' | 'CORTE';
+                processStartAt?: string;
+                dueDate?: string | null;
+                slaDays?: number | null;
+            }) => {
+                const payload: any = {
+                    order_number: resolvedOrderNumber,
+                    customer_name: customerDisplay,
+                    status,
+                    region,
+                    delivery_address: currentOrder?.delivery_address || null,
+                    contact_name: currentOrder?.contact_name || null,
+                    phone: currentOrder?.phone || null,
+                    fabric,
+                    color,
+                    quantity_total: quantity,
+                    notes_internal: currentOrder?.internal_notes || null,
+                    admin_code: currentOrder?.admin_code || null,
+                    due_date: dueDate || currentOrder?.delivery_date || null,
+                    process_start_at: processStartAt || null,
+                    sla_days: slaDays || null,
+                    qr_payload: `ORDER:${resolvedOrderNumber}|CUSTOMER:${customerDisplay}|STATUS:${status}`,
+                    technical_specs: {
+                        fabric,
+                        color,
+                        quantity,
+                        customer_name: customerDisplay,
+                        region
+                    }
+                };
+
+                const { data: newWorkOrder, error: createError } = await supabase
+                    .from('produccion_work_orders')
+                    .insert([payload])
+                    .select('id')
+                    .single();
+
+                if (createError) throw createError;
+                return newWorkOrder?.id;
+            };
+
             // Get authenticated user from MAIN
             const { data: { user } } = await supabaseMain.auth.getUser();
             const userId = user?.id || 'unknown';
 
             const updates: any = { status: nextStatus };
             const now = new Date().toISOString();
+
+            let computedSlaDays: number | null = null;
 
             if (nextStatus === "EN_PROCESO") {
                 // Removed production_start_date - column doesn't exist in DB
@@ -122,6 +183,7 @@ export const useUpdateOrderStatus = () => {
                             .eq("region", currentOrder?.delivery_region || currentOrder?.region || null)
                             .maybeSingle();
                         const days = Number(slaConfig?.days) || 7;
+                        computedSlaDays = days;
                         const target = new Date();
                         target.setDate(target.getDate() + days);
                         updates.delivery_date = target.toISOString().slice(0, 10);
@@ -139,6 +201,32 @@ export const useUpdateOrderStatus = () => {
                 // Removed delivered_date - column doesn't exist in DB
             }
 
+            const escapeOrValue = (value?: string | null) => {
+                if (!value) return null;
+                return `"${String(value).replace(/"/g, '""')}"`;
+            };
+            const workOrderMatch = [
+                currentOrder?.order_number ? `order_number.eq.${escapeOrValue(currentOrder.order_number)}` : null,
+                currentOrder?.admin_code ? `admin_code.eq.${escapeOrValue(currentOrder.admin_code)}` : null
+            ].filter(Boolean).join(',');
+
+            if (nextStatus === "PAGADO" && currentStatus !== "PAGADO") {
+                const { data: existingWorkOrder, error: existingError } = await supabase
+                    .from('produccion_work_orders')
+                    .select('id')
+                    .or(workOrderMatch)
+                    .maybeSingle();
+
+                if (existingError) {
+                    console.error("Error checking production work order:", existingError);
+                    throw existingError;
+                }
+
+                if (!existingWorkOrder) {
+                    await createProductionWorkOrder({ status: 'PENDIENTE' });
+                }
+            }
+
             // Update order status
             const { data, error } = await supabase
                 .from('comercial_orders')
@@ -150,6 +238,66 @@ export const useUpdateOrderStatus = () => {
             if (error) {
                 console.error("Error updating order status:", error);
                 throw error;
+            }
+
+            if (nextStatus === "EN_PROCESO" && currentStatus !== "EN_PROCESO") {
+                const { data: existingWorkOrder, error: existingError } = await supabase
+                    .from('produccion_work_orders')
+                    .select('id, due_date')
+                    .or(workOrderMatch)
+                    .maybeSingle();
+
+                if (existingError) {
+                    console.error("Error fetching production work order:", existingError);
+                    throw existingError;
+                }
+
+                const updateWorkOrder = async (resolvedDueDate: string | null, resolvedSlaDays: number | null) => {
+                    const payload: any = {
+                        status: 'CORTE',
+                        process_start_at: now,
+                        due_date: resolvedDueDate || null,
+                        sla_days: resolvedSlaDays
+                    };
+
+                    const { error: updateError } = await supabase
+                        .from('produccion_work_orders')
+                        .update(payload)
+                        .eq('id', existingWorkOrder.id);
+
+                    if (updateError) {
+                        console.error("Error updating production work order:", updateError);
+                        throw updateError;
+                    }
+                };
+
+                if (existingWorkOrder) {
+                    let slaDays = computedSlaDays;
+                    if (!slaDays) {
+                        try {
+                            const { data: slaConfig } = await supabase
+                                .from("comercial_sla_config")
+                                .select("days")
+                                .eq("region", currentOrder?.delivery_region || currentOrder?.region || null)
+                                .maybeSingle();
+                            slaDays = Number(slaConfig?.days) || 7;
+                        } catch (slaError) {
+                            console.warn("No se pudo cargar SLA para produccion", slaError);
+                        }
+                    }
+
+                    const dueDate = (existingWorkOrder as any)?.due_date || updates.delivery_date || currentOrder?.delivery_date || null;
+                    await updateWorkOrder(dueDate, slaDays || null);
+                } else {
+                    const dueDate = updates.delivery_date || currentOrder?.delivery_date || null;
+                    const workOrderId = await createProductionWorkOrder({
+                        status: 'CORTE',
+                        processStartAt: now,
+                        dueDate,
+                        slaDays: computedSlaDays
+                    });
+                    void workOrderId;
+                }
             }
 
             // Insert log entry

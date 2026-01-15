@@ -8,11 +8,15 @@ export type CalendarMode = 'commercial' | 'installations';
 export interface CommercialOrder {
     id: string;
     order_number: string;
+    admin_code?: string;
     customer_name: string;
-    status: 'PENDIENTE_PAGO' | 'PAGADO' | 'EN_PRODUCCION' | 'LISTO_ENVIO' | 'ENVIADO' | 'ENTREGADO' | 'CANCELADO';
+    customer_company?: string;
+    status: 'PENDIENTE_PAGO' | 'PAGADO' | 'EN_PROCESO' | 'PTE_ENVIO' | 'ENVIADO' | 'ENTREGADO' | 'CANCELADO' | 'EN_PRODUCCION' | 'LISTO_ENVIO';
     delivery_date: string | null;
     production_start_date: string | null;
     quantity_total: number;
+    delivery_region?: string | null;
+    region?: string | null;
 }
 
 export const useDashboardCalendarData = (
@@ -37,12 +41,12 @@ export const useDashboardCalendarData = (
         queryKey: ['commercial-orders-calendar', startStr, endStr],
         queryFn: async () => {
             // Fetch Active Orders (not delivered/cancelled) OR Orders in the current date range
-            const statusFilter = `status.in.(PENDIENTE_PAGO,PAGADO,EN_PRODUCCION,LISTO_ENVIO,PTE_ENVIO)`;
+            const statusFilter = `status.in.(PENDIENTE_PAGO,PAGADO,EN_PROCESO,PTE_ENVIO,EN_PRODUCCION,LISTO_ENVIO,ENVIADO,ENTREGADO)`;
             const dateFilter = `and(delivery_date.gte.${startStr},delivery_date.lte.${endStr})`;
 
             const { data, error } = await supabaseProductivity
                 .from('comercial_orders')
-                .select('id, order_number, customer_name, status, delivery_date, quantity_total, created_at')
+                .select('id, order_number, admin_code, customer_name, customer_company, status, delivery_date, quantity_total, created_at, delivery_region, region')
                 .or(`${statusFilter},${dateFilter}`)
                 .order('delivery_date', { ascending: true });
 
@@ -54,11 +58,15 @@ export const useDashboardCalendarData = (
             return (data as any[]).map(o => ({
                 id: o.id,
                 order_number: o.order_number,
-                customer_name: o.customer_name,
+                admin_code: o.admin_code,
+                customer_name: o.customer_company || o.customer_name || 'Cliente',
+                customer_company: o.customer_company,
                 status: o.status,
                 delivery_date: o.delivery_date || o.created_at, // Fallback to created_at if no delivery date
                 production_start_date: o.delivery_date || o.created_at,
-                quantity_total: o.quantity_total
+                quantity_total: o.quantity_total,
+                delivery_region: o.delivery_region,
+                region: o.region
             })) as CommercialOrder[];
         },
         enabled: mode === 'commercial',

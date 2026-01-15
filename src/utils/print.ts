@@ -38,8 +38,11 @@ export const printHtmlToIframe = (htmlContent: string) => {
 
     Promise.all([fontsReady, ...imagePromises])
       .then(() => {
-        win.focus();
-        win.print();
+        // Small delay helps browsers finish layout before print on first run.
+        setTimeout(() => {
+          win.focus();
+          win.print();
+        }, 250);
       })
       .finally(() => cleanup());
   };

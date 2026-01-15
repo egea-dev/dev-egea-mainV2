@@ -19,11 +19,14 @@ const ShippingLabel: React.FC<ShippingLabelProps> = ({ item }) => {
             </div>
 
             <div className="flex flex-col items-center justify-center py-6 bg-slate-50 border border-slate-100 rounded-2xl mb-6">
-                <QRCode
-                    value={item.order_number}
-                    size={160}
-                    className="print:w-[150px] print:h-[150px]"
-                />
+                <div className="bg-white border-2 border-black p-2">
+                    <QRCode
+                        value={item.order_number}
+                        size={170}
+                        level="H"
+                        className="w-[170px] h-[170px] print:w-[40mm] print:h-[40mm]"
+                    />
+                </div>
                 <p className="mt-4 font-black text-2xl tracking-[0.2em]">{item.order_number}</p>
             </div>
 

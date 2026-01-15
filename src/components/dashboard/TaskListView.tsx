@@ -25,8 +25,8 @@ export const TaskListView = ({ tasks, mode, className }: TaskListViewProps) => {
 
         if (mode === 'commercial') {
             return (
-                (task.customer_name?.toLowerCase() || '').includes(query) ||
-                (task.order_number?.toLowerCase() || '').includes(query) ||
+                (task.customer_company?.toLowerCase() || task.customer_name?.toLowerCase() || '').includes(query) ||
+                (task.admin_code?.toLowerCase() || task.order_number?.toLowerCase() || '').includes(query) ||
                 (task.status?.toLowerCase() || '').includes(query)
             );
         } else {
@@ -48,8 +48,8 @@ export const TaskListView = ({ tasks, mode, className }: TaskListViewProps) => {
         const rows = filteredTasks.map(task =>
             mode === 'commercial'
                 ? [
-                    task.order_number || '',
-                    task.customer_name || '',
+                    task.admin_code || task.order_number || '',
+                    task.customer_company || task.customer_name || '',
                     task.status || '',
                     task.delivery_date || '',
                     task.quantity_total || 0
@@ -150,8 +150,8 @@ export const TaskListView = ({ tasks, mode, className }: TaskListViewProps) => {
                                     <TableRow key={task.id} className="border-border/60 hover:bg-muted/50 transition-colors">
                                         {mode === 'commercial' ? (
                                             <>
-                                                <TableCell className="font-mono text-slate-300 font-medium">{task.order_number}</TableCell>
-                                                <TableCell className="text-slate-300">{task.customer_name}</TableCell>
+                                                <TableCell className="font-mono text-slate-300 font-medium">{task.admin_code || task.order_number}</TableCell>
+                                                <TableCell className="text-slate-300">{task.customer_company || task.customer_name}</TableCell>
                                                 <TableCell>{getStatusBadge(task.status)}</TableCell>
                                                 <TableCell className="text-slate-400">
                                                     <div className="flex items-center gap-2">
