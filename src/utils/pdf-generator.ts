@@ -55,16 +55,16 @@ export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
     doc.setFontSize(14);
     doc.text(`Nº: ${order.order_number}`, margin, yPos);
 
-    // QR Code en esquina superior derecha
+    // QR Code en esquina superior derecha (más arriba para no taparlo)
     if (qrDataUrl) {
-        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 45, 15, 45, 45);
+        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 50, 8, 50, 50);
     }
 
     yPos += 10;
 
-    // Línea separadora
+    // Línea separadora (acortada para no tocar el QR)
     doc.setLineWidth(0.5);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
+    doc.line(margin, yPos, pageWidth - margin - 55, yPos);
     yPos += 10;
 
     // Información del cliente
