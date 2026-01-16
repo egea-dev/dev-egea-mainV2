@@ -107,8 +107,11 @@ export default function PlantBoardPage() {
 
             const transformed = (data || []).map((order: any) => {
                 const specs = order.technical_specs || {};
-                const fabric = specs.fabric || order.fabric || "Estandar";
-                const color = specs.color || order.color || "Gris";
+                // Extraer material de lines si existe
+                const lines = order.lines || [];
+                const firstLine = lines[0] || {};
+                const fabric = firstLine.material || specs.fabric || order.fabric || "N/D";
+                const color = firstLine.color || specs.color || order.color || "N/D";
 
                 // Calculate days elapsed
                 const days = Math.floor((new Date().getTime() - new Date(order.created_at).getTime()) / (1000 * 60 * 60 * 24));
@@ -132,7 +135,7 @@ export default function PlantBoardPage() {
                 return {
                     ...order,
                     order_number: order.order_number || order.work_order_number || order.id,
-                    customer_name: order.customer_name || specs.customer_name || "Cliente Final",
+                    customer_name: order.customer_company || order.customer_name || specs.customer_name || "Cliente Final",
                     region: order.region || specs.region || "PENINSULA",
                     fabric,
                     color,

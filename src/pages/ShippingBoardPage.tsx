@@ -86,13 +86,13 @@ export default function ShippingBoardPage() {
     }, []);
 
     const fetchOrders = async () => {
-            const { data, error } = await supabaseProductivity
-                .from("produccion_work_orders")
-                .select("*")
-                .or("status.eq.PTE_ENVIO,status.eq.LISTO_ENVIO,status.eq.TERMINADO,and(status.eq.EN_PROCESO,needs_shipping_validation.eq.true),status.eq.ENVIADO")
-                .order("priority", { ascending: false })
-                .order("created_at", { ascending: false })
-                .limit(200);
+        const { data, error } = await supabaseProductivity
+            .from("produccion_work_orders")
+            .select("*")
+            .or("status.eq.PTE_ENVIO,status.eq.LISTO_ENVIO,status.eq.TERMINADO,and(status.eq.EN_PROCESO,needs_shipping_validation.eq.true),status.eq.ENVIADO")
+            .order("priority", { ascending: false })
+            .order("created_at", { ascending: false })
+            .limit(200);
 
         if (error) {
             console.error("Error fetching shipping board data:", error);
@@ -113,8 +113,11 @@ export default function ShippingBoardPage() {
 
         const transformed = (data || []).map((order: any) => {
             const specs = order.technical_specs || {};
-            const fabric = specs.fabric || order.fabric || "Estandar";
-            const color = specs.color || order.color || "N/D";
+            // Extraer material de lines si existe
+            const lines = order.lines || [];
+            const firstLine = lines[0] || {};
+            const fabric = firstLine.material || specs.fabric || order.fabric || "N/D";
+            const color = firstLine.color || specs.color || order.color || "N/D";
             const normalizedStatus = normalizeStatus(order.status);
 
             // Calculate package progress
@@ -139,20 +142,20 @@ export default function ShippingBoardPage() {
                 (Date.now() - new Date(order.created_at).getTime()) / (1000 * 60 * 60 * 24)
             );
 
-              return {
-                  ...order,
-                  order_number: order.order_number || order.work_order_number || order.id,
-                  customer_name: order.customer_name || specs.customer_name || "Cliente Final",
-                  region: order.region || specs.region || "PENINSULA",
-                  fabric,
-                  color,
-                  quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
-                  packageProgress,
-                  isUrgent,
-                  isRecentShipment,
-                  daysElapsed,
-                  due_date: order.due_date || order.estimated_completion || null,
-                  status: normalizedStatus
+            return {
+                ...order,
+                order_number: order.order_number || order.work_order_number || order.id,
+                customer_name: order.customer_company || order.customer_name || specs.customer_name || "Cliente Final",
+                region: order.region || specs.region || "PENINSULA",
+                fabric,
+                color,
+                quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
+                packageProgress,
+                isUrgent,
+                isRecentShipment,
+                daysElapsed,
+                due_date: order.due_date || order.estimated_completion || null,
+                status: normalizedStatus
             } as ShippingOrder;
         });
 
