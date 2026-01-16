@@ -24,6 +24,7 @@ import {
     generateProduccionInicioSubject
 } from '@/utils/email-templates';
 import { useUpdateOrder } from '@/hooks/use-orders';
+import { generateOrderPDF } from '@/utils/pdf-generator';
 
 // --- Types & Constants ---
 
