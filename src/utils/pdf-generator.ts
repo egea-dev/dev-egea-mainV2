@@ -45,26 +45,27 @@ export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
         }
     }
 
-    // Encabezado
-    doc.setFontSize(20);
+    // Encabezado a la izquierda
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('ORDEN DE TRABAJO', pageWidth / 2, yPos, { align: 'center' });
-    yPos += 15;
+    doc.text('ORDEN DE TRABAJO', margin, yPos);
+    yPos += 10;
 
-    // Número de orden
-    doc.setFontSize(14);
+    // Número de orden más grande
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
     doc.text(`Nº: ${order.order_number}`, margin, yPos);
 
-    // QR Code en esquina superior derecha (más arriba para no taparlo)
+    // QR Code 3x3cm en esquina superior derecha
     if (qrDataUrl) {
-        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 50, 8, 50, 50);
+        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 30, 15, 30, 30);
     }
 
     yPos += 10;
 
-    // Línea separadora (acortada para no tocar el QR)
+    // Línea separadora completa
     doc.setLineWidth(0.5);
-    doc.line(margin, yPos, pageWidth - margin - 55, yPos);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 10;
 
     // Información del cliente
