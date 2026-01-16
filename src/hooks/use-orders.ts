@@ -144,13 +144,16 @@ export const useUpdateOrderStatus = () => {
                     due_date: dueDate || currentOrder?.delivery_date || null,
                     process_start_at: processStartAt || null,
                     sla_days: slaDays || null,
-                    // Usar la nueva utilidad para generar QR con datos técnicos completos
+                    // Usar la nueva utilidad para generar QR con desglose de líneas
                     qr_payload: generateQRPayload({
                         orderNumber: resolvedOrderNumber,
                         customerName: customerDisplay,
-                        fabric,
-                        color,
-                        quantity,
+                        region,
+                        deliveryDate: currentOrder?.delivery_date || null,
+                        lines: currentOrder?.lines?.map(line => ({
+                            material: line.material,
+                            quantity: line.quantity
+                        })) || [],
                         status,
                     }),
                     technical_specs: {

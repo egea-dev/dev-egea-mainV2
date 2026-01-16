@@ -31,15 +31,19 @@ export interface QRValidationResultWithLines extends QRValidationResult {
 }
 
 /**
- * Genera un payload de QR con el formato completo incluyendo datos técnicos
- * Formato: ORDER:{number}|CUSTOMER:{name}|FABRIC:{fabric}|COLOR:{color}|QTY:{quantity}|STATUS:{status}
+ * Genera un payload de QR con el formato completo incluyendo desglose de líneas
+ * Formato: ORDER:{number}|CUSTOMER:{name}|REGION:{region}|DATE:{date}|LINES:{desglose}|STATUS:{status}
+ * Ejemplo: EG49168840|Cliente Importado|BALEARES|16/1/2026|Formentera 100|PAGADO
  */
 export function generateQRPayload(data: {
     orderNumber: string;
     customerName: string;
-    fabric?: string;
-    color?: string;
-    quantity?: number;
+    region?: string;
+    deliveryDate?: string;
+    lines?: Array<{
+        material?: string;
+        quantity: number;
+    }>;
     status: string;
 }): string {
     const parts: string[] = [
@@ -47,17 +51,22 @@ export function generateQRPayload(data: {
         `CUSTOMER:${data.customerName}`,
     ];
 
-    // Agregar datos técnicos si están disponibles
-    if (data.fabric) {
-        parts.push(`FABRIC:${data.fabric}`);
+    // Agregar región si está disponible
+    if (data.region) {
+        parts.push(`REGION:${data.region}`);
     }
 
-    if (data.color) {
-        parts.push(`COLOR:${data.color}`);
+    // Agregar fecha de entrega si está disponible
+    if (data.deliveryDate) {
+        parts.push(`DATE:${data.deliveryDate}`);
     }
 
-    if (data.quantity !== undefined && data.quantity !== null) {
-        parts.push(`QTY:${data.quantity}`);
+    // Agregar desglose de líneas si está disponible
+    if (data.lines && data.lines.length > 0) {
+        const linesBreakdown = data.lines
+            .map(line => `${line.material || 'N/D'} ${line.quantity}`)
+            .join(', ');
+        parts.push(`LINES:${linesBreakdown}`);
     }
 
     parts.push(`STATUS:${data.status}`);

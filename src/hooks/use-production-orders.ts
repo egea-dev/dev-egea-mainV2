@@ -104,11 +104,26 @@ export const useStartProduction = () => {
         mutationFn: async ({ id, region }: { id: string; region: string }) => {
             // SLA por región (días)
             const slaConfig: Record<string, number> = {
+                // Baleares - 7 días
                 'MALLORCA': 7,
-                'MENORCA': 10,
-                'IBIZA': 10,
-                'FORMENTERA': 12,
-                'PENINSULA': 14,
+                'MENORCA': 7,        // CORREGIDO: era 10
+                'IBIZA': 7,          // CORREGIDO: era 10
+                'FORMENTERA': 7,     // CORREGIDO: era 12
+                'BALEARES': 7,
+
+                // Península - 10 días
+                'PENINSULA': 10,     // CORREGIDO: era 14
+
+                // Canarias - 15 días
+                'CANARIAS': 15,
+                'TENERIFE': 15,
+                'GRAN_CANARIA': 15,
+                'LANZAROTE': 15,
+                'FUERTEVENTURA': 15,
+                'LA_PALMA': 15,
+                'LA_GOMERA': 15,
+                'EL_HIERRO': 15,
+
                 'DEFAULT': 10,
             };
 
