@@ -179,6 +179,11 @@ export default function ShippingScanPage() {
 
     const filtered = orders.filter(
       o => {
+        // Excluir órdenes ya ENVIADO (tareas terminadas)
+        if (o.status === 'ENVIADO') {
+          return false;
+        }
+
         const isReady = o.status === 'PTE_ENVIO' ||
           o.status === 'LISTO_ENVIO' ||
           (o.status === 'EN_PROCESO' && o.needs_shipping_validation) ||

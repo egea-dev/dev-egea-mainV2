@@ -93,17 +93,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
             errors.push("Es necesario el número de presupuesto");
         }
 
+        // ⚠️ VALIDACIÓN DE PDFs DESACTIVADA TEMPORALMENTE (2026-01-16)
+        // TODO: Reactivar cuando sea necesario descomentar las siguientes líneas
+
         // Check for PRESUPUESTO document
-        const hasPresupuesto = formData.documents?.some(doc => doc.type === 'PRESUPUESTO');
-        if (!hasPresupuesto) {
-            errors.push("Debes subir el presupuesto firmado en PDFs");
-        }
+        // const hasPresupuesto = formData.documents?.some(doc => doc.type === 'PRESUPUESTO');
+        // if (!hasPresupuesto) {
+        //     errors.push("Debes subir el presupuesto firmado en PDFs");
+        // }
 
         // Check for PEDIDO_ACEPTADO document
-        const hasPedidoAceptado = formData.documents?.some(doc => doc.type === 'PEDIDO_ACEPTADO');
-        if (!hasPedidoAceptado) {
-            errors.push("Debes subir el pedido aceptado en PDFs");
-        }
+        // const hasPedidoAceptado = formData.documents?.some(doc => doc.type === 'PEDIDO_ACEPTADO');
+        // if (!hasPedidoAceptado) {
+        //     errors.push("Debes subir el pedido aceptado en PDFs");
+        // }
 
         // Check for at least one line
         if (!formData.lines || formData.lines.length === 0) {
@@ -282,6 +285,28 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                         <p className="text-sm text-[#8B8D90] mt-1">Ref. Admin: {formData.admin_code || '---'}</p>
                     </div>
                     <div className="flex items-center justify-end gap-2">
+                        {/* Botón Marcar como Pagado */}
+                        {formData.status === 'PENDIENTE_PAGO' && (
+                            <Button
+                                onClick={async () => {
+                                    try {
+                                        await updateOrder.mutateAsync({
+                                            id: formData.id,
+                                            status: 'PAGADO'
+                                        });
+                                        setFormData(prev => ({ ...prev, status: 'PAGADO' }));
+                                        toast.success('Pedido marcado como PAGADO');
+                                        if (onSave) onSave({ ...formData, status: 'PAGADO' });
+                                    } catch (error: any) {
+                                        toast.error(`Error: ${error.message}`);
+                                    }
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                <FileCheck className="w-4 h-4 mr-2" /> Marcar como Pagado
+                            </Button>
+                        )}
+
                         {!isEditing ? (
                             <Button onClick={() => setIsEditing(true)} variant="outline" className="border-[#6E6F71] text-[#B5B8BA] hover:text-white hover:bg-[#45474A]">
                                 <Edit className="w-4 h-4 mr-2" /> Editar
@@ -734,8 +759,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     <h4 className="font-bold text-white">Etiqueta de Produccion</h4>
                                 </div>
 
-                                    <div className="flex flex-col items-center gap-4">
-                                        <div className="bg-white p-4 rounded-2xl shadow-lg">
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="bg-white p-4 rounded-2xl shadow-lg">
                                         <QRCodeGenerator order={formData} containerRef={qrContainerRef} />
                                     </div>
 
