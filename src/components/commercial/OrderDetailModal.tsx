@@ -800,7 +800,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     </Button>
                                     <Button
                                         disabled={!canPrint}
-                                        onClick={() => generateOrderPDF(formData)}
+                                        onClick={() => {
+                                            const qrPayload = generateQRPayload({
+                                                orderNumber: formData.order_number,
+                                                customerName: formData.customer_company || formData.customer_name || 'Cliente',
+                                                region: formData.delivery_region || formData.region,
+                                                deliveryDate: formData.delivery_date,
+                                                lines: formData.lines?.map(l => ({
+                                                    material: l.material,
+                                                    quantity: l.quantity
+                                                })) || [],
+                                                status: formData.status,
+                                            });
+                                            generateOrderPDF({ ...formData, qr_payload: qrPayload });
+                                        }}
                                         className="w-full bg-muted/40 hover:bg-muted/60 text-foreground border border-border/60 disabled:opacity-50"
                                     >
                                         <FileText className="w-4 h-4 mr-2" />
