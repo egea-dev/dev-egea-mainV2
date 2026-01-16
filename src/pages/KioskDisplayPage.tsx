@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "react-router-dom";
 import { supabaseProductivity } from "@/integrations/supabase";
+import { parseQRCode, extractOrderNumber } from "@/lib/qr-utils";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
     PENDIENTE: { label: "Pendiente", color: "bg-slate-500/10 text-slate-400 border-slate-500/30", icon: Timer },
@@ -89,8 +90,17 @@ const KioskDisplayPage: React.FC = () => {
     }, [kioskConfig]);
 
     function onScanSuccess(decodedText: string) {
-        setScannedId(decodedText);
-        toast.success(`Orden detectada: ${decodedText}`);
+        // Parsear el código QR usando la utilidad centralizada
+        const qrData = parseQRCode(decodedText);
+        const orderNum = qrData.orderNumber || extractOrderNumber(decodedText);
+
+        setScannedId(orderNum);
+
+        if (qrData.isLegacyFormat) {
+            toast.success(`Orden detectada: ${orderNum} (formato antiguo)`);
+        } else {
+            toast.success(`✓ Orden detectada: ${orderNum}`);
+        }
     }
 
     function onScanFailure(_error: any) { }

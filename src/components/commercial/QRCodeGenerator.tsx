@@ -1,6 +1,7 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Order } from '@/types/commercial';
+import { generateQRPayload } from '@/lib/qr-utils';
 
 interface QRCodeGeneratorProps {
     order: Order;
@@ -8,7 +9,15 @@ interface QRCodeGeneratorProps {
 }
 
 export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ order, containerRef }) => {
-    const qrPayload = `ORDER:${order.order_number}|CUSTOMER:${order.customer_name}|STATUS:${order.status}`;
+    // Generar payload con datos técnicos completos usando la utilidad centralizada
+    const qrPayload = generateQRPayload({
+        orderNumber: order.order_number,
+        customerName: order.customer_name,
+        fabric: order.fabric,
+        color: order.color,
+        quantity: order.quantity_total,
+        status: order.status,
+    });
 
     return (
         <div className="space-y-4">
@@ -20,6 +29,14 @@ export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ order, contain
                     includeMargin={true}
                 />
             </div>
+
+            {/* Información de depuración (solo visible en desarrollo) */}
+            {process.env.NODE_ENV === 'development' && (
+                <div className="text-xs text-gray-500 font-mono p-2 bg-gray-100 rounded">
+                    <div className="font-bold mb-1">QR Payload:</div>
+                    <div className="break-all">{qrPayload}</div>
+                </div>
+            )}
         </div>
     );
 };

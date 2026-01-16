@@ -26,6 +26,7 @@ import { MobileAlert, AlertType } from '@/components/common/MobileAlert';
 import { TrackingToggle } from '@/components/shipping/TrackingToggle';
 import { IncidentReportButton } from '@/components/incidents/IncidentReportButton';
 import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
+import { parseQRCode, validateQRAgainstOrder, extractOrderNumber } from '@/lib/qr-utils';
 
 // Tipos
 interface Order {
@@ -210,7 +211,9 @@ export default function ShippingScanPage() {
   };
 
   const handleScan = async (code: string) => {
-    const orderNum = code.includes('|') ? code.split('|')[0] : code;
+    // Parsear el código QR usando la utilidad centralizada
+    const qrData = parseQRCode(code);
+    const orderNum = qrData.orderNumber || extractOrderNumber(code);
 
     if (scannedOrder && scannedOrder.order_number === orderNum) {
       const currentCount = scannedOrder.scanned_packages || 0;
@@ -231,6 +234,33 @@ export default function ShippingScanPage() {
 
     const order = orders.find(o => o.order_number === orderNum);
     if (order) {
+      // Validar los datos del QR contra la orden de la BD
+      const validation = validateQRAgainstOrder(qrData, {
+        order_number: order.order_number,
+        customer_name: order.customer_name,
+        fabric: order.fabric,
+        color: order.color,
+        quantity_total: order.quantity_total,
+        status: order.status,
+      });
+
+      // Mostrar alertas según el resultado de la validación
+      if (!validation.isValid) {
+        showAlert('error', 'QR Inválido', 'El número de orden del QR no coincide con ningún pedido en el sistema.');
+        return;
+      }
+
+      if (validation.hasDiscrepancies) {
+        const discrepancyMessage = validation.discrepancies.join('\n');
+        showAlert(
+          'warning',
+          'Advertencia: Discrepancias detectadas',
+          `Se encontraron diferencias entre el QR y la base de datos:\n\n${discrepancyMessage}\n\nSe usarán los datos de la base de datos.`
+        );
+      } else if (qrData.isLegacyFormat) {
+        toast.info(`QR en formato antiguo - Datos técnicos cargados desde BD`);
+      }
+
       // Validar que la orden esté lista para envío
       const validStatuses = ['PTE_ENVIO', 'LISTO_ENVIO', 'ENVIADO'];
       const isValidForShipping = validStatuses.includes(order.status) ||
@@ -249,7 +279,7 @@ export default function ShippingScanPage() {
       setQrInput('');
       setTrackingNumber(order.tracking_number || '');
       setScannedPackagesCount(order.scanned_packages || 0);
-      toast.success(`Orden ${orderNum} cargada`);
+      toast.success(`✓ Orden ${orderNum} validada correctamente`);
     } else {
       toast.error(`Pedido no encontrado: ${orderNum}`);
     }
@@ -269,29 +299,29 @@ export default function ShippingScanPage() {
       return;
     }
 
-      const updatedOrder: Partial<Order> = {
-        status: 'ENVIADO',
-        quantity_shipped: scannedOrder.quantity_total,
-        needs_shipping_validation: false,
-        tracking_number: trackingNumber.trim() || null,
-        tracking_pending: !trackingNumber.trim(),
-        shipping_date: new Date().toISOString()
-      };
+    const updatedOrder: Partial<Order> = {
+      status: 'ENVIADO',
+      quantity_shipped: scannedOrder.quantity_total,
+      needs_shipping_validation: false,
+      tracking_number: trackingNumber.trim() || null,
+      tracking_pending: !trackingNumber.trim(),
+      shipping_date: new Date().toISOString()
+    };
 
     await persistOrderUpdate(scannedOrder.id, updatedOrder);
 
-      // Alerta de éxito si se envió sin tracking
-      if (!trackingNumber.trim()) {
-        toast.success('Salida marcada como PENDIENTE DE TRACKING');
-      } else {
-        toast.success(`Salida validada. Tracking: ${trackingNumber}`);
-      }
+    // Alerta de éxito si se envió sin tracking
+    if (!trackingNumber.trim()) {
+      toast.success('Salida marcada como PENDIENTE DE TRACKING');
+    } else {
+      toast.success(`Salida validada. Tracking: ${trackingNumber}`);
+    }
     setScannedOrder(null);
   };
 
-    const printManifest = () => {
-      if (!scannedOrder) return;
-      const logoUrl = '/logo-placeholder.png';
+  const printManifest = () => {
+    if (!scannedOrder) return;
+    const logoUrl = '/logo-placeholder.png';
     const safe = (value: string | number | null | undefined) => escapeHtml(String(value ?? '-'));
     const orderNumber = safe(scannedOrder.order_number);
     const adminCode = safe(scannedOrder.admin_code || '---');

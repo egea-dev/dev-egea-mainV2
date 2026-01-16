@@ -9,6 +9,7 @@ import { IncidentReportButton } from '@/components/incidents/IncidentReportButto
 import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
 import { toast } from 'sonner';
 import { printHtmlToIframe } from '@/utils/print';
+import { parseQRCode, validateQRAgainstOrder, extractOrderNumber } from '@/lib/qr-utils';
 
 function escapeZpl(str: string): string {
   if (!str) return "";
@@ -208,48 +209,48 @@ export function ProductionPage() {
     }
   };
 
-    const productionQueue = useMemo(() => {
-      const now = Date.now();
-      return orders
-        .filter(order => {
-          const allowed = ['EN_PROCESO', 'PAGADO', 'PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'];
-          if (!allowed.includes(order.status)) return false;
-          if (order.status !== 'LISTO_ENVIO') return true;
-          if (!order.updated_at) return true;
-          const updatedAt = new Date(order.updated_at).getTime();
-          return now - updatedAt <= 30 * 60 * 1000;
-        })
-        .sort((a, b) => {
-          const aDate = a.due_date ? new Date(a.due_date).getTime() : Infinity;
-          const bDate = b.due_date ? new Date(b.due_date).getTime() : Infinity;
-          return aDate - bDate;
-        });
-    }, [orders]);
+  const productionQueue = useMemo(() => {
+    const now = Date.now();
+    return orders
+      .filter(order => {
+        const allowed = ['EN_PROCESO', 'PAGADO', 'PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'];
+        if (!allowed.includes(order.status)) return false;
+        if (order.status !== 'LISTO_ENVIO') return true;
+        if (!order.updated_at) return true;
+        const updatedAt = new Date(order.updated_at).getTime();
+        return now - updatedAt <= 30 * 60 * 1000;
+      })
+      .sort((a, b) => {
+        const aDate = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+        const bDate = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+        return aDate - bDate;
+      });
+  }, [orders]);
 
   const persistOrderUpdate = async (orderId: string, patch: Partial<Order>) => {
-      setOrders((prev: Order[]) => prev.map(o => o.id === orderId ? { ...o, ...patch } as Order : o));
-      setScannedOrder(prev => prev && prev.id === orderId ? { ...prev, ...patch } as Order : prev);
-      try {
-        const payload: any = { ...patch };
-        if (Object.prototype.hasOwnProperty.call(payload, 'due_date')) {
-          payload.estimated_completion = payload.due_date || null;
-          delete payload.due_date;
-        }
-        if (Object.prototype.hasOwnProperty.call(payload, 'process_start_at')) {
-          payload.started_at = payload.process_start_at || null;
-          delete payload.process_start_at;
-        }
-        if (Object.prototype.hasOwnProperty.call(payload, 'sla_days')) {
-          delete payload.sla_days;
-        }
+    setOrders((prev: Order[]) => prev.map(o => o.id === orderId ? { ...o, ...patch } as Order : o));
+    setScannedOrder(prev => prev && prev.id === orderId ? { ...prev, ...patch } as Order : prev);
+    try {
+      const payload: any = { ...patch };
+      if (Object.prototype.hasOwnProperty.call(payload, 'due_date')) {
+        payload.estimated_completion = payload.due_date || null;
+        delete payload.due_date;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'process_start_at')) {
+        payload.started_at = payload.process_start_at || null;
+        delete payload.process_start_at;
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'sla_days')) {
+        delete payload.sla_days;
+      }
 
-        // @ts-ignore
-        const { error } = await supabaseProductivity
-          .from('produccion_work_orders')
-          .update(payload)
-          .eq('id', orderId)
-          .select('id')
-          .maybeSingle();
+      // @ts-ignore
+      const { error } = await supabaseProductivity
+        .from('produccion_work_orders')
+        .update(payload)
+        .eq('id', orderId)
+        .select('id')
+        .maybeSingle();
 
       if (error) throw error;
       await loadOrders();
@@ -259,15 +260,51 @@ export function ProductionPage() {
   };
 
   const handleScan = (code: string) => {
-    const orderNum = code.includes('|') ? code.split('|')[0] : code;
+    // Parsear el código QR usando la utilidad centralizada
+    const qrData = parseQRCode(code);
+    const orderNum = qrData.orderNumber || extractOrderNumber(code);
+
     const order = orders.find(o => o.order_number === orderNum);
+
     if (order) {
+      // Validar los datos del QR contra la orden de la BD
+      const validation = validateQRAgainstOrder(qrData, {
+        order_number: order.order_number,
+        customer_name: order.customer_name,
+        fabric: order.fabric,
+        color: order.color,
+        quantity_total: order.quantity_total,
+        status: order.status,
+      });
+
       setScannedOrder(order);
       setCameraActive(false);
       setQrInput('');
       setPackagesInput(order.packages_count || 1);
-      // Solo toast para éxito, no interrumpe flujo
-      toast.success(`Orden ${orderNum} cargada`);
+
+      // Mostrar alertas según el resultado de la validación
+      if (!validation.isValid) {
+        showAlert('error', 'QR Inválido', 'El número de orden del QR no coincide con ningún pedido en el sistema.');
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+        return;
+      }
+
+      if (validation.hasDiscrepancies) {
+        // Mostrar advertencia si hay discrepancias en datos técnicos
+        const discrepancyMessage = validation.discrepancies.join('\n');
+        showAlert(
+          'warning',
+          'Advertencia: Discrepancias detectadas',
+          `Se encontraron diferencias entre el QR y la base de datos:\n\n${discrepancyMessage}\n\nSe usarán los datos de la base de datos.`
+        );
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      } else if (qrData.isLegacyFormat) {
+        // Informar si es formato antiguo
+        toast.info(`QR en formato antiguo - Datos técnicos cargados desde BD`);
+      } else {
+        // Éxito total - QR nuevo y validado
+        toast.success(`✓ Orden ${orderNum} validada correctamente`);
+      }
     } else {
       // Alerta bloqueante para error de escaneo
       showAlert('error', 'Pedido no encontrado', `El código ${orderNum} no existe en el sistema actual.`);

@@ -4,6 +4,7 @@ import { supabase as supabaseMain } from "@/integrations/supabase/client";
 import { Order, OrderStatus } from "@/types/commercial";
 import { toast } from "sonner";
 import { ORDER_STATUS_FLOW, resolveOrderStatus } from "@/lib/order-status";
+import { generateQRPayload } from "@/lib/qr-utils";
 
 export const useOrders = () => {
     return useQuery({
@@ -143,7 +144,15 @@ export const useUpdateOrderStatus = () => {
                     due_date: dueDate || currentOrder?.delivery_date || null,
                     process_start_at: processStartAt || null,
                     sla_days: slaDays || null,
-                    qr_payload: `ORDER:${resolvedOrderNumber}|CUSTOMER:${customerDisplay}|STATUS:${status}`,
+                    // Usar la nueva utilidad para generar QR con datos técnicos completos
+                    qr_payload: generateQRPayload({
+                        orderNumber: resolvedOrderNumber,
+                        customerName: customerDisplay,
+                        fabric,
+                        color,
+                        quantity,
+                        status,
+                    }),
                     technical_specs: {
                         fabric,
                         color,
