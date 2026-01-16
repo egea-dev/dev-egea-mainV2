@@ -128,7 +128,8 @@ export default function PlantBoardPage() {
                     default: progress = 5;
                 }
 
-                if (normalizedStatus === "LISTO_ENVIO") {
+                // Mostrar solo órdenes en proceso de producción (no terminadas ni listas para envío)
+                if (normalizedStatus === "LISTO_ENVIO" || normalizedStatus === "ENVIADO" || normalizedStatus === "PTE_ENVIO") {
                     return null;
                 }
 
