@@ -25,6 +25,7 @@ import {
 } from '@/utils/email-templates';
 import { useUpdateOrder } from '@/hooks/use-orders';
 import { generateOrderPDF } from '@/utils/pdf-generator';
+import { generateQRPayload } from '@/lib/qr-utils';
 
 // --- Types & Constants ---
 
