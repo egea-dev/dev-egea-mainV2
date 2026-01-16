@@ -26,7 +26,7 @@ import { MobileAlert, AlertType } from '@/components/common/MobileAlert';
 import { TrackingToggle } from '@/components/shipping/TrackingToggle';
 import { IncidentReportButton } from '@/components/incidents/IncidentReportButton';
 import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
-import { parseQRCode, validateQRAgainstOrder, extractOrderNumber } from '@/lib/qr-utils';
+import { parseQRCode, validateQRWithLines, extractOrderNumber } from '@/lib/qr-utils';
 
 // Tipos
 interface Order {
@@ -234,14 +234,15 @@ export default function ShippingScanPage() {
 
     const order = orders.find(o => o.order_number === orderNum);
     if (order) {
-      // Validar los datos del QR contra la orden de la BD
-      const validation = validateQRAgainstOrder(qrData, {
+      // Validar los datos del QR contra la orden de la BD INCLUYENDO el desglose de líneas
+      const validation = validateQRWithLines(qrData, {
         order_number: order.order_number,
         customer_name: order.customer_name,
         fabric: order.fabric,
         color: order.color,
         quantity_total: order.quantity_total,
         status: order.status,
+        lines: order.lines,  // ← NUEVO: Validar desglose de líneas
       });
 
       // Mostrar alertas según el resultado de la validación
@@ -250,7 +251,15 @@ export default function ShippingScanPage() {
         return;
       }
 
-      if (validation.hasDiscrepancies) {
+      // Verificar discrepancias en el desglose de líneas
+      if (validation.linesDiscrepancies && validation.linesDiscrepancies.length > 0) {
+        const linesMessage = validation.linesDiscrepancies.join('\n');
+        showAlert(
+          'warning',
+          '⚠️ Advertencia: Problemas en el desglose',
+          `Se detectaron problemas en el desglose de artículos:\n\n${linesMessage}\n\nRevisa el pedido antes de continuar.`
+        );
+      } else if (validation.hasDiscrepancies) {
         const discrepancyMessage = validation.discrepancies.join('\n');
         showAlert(
           'warning',
@@ -279,7 +288,9 @@ export default function ShippingScanPage() {
       setQrInput('');
       setTrackingNumber(order.tracking_number || '');
       setScannedPackagesCount(order.scanned_packages || 0);
-      toast.success(`✓ Orden ${orderNum} validada correctamente`);
+
+      const linesCount = order.lines?.length || 0;
+      toast.success(`✓ Orden ${orderNum} validada (${linesCount} líneas)`);
     } else {
       toast.error(`Pedido no encontrado: ${orderNum}`);
     }

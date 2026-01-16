@@ -21,6 +21,16 @@ export interface QRValidationResult {
 }
 
 /**
+ * Resultado de validación extendido que incluye validación del desglose de líneas
+ */
+export interface QRValidationResultWithLines extends QRValidationResult {
+    linesDiscrepancies?: string[];  // Discrepancias específicas en el desglose
+    expectedLines?: number;          // Número de líneas esperadas en BD
+    actualLines?: number;            // Número de líneas en el QR (si aplica)
+    linesValid?: boolean;            // Si el desglose es válido
+}
+
+/**
  * Genera un payload de QR con el formato completo incluyendo datos técnicos
  * Formato: ORDER:{number}|CUSTOMER:{name}|FABRIC:{fabric}|COLOR:{color}|QTY:{quantity}|STATUS:{status}
  */
@@ -203,3 +213,115 @@ export function extractOrderNumber(qrCode: string): string {
     // Si no tiene formato, asumir que todo el código es el número de orden
     return qrCode;
 }
+
+/**
+ * Valida los datos del QR contra los datos de una orden de la base de datos
+ * INCLUYENDO validación del desglose de líneas/artículos
+ * 
+ * Esta función extiende validateQRAgainstOrder para también validar que el desglose
+ * de líneas en la BD coincida con las expectativas del pedido
+ */
+export function validateQRWithLines(
+    qrData: QRData,
+    orderData: {
+        order_number: string;
+        customer_name?: string;
+        fabric?: string;
+        color?: string;
+        quantity_total?: number;
+        status?: string;
+        lines?: Array<{
+            quantity: number;
+            width: number | string;
+            height: number | string;
+            material?: string;
+            color?: string;
+        }>;
+    }
+): QRValidationResultWithLines {
+    // Primero hacer la validación básica
+    const basicValidation = validateQRAgainstOrder(qrData, orderData);
+
+    // Inicializar resultado extendido
+    const result: QRValidationResultWithLines = {
+        ...basicValidation,
+        linesDiscrepancies: [],
+        linesValid: true,
+    };
+
+    // Si no hay líneas en la BD, no podemos validar el desglose
+    if (!orderData.lines || orderData.lines.length === 0) {
+        result.linesDiscrepancies = ['No hay desglose de líneas en la base de datos'];
+        result.linesValid = false;
+        result.expectedLines = 0;
+        result.actualLines = 0;
+        return result;
+    }
+
+    // Validar que la cantidad total coincida con la suma de líneas
+    const totalFromLines = orderData.lines.reduce((sum, line) => sum + line.quantity, 0);
+    result.expectedLines = orderData.lines.length;
+    result.actualLines = orderData.lines.length;
+
+    if (qrData.quantity && totalFromLines !== qrData.quantity) {
+        result.linesDiscrepancies!.push(
+            `Cantidad total no coincide: QR="${qrData.quantity}" vs Suma de líneas="${totalFromLines}"`
+        );
+        result.linesValid = false;
+    }
+
+    // Validar que todas las líneas tengan datos válidos
+    orderData.lines.forEach((line, index) => {
+        const lineNum = index + 1;
+
+        // Validar cantidad
+        if (!line.quantity || line.quantity <= 0) {
+            result.linesDiscrepancies!.push(
+                `Línea ${lineNum}: Cantidad inválida (${line.quantity})`
+            );
+            result.linesValid = false;
+        }
+
+        // Validar medidas
+        const width = typeof line.width === 'string' ? parseFloat(line.width) : line.width;
+        const height = typeof line.height === 'string' ? parseFloat(line.height) : line.height;
+
+        if (!width || width <= 0) {
+            result.linesDiscrepancies!.push(
+                `Línea ${lineNum}: Ancho inválido (${line.width})`
+            );
+            result.linesValid = false;
+        }
+
+        if (!height || height <= 0) {
+            result.linesDiscrepancies!.push(
+                `Línea ${lineNum}: Alto inválido (${line.height})`
+            );
+            result.linesValid = false;
+        }
+
+        // Validar material si está en el QR
+        if (qrData.fabric && line.material) {
+            const qrFabric = qrData.fabric.trim().toLowerCase();
+            const lineFabric = line.material.trim().toLowerCase();
+            if (qrFabric !== lineFabric) {
+                result.linesDiscrepancies!.push(
+                    `Línea ${lineNum}: Material no coincide - QR="${qrData.fabric}" vs Línea="${line.material}"`
+                );
+                result.linesValid = false;
+            }
+        }
+    });
+
+    // Actualizar hasDiscrepancies si hay problemas en las líneas
+    if (result.linesDiscrepancies!.length > 0) {
+        result.hasDiscrepancies = true;
+        result.discrepancies = [
+            ...result.discrepancies,
+            ...result.linesDiscrepancies!
+        ];
+    }
+
+    return result;
+}
+

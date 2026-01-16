@@ -9,7 +9,7 @@ import { IncidentReportButton } from '@/components/incidents/IncidentReportButto
 import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
 import { toast } from 'sonner';
 import { printHtmlToIframe } from '@/utils/print';
-import { parseQRCode, validateQRAgainstOrder, extractOrderNumber } from '@/lib/qr-utils';
+import { parseQRCode, validateQRWithLines, extractOrderNumber } from '@/lib/qr-utils';
 
 function escapeZpl(str: string): string {
   if (!str) return "";
@@ -267,14 +267,15 @@ export function ProductionPage() {
     const order = orders.find(o => o.order_number === orderNum);
 
     if (order) {
-      // Validar los datos del QR contra la orden de la BD
-      const validation = validateQRAgainstOrder(qrData, {
+      // Validar los datos del QR contra la orden de la BD INCLUYENDO el desglose de líneas
+      const validation = validateQRWithLines(qrData, {
         order_number: order.order_number,
         customer_name: order.customer_name,
         fabric: order.fabric,
         color: order.color,
         quantity_total: order.quantity_total,
         status: order.status,
+        lines: order.lines,  // ← NUEVO: Validar desglose de líneas
       });
 
       setScannedOrder(order);
@@ -289,8 +290,17 @@ export function ProductionPage() {
         return;
       }
 
-      if (validation.hasDiscrepancies) {
-        // Mostrar advertencia si hay discrepancias en datos técnicos
+      // Verificar discrepancias en el desglose de líneas
+      if (validation.linesDiscrepancies && validation.linesDiscrepancies.length > 0) {
+        const linesMessage = validation.linesDiscrepancies.join('\n');
+        showAlert(
+          'warning',
+          '⚠️ Advertencia: Problemas en el desglose',
+          `Se detectaron problemas en el desglose de artículos:\n\n${linesMessage}\n\nRevisa el pedido antes de continuar.`
+        );
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
+      } else if (validation.hasDiscrepancies) {
+        // Mostrar advertencia si hay discrepancias en datos técnicos básicos
         const discrepancyMessage = validation.discrepancies.join('\n');
         showAlert(
           'warning',
@@ -302,8 +312,9 @@ export function ProductionPage() {
         // Informar si es formato antiguo
         toast.info(`QR en formato antiguo - Datos técnicos cargados desde BD`);
       } else {
-        // Éxito total - QR nuevo y validado
-        toast.success(`✓ Orden ${orderNum} validada correctamente`);
+        // Éxito total - QR nuevo y validado con desglose correcto
+        const linesCount = order.lines?.length || 0;
+        toast.success(`✓ Orden ${orderNum} validada (${linesCount} líneas)`);
       }
     } else {
       // Alerta bloqueante para error de escaneo
