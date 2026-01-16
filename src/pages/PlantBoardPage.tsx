@@ -83,7 +83,7 @@ export default function PlantBoardPage() {
             // For now, fetching from work_orders.
             const { data, error } = await supabaseProductivity
                 .from("produccion_work_orders")
-                .select("*")
+                .select("*, lines")
                 .order("priority", { ascending: false })
                 .order("created_at", { ascending: false })
                 .limit(200);
