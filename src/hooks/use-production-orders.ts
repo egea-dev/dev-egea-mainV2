@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabaseProductivity } from '@/integrations/supabase';
 import { WorkOrder, WorkOrderLine, WorkOrderStatus } from '@/types/production';
 import { toast } from 'sonner';
+import { useSLADays } from '@/hooks/use-sla-days';
 
 // Hook para obtener todas las órdenes de trabajo CON sus líneas
 export const useProductionOrders = () => {

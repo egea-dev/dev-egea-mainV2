@@ -9,10 +9,10 @@ interface QRCodeGeneratorProps {
 }
 
 export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({ order, containerRef }) => {
-    // Generar payload con desglose de líneas usando la utilidad centralizada
+    // Generar payload con desglose de líneas - CORREGIDO: usar customer_company primero
     const qrPayload = generateQRPayload({
         orderNumber: order.order_number,
-        customerName: order.customer_name || order.customer_company || 'Cliente',
+        customerName: order.customer_company || order.customer_name || 'Cliente', // CORREGIDO
         region: order.delivery_region || order.region,
         deliveryDate: order.delivery_date,
         lines: order.lines?.map(line => ({

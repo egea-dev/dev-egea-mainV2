@@ -5,6 +5,7 @@ import { Order, OrderStatus } from "@/types/commercial";
 import { toast } from "sonner";
 import { ORDER_STATUS_FLOW, resolveOrderStatus } from "@/lib/order-status";
 import { generateQRPayload } from "@/lib/qr-utils";
+import { useSLADays } from "@/hooks/use-sla-days";
 
 export const useOrders = () => {
     return useQuery({
@@ -144,10 +145,10 @@ export const useUpdateOrderStatus = () => {
                     due_date: dueDate || currentOrder?.delivery_date || null,
                     process_start_at: processStartAt || null,
                     sla_days: slaDays || null,
-                    // Usar la nueva utilidad para generar QR con desglose de líneas
+                    // Generar QR con customer_company (razón social)
                     qr_payload: generateQRPayload({
                         orderNumber: resolvedOrderNumber,
-                        customerName: customerDisplay,
+                        customerName: currentOrder?.customer_company || currentOrder?.customer_name || customerDisplay,
                         region,
                         deliveryDate: currentOrder?.delivery_date || null,
                         lines: currentOrder?.lines?.map(line => ({
