@@ -174,11 +174,16 @@ export const useUpdateOrderStatus = () => {
 
                 if (createError) throw createError;
 
-                // Crear evento en calendario comercial usando delivery_date
+                // Crear evento en calendario comercial usando delivery_date + SLA días
                 if (currentOrder?.delivery_date) {
+                    const slaDays = useSLADays(region);
+                    const deliveryDate = new Date(currentOrder.delivery_date);
+                    const eventDate = new Date(deliveryDate);
+                    eventDate.setDate(eventDate.getDate() + slaDays);
+
                     await supabase.from('comercial_calendar_events').insert([{
                         title: `Entrega: ${resolvedOrderNumber}`,
-                        event_date: currentOrder.delivery_date,
+                        event_date: eventDate.toISOString().split('T')[0],
                         order_id: currentOrder.id,
                         customer_name: currentOrder.customer_company || currentOrder.customer_name,
                         region: region
