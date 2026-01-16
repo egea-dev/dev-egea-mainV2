@@ -63,11 +63,6 @@ export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
 
     yPos += 10;
 
-    // Línea separadora completa
-    doc.setLineWidth(0.5);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 10;
-
     // Información del cliente
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
