@@ -22,6 +22,7 @@ interface OrderPDFData {
 
 /**
  * Genera un PDF de orden de trabajo con QR y desglose de líneas
+ * Abre ventana de impresión automáticamente
  */
 export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
     const doc = new jsPDF();
@@ -30,6 +31,19 @@ export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 20;
     let yPos = 20;
+
+    // Generar QR primero
+    let qrDataUrl: string | null = null;
+    if (order.qr_payload) {
+        try {
+            qrDataUrl = await QRCode.toDataURL(order.qr_payload, {
+                width: 200,
+                margin: 1,
+            });
+        } catch (error) {
+            console.error('Error generando QR:', error);
+        }
+    }
 
     // Encabezado
     doc.setFontSize(20);
@@ -40,6 +54,12 @@ export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
     // Número de orden
     doc.setFontSize(14);
     doc.text(`Nº: ${order.order_number}`, margin, yPos);
+
+    // QR Code en esquina superior derecha
+    if (qrDataUrl) {
+        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 45, 15, 45, 45);
+    }
+
     yPos += 10;
 
     // Línea separadora
@@ -121,21 +141,6 @@ export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
 
     // Estado
     doc.text(`ESTADO: ${order.status || 'N/A'}`, margin, yPos);
-    yPos += 15;
-
-    // QR Code
-    if (order.qr_payload) {
-        try {
-            const qrDataUrl = await QRCode.toDataURL(order.qr_payload, {
-                width: 150,
-                margin: 1,
-            });
-
-            doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 40, 20, 40, 40);
-        } catch (error) {
-            console.error('Error generando QR:', error);
-        }
-    }
 
     // Pie de página
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -148,6 +153,7 @@ export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
         { align: 'center' }
     );
 
-    // Descargar PDF
-    doc.save(`Orden_${order.order_number}.pdf`);
+    // Abrir ventana de impresión
+    doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
 }
