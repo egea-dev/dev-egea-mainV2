@@ -56,9 +56,9 @@ export async function generateOrderPDF(order: OrderPDFData): Promise<void> {
     doc.setFont('helvetica', 'bold');
     doc.text(`Nº: ${order.order_number}`, margin, yPos);
 
-    // QR Code 3x3cm en esquina superior derecha
+    // QR Code 3x3cm en esquina superior derecha (más arriba)
     if (qrDataUrl) {
-        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 30, 15, 30, 30);
+        doc.addImage(qrDataUrl, 'PNG', pageWidth - margin - 30, 10, 30, 30);
     }
 
     yPos += 10;
