@@ -785,7 +785,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
                                     <div className="w-full bg-muted/40 rounded-xl border border-border/60 p-3">
                                         <p className="text-xs text-[#B5B8BA] text-center font-mono break-all">
-                                            {`${formData.order_number || 'INT-XXXX'}|${formData.customer_name || 'Cliente'}|${formData.delivery_region || 'Region'}|${formData.delivery_date ? new Date(formData.delivery_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : '--/--'}|${formData.lines?.reduce((acc, l) => acc + (l.material || ''), '') || 'Material'}|${formData.status || 'PENDIENTE'}`}
+                                            {`${formData.order_number || 'INT-XXXX'}|${formData.customer_company || formData.customer_name || 'Cliente'}|${formData.delivery_region || 'Region'}|${formData.delivery_date ? new Date(formData.delivery_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : '--/--'}|${formData.lines?.reduce((acc, l) => acc + (l.material || ''), '') || 'Material'}|${formData.status || 'PENDIENTE'}`}
                                         </p>
                                     </div>
 
