@@ -3,7 +3,7 @@ import { DndContext } from "@dnd-kit/core";
 import PageShell from "@/components/layout/PageShell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DetailedTask } from "@/integrations/supabase/types";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabaseProductivity } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, subDays, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -37,18 +37,52 @@ export default function GlobalCalendarPage() {
     const startStr = format(subDays(viewStart, isMobile ? 1 : 1), 'yyyy-MM-dd'); // Buffer logic
     const endStr = format(addDays(viewEnd, isMobile ? 1 : 1), 'yyyy-MM-dd');
 
-    const { data, error } = await supabase
+    // 1. Fetch Installation Tasks
+    const { data: installationTasks, error: installationError } = await supabase
       .from('detailed_tasks')
       .select('*')
       .gte('start_date', startStr)
       .lte('start_date', endStr)
       .order('start_date', { ascending: true });
 
-    if (error) {
+    // 2. Fetch Commercial Delivery Events FROM PRODUCTIVITY
+    const { data: commercialEvents, error: commercialError } = await supabaseProductivity
+      .from('comercial_calendar_events')
+      .select('*')
+      .gte('event_date', startStr)
+      .lte('event_date', endStr);
+
+    if (installationError || commercialError) {
       toast.error("Error cargando calendario");
-      console.error(error);
+      console.error("Installation Error:", installationError);
+      console.error("Commercial Error:", commercialError);
     } else {
-      setTasks((data as any[]) || []);
+      // 3. Map Commercial Events to Task format (Synthetic DetailedTask)
+      const mappedCommercial: any[] = (commercialEvents as any[] || []).map(event => ({
+        id: event.id,
+        title: event.title, // Keep for synthetic use
+        description: event.title, // Map to existing field in DetailedTask
+        start_date: event.event_date,
+        end_date: event.event_date,
+        client: event.customer_name,
+        status: 'ENTREGA' as any,
+        service_type: 'ENTREGA COMERCIAL',
+        notes: `Región: ${event.region}`,
+        // Required fields for DetailedTask to avoid UI crashes
+        screen_id: 'commercial',
+        state: 'comercial',
+        order: 999,
+        screen_name: 'Comercial',
+        data: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      // 4. Combine and Sort
+      const combined = [...(installationTasks as any[] || []), ...mappedCommercial];
+      setTasks(combined.sort((a, b) =>
+        new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime()
+      ));
     }
     setLoadingTasks(false);
   };
@@ -113,6 +147,10 @@ export default function GlobalCalendarPage() {
               <MobileTaskList
                 tasks={mobileDisplayTasks}
                 onTaskClick={(t) => {
+                  if (t.status === 'ENTREGA') {
+                    toast.info(`Entrega: ${(t as any).title || t.description}`);
+                    return;
+                  }
                   setSelectedTask(t);
                   setIsTaskDialogOpen(true);
                 }}
@@ -125,6 +163,10 @@ export default function GlobalCalendarPage() {
                     currentDate={currentDate}
                     tasks={tasks}
                     onTaskEdit={(t) => {
+                      if (t.status === 'ENTREGA') {
+                        toast.info(`Detalle Entrega: ${(t as any).title || t.description}`);
+                        return;
+                      }
                       setSelectedTask(t);
                       setIsTaskDialogOpen(true);
                     }}

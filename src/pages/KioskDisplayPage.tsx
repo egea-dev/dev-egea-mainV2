@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Html5QrcodeScanner } from "html5-qrcode";
-import { useWorkOrders, useUpdateWorkOrderStatus } from "@/hooks/use-work-orders";
+import { useWorkOrders, useUpdateWorkOrderStatus, normalizeStatus } from "@/hooks/use-work-orders";
 import { WorkOrderStatus } from "@/types/production";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,29 +16,34 @@ import {
     Package,
     History,
     Timer,
+    Calendar,
+    RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useSearchParams } from "react-router-dom";
 import { supabaseProductivity } from "@/integrations/supabase";
 import { parseQRCode, extractOrderNumber } from "@/lib/qr-utils";
+import { summarizeMaterials } from "@/lib/materials";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
     PENDIENTE: { label: "Pendiente", color: "bg-slate-500/10 text-slate-400 border-slate-500/30", icon: Timer },
     CORTE: { label: "Corte", color: "bg-sky-500/10 text-sky-400 border-sky-500/30", icon: Play },
-    CONFECCION: { label: "Confeccion", color: "bg-violet-500/10 text-violet-400 border-violet-500/30", icon: Pause },
-    TAPICERIA: { label: "Tapiceria", color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30", icon: Pause },
+    CONFECCION: { label: "Confección", color: "bg-violet-500/10 text-violet-400 border-violet-500/30", icon: Pause },
+    TAPICERIA: { label: "Tapicería", color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30", icon: Pause },
     CONTROL_CALIDAD: { label: "Calidad", color: "bg-amber-500/10 text-amber-400 border-amber-500/30", icon: AlertTriangle },
     LISTO_ENVIO: { label: "Listo", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", icon: CheckCircle2 },
 };
 
 const KioskDisplayPage: React.FC = () => {
+    const queryClient = useQueryClient();
     const [searchParams] = useSearchParams();
-    const token = searchParams.get("token"); // Optional: use token to config defaults
+    const token = searchParams.get("token");
 
     const [scannedId, setScannedId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<"scanner" | "list">("scanner");
     const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+    const lastScannedRef = useRef<string | null>(null); // Referencia para evitar parpadeo/spam
     const [theme, setTheme] = useState<"dark" | "light">("dark");
 
     const { data: workOrders } = useWorkOrders();
@@ -54,25 +59,91 @@ const KioskDisplayPage: React.FC = () => {
                 .select("config")
                 .eq("id", token)
                 .maybeSingle();
-
             if (error) throw error;
-            return data?.config;
+            return (data as any)?.config;
         }
     });
 
-    const selectedOrder = workOrders?.find((o) => o.id === scannedId || o.order_number === scannedId);
+    // Consulta consolidada: Busca en producción y, si es necesario, complementa con comercial
+    const {
+        data: selectedOrder,
+        isLoading: isLoadingBase,
+        isFetching: isFetchingBase,
+        isError: isErrorBase
+    } = useQuery({
+        queryKey: ["scanned-order-lookup", scannedId],
+        enabled: !!scannedId,
+        staleTime: 60000, // Los datos escaneados son estables; solo se invalidan por acción
+        queryFn: async () => {
+            if (!scannedId) return null;
+
+            // 1. Validar UUID para evitar error PostgREST
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scannedId);
+
+            let prodQuery = supabaseProductivity
+                .from("produccion_work_orders")
+                .select("*");
+
+            if (isUUID) {
+                prodQuery = prodQuery.or(`id.eq.${scannedId},order_number.eq.${scannedId}`);
+            } else {
+                prodQuery = prodQuery.eq("order_number", scannedId);
+            }
+
+            const { data: prodData } = await prodQuery.maybeSingle();
+            let linesData: any[] | null = null;
+            if (prodData?.id) {
+                const { data: lines } = await supabaseProductivity
+                    .from("produccion_work_order_lines")
+                    .select("*")
+                    .eq("work_order_id", prodData.id);
+                linesData = lines as any[] | null;
+            }
+
+            // 2. Buscar en comercial_orders (siempre necesario para la "Verdad Absoluta")
+            const orderNumToSearch = prodData?.order_number || scannedId;
+            const { data: commData } = await supabaseProductivity
+                .from("comercial_orders")
+                .select("*")
+                .eq("order_number", orderNumToSearch)
+                .maybeSingle();
+
+            if (!prodData && !commData) return null;
+
+            // 3. Merge Logic Consolidada
+            const base = prodData || {
+                id: (commData as any)?.id,
+                order_number: (commData as any)?.order_number,
+                customer_name: (commData as any)?.customer_company || (commData as any)?.customer_name,
+                status: 'PENDIENTE',
+                is_only_commercial: true
+            };
+
+            const order = base as any;
+            const specs = order.technical_specs || {};
+            const lines = (Array.isArray((commData as any)?.lines) && (commData as any).lines.length > 0)
+                ? (commData as any).lines
+                : (Array.isArray(order.lines) && order.lines.length > 0)
+                    ? order.lines
+                    : (linesData || []);
+            const materialList = summarizeMaterials(lines, (commData as any)?.fabric || specs.fabric || order.fabric || "N/D");
+
+            return {
+                ...order,
+                status: normalizeStatus(order.status),
+                fabric: materialList,
+                color: (commData as any)?.color || lines.map((l: any) => l.color).filter(Boolean).join(", ") || (specs.color || order.color || "N/D"),
+                lines: lines,
+                due_date: (commData as any)?.delivery_date || order.due_date
+            };
+        }
+    });
 
     useEffect(() => {
         if (activeTab === "scanner" && !scannerRef.current) {
-            // In Kiosk mode, we might want to auto-mount, but Html5QrcodeScanner handles it well
-            scannerRef.current = new Html5QrcodeScanner(
-                "reader",
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                false
-            );
+            scannerRef.current = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
             scannerRef.current.render(onScanSuccess, onScanFailure);
         }
-
         return () => {
             if (scannerRef.current) {
                 scannerRef.current.clear().catch((err) => console.error("Error clearing scanner", err));
@@ -90,17 +161,15 @@ const KioskDisplayPage: React.FC = () => {
     }, [kioskConfig]);
 
     function onScanSuccess(decodedText: string) {
-        // Parsear el código QR usando la utilidad centralizada
         const qrData = parseQRCode(decodedText);
         const orderNum = qrData.orderNumber || extractOrderNumber(decodedText);
 
-        setScannedId(orderNum);
+        // Evitar procesar el mismo código repetidamente (causa parpadeo de toasts y estado)
+        if (orderNum === lastScannedRef.current) return;
+        lastScannedRef.current = orderNum;
 
-        if (qrData.isLegacyFormat) {
-            toast.success(`Orden detectada: ${orderNum} (formato antiguo)`);
-        } else {
-            toast.success(`✓ Orden detectada: ${orderNum}`);
-        }
+        setScannedId(orderNum);
+        toast.success(`✓ Orden detectada: ${orderNum}`);
     }
 
     function onScanFailure(_error: any) { }
@@ -108,15 +177,26 @@ const KioskDisplayPage: React.FC = () => {
     const handleStatusChange = async (newStatus: WorkOrderStatus) => {
         if (!selectedOrder) return;
 
+        // Si el pedido solo existe en comercial, avisar que no se puede actualizar en producción directamente
+        if ((selectedOrder as any).is_only_commercial) {
+            toast.error("Este pedido no ha sido aceptado en producción todavía. Acéptalo primero en la zona comercial.");
+            return;
+        }
+
         try {
             await updateStatus.mutateAsync({
                 workOrderId: selectedOrder.id,
                 status: newStatus,
-                notes: "Actualizacion desde Kiosco Publico",
+                notes: "Actualización desde Kiosco de Operario",
             });
+
+            // Invalidad la búsqueda específica inmediatamente
+            queryClient.invalidateQueries({ queryKey: ["scanned-order-lookup", scannedId] });
+
             if (newStatus === "LISTO_ENVIO") {
                 setScannedId(null);
-                toast.info("Orden finalizada");
+                lastScannedRef.current = null;
+                toast.info("Orden finalizada correctamente");
             }
         } catch (err) {
             console.error(err);
@@ -136,153 +216,149 @@ const KioskDisplayPage: React.FC = () => {
         panelMuted: isLight ? "bg-slate-100/80" : "bg-black/40",
         mutedText: isLight ? "text-slate-500" : "text-gray-500",
         softText: isLight ? "text-slate-600" : "text-gray-400",
-        empty: isLight ? "border-slate-200 bg-slate-50 text-slate-500" : "border-white/10 bg-[#1A1D1F] text-gray-400",
         ghostBtn: isLight ? "text-slate-500 hover:text-slate-900 hover:bg-slate-100" : "text-gray-400 hover:text-white hover:bg-white/5",
     };
 
+    // Days logic for the scanned detail
+    const getDueBadge = () => {
+        if (!selectedOrder?.due_date) return null;
+        const now = new Date();
+        const due = new Date(selectedOrder.due_date);
+        const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return { label: "VENCIDO", color: "bg-red-900/40 text-red-400 border-red-500/30", box: Math.abs(diffDays) };
+        if (diffDays <= 3) return { label: "URGENTE", color: "bg-amber-900/40 text-amber-400 border-amber-500/30", box: diffDays };
+        return { label: "A TIEMPO", color: "bg-emerald-900/40 text-emerald-400 border-emerald-500/30", box: diffDays };
+    };
+
+    const dueBadge = getDueBadge();
+
     return (
-        <div className={cn("min-h-screen p-4", colors.page)}>
-            {/* Simplified Header for Kiosk Display */}
+        <div className={cn("min-h-screen p-4 flex flex-col", colors.page)}>
             <header className="flex justify-between items-center mb-6 pl-2">
                 <div>
                     <h1 className={cn("text-xl font-bold uppercase tracking-widest", colors.headerMuted)}>
-                        Modo Kiosco
+                        Modo Kiosco <span className="text-[#D4AF37] ml-2 font-black">Industrial</span>
                     </h1>
-                    {token && <span className={cn("text-xs font-mono", colors.token)}>Terminal ID: {token.slice(0, 8)}</span>}
+                    {token && <span className={cn("text-[10px] font-mono opacity-50 uppercase", colors.token)}>Terminal: {token.slice(0, 8)}</span>}
                 </div>
                 <div className="flex gap-2">
-                    <Button
-                        variant={activeTab === "scanner" ? "default" : "outline"}
-                        onClick={() => setActiveTab("scanner")}
-                        className={activeTab === "scanner" ? colors.buttonActive : colors.buttonInactive}
-                    >
+                    <Button variant={activeTab === "scanner" ? "default" : "outline"} onClick={() => setActiveTab("scanner")} className={activeTab === "scanner" ? colors.buttonActive : colors.buttonInactive}>
                         <QrCode className="mr-2 h-4 w-4" /> Escaner
                     </Button>
-                    <Button
-                        variant={activeTab === "list" ? "default" : "outline"}
-                        onClick={() => setActiveTab("list")}
-                        className={activeTab === "list" ? colors.buttonActive : colors.buttonInactive}
-                    >
-                        <History className="mr-2 h-4 w-4" /> Cola
+                    <Button variant={activeTab === "list" ? "default" : "outline"} onClick={() => setActiveTab("list")} className={activeTab === "list" ? colors.buttonActive : colors.buttonInactive}>
+                        <History className="mr-2 h-4 w-4" /> Cola Activa
                     </Button>
                 </div>
             </header>
 
             {activeTab === "scanner" && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-100px)]">
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 h-full pb-6">
                     <Card className={cn("overflow-hidden flex flex-col", colors.card)}>
                         <CardHeader className={cn("py-4", colors.cardHeader)}>
                             <CardTitle className={cn("text-xs font-bold tracking-[0.2em] uppercase flex items-center", isLight ? "text-slate-800" : "text-white")}>
-                                <QrCode className={cn("w-4 h-4 mr-2", colors.token)} /> Camara de reconocimiento
+                                <QrCode className={cn("w-4 h-4 mr-2", colors.token)} /> Lector de Pedidos
                             </CardTitle>
                         </CardHeader>
                         <CardContent className={cn("flex-1 p-0 flex items-center justify-center relative", colors.panelMuted)}>
-                            {/* Container for scanner */}
                             <div id="reader" className="w-full h-full [&>div]:border-none [&>div>img]:hidden"></div>
                         </CardContent>
                     </Card>
 
                     <div className="space-y-6 overflow-y-auto">
                         {selectedOrder ? (
-                            <Card className={colors.card}>
+                            <Card className={cn(colors.card, "relative")}>
+                                {isFetchingBase && (
+                                    <div className="absolute top-2 right-2 flex items-center gap-2 text-[10px] font-bold text-emerald-500 animate-pulse">
+                                        <RefreshCw className="w-3 h-3 animate-spin" /> Actualizando...
+                                    </div>
+                                )}
                                 <CardContent className="p-6">
                                     <div className="flex justify-between items-start mb-6">
                                         <div>
                                             <Badge className="bg-emerald-900/40 text-emerald-400 border-emerald-500/30 mb-2 px-3 py-1 text-[10px] tracking-widest font-bold uppercase">
-                                                Orden activa
+                                                Información del Pedido
                                             </Badge>
-                                            <h2 className={cn("text-3xl font-bold tracking-tight uppercase", isLight ? "text-slate-900" : "text-white")}>
+                                            <h2 className={cn("text-4xl font-black tracking-tight uppercase", isLight ? "text-slate-900" : "text-white")}>
                                                 {selectedOrder.order_number}
                                             </h2>
                                         </div>
-                                        <div className="text-right">
-                                            <Badge
-                                                className={cn(
-                                                    "px-3 py-1 rounded-lg text-xs font-bold tracking-tight border",
-                                                    STATUS_CONFIG[selectedOrder.status]?.color || "bg-muted text-muted-foreground border-border/60"
-                                                )}
-                                            >
-                                                {STATUS_CONFIG[selectedOrder.status]?.label || selectedOrder.status}
-                                            </Badge>
-                                        </div>
+                                        {dueBadge && (
+                                            <div className="flex flex-col items-end gap-2">
+                                                <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase", dueBadge.color)}>
+                                                    {dueBadge.label}
+                                                </Badge>
+                                                <div className={cn("text-center border rounded-xl px-4 py-2 min-w-[100px]", colors.panel)}>
+                                                    <span className="text-3xl font-black block leading-none">{dueBadge.box}</span>
+                                                    <span className="text-[10px] opacity-60 uppercase font-black">Días</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 mb-6">
                                         <div className={cn("p-4 rounded-2xl border", colors.panel)}>
-                                            <p className={cn("text-[10px] font-bold tracking-widest uppercase mb-1", colors.mutedText)}>
-                                                Prioridad
-                                            </p>
-                                            <p
-                                                className={cn(
-                                                    "text-lg font-bold",
-                                                    selectedOrder.priority > 0 ? "text-amber-400" : colors.softText
-                                                )}
-                                            >
-                                                {selectedOrder.priority === 2
-                                                    ? "Urgente"
-                                                    : selectedOrder.priority === 1
-                                                        ? "Alta"
-                                                        : "Normal"}
-                                            </p>
+                                            <p className={cn("text-[10px] font-black tracking-widest uppercase mb-1", colors.mutedText)}>Material Principal</p>
+                                            <p className={cn("text-lg font-black truncate", colors.softText)}>{selectedOrder.fabric || "N/D"}</p>
                                         </div>
                                         <div className={cn("p-4 rounded-2xl border", colors.panel)}>
-                                            <p className={cn("text-[10px] font-bold tracking-widest uppercase mb-1", colors.mutedText)}>
-                                                Fecha inicio
-                                            </p>
-                                            <p className={cn("text-lg font-bold", colors.softText)}>
-                                                {selectedOrder.start_date
-                                                    ? new Date(selectedOrder.start_date).toLocaleDateString()
-                                                    : "--/--/--"}
-                                            </p>
+                                            <p className={cn("text-[10px] font-black tracking-widest uppercase mb-1", colors.mutedText)}>Acabado / Color</p>
+                                            <p className={cn("text-lg font-black truncate", colors.softText)}>{selectedOrder.color || "N/D"}</p>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {Object.entries(STATUS_CONFIG).map(([statusKey, config]) => {
-                                            const Icon = config.icon;
-                                            const isCurrent = selectedOrder.status === statusKey;
-                                            const isDisabled = updateStatus.isPending;
+                                    {selectedOrder.lines && selectedOrder.lines.length > 0 && (
+                                        <div className={cn("mb-6 p-4 rounded-2xl border", colors.panel)}>
+                                            <p className={cn("text-[10px] font-black tracking-widest uppercase mb-3", colors.mutedText)}>Desglose Detallado (Tareas)</p>
+                                            <div className="space-y-2">
+                                                {selectedOrder.lines.map((line: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center text-sm border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-black text-emerald-400 text-base">{line.quantity}x</span>
+                                                            <span className={cn("font-bold uppercase", colors.softText)}>{line.material || line.fabric || "Pieza"}</span>
+                                                            {line.width && line.height && <span className="text-[10px] opacity-70">({line.width}x{line.height})</span>}
+                                                        </div>
+                                                        {line.color && <span className="text-[10px] opacity-70 uppercase font-black">{line.color}</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {Object.entries(STATUS_CONFIG).map(([statusKey, config]) => {
+                                            const isCurrent = selectedOrder.status === statusKey;
                                             return (
-                                                <Button
-                                                    key={statusKey}
-                                                    disabled={isCurrent || isDisabled}
-                                                    onClick={() => handleStatusChange(statusKey as WorkOrderStatus)}
-                                                    className={cn(
-                                                        "h-20 rounded-2xl flex flex-col items-center justify-center gap-2 border transition-all",
-                                                        isCurrent
-                                                            ? "bg-emerald-500/20 border-emerald-500 text-emerald-400"
-                                                            : cn(
-                                                                "text-gray-400 hover:text-white",
-                                                                isLight
-                                                                    ? "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                                                                    : "bg-black/20 border-white/5"
-                                                            )
-                                                    )}
-                                                >
-                                                    <Icon className={cn("w-6 h-6", isCurrent ? "text-emerald-400" : colors.mutedText)} />
-                                                    <span className="text-[10px] font-black tracking-widest uppercase">
-                                                        {config.label}
-                                                    </span>
+                                                <Button key={statusKey} disabled={isCurrent || updateStatus.isPending} onClick={() => handleStatusChange(statusKey as WorkOrderStatus)} className={cn("h-16 rounded-xl flex flex-col items-center justify-center gap-1 border transition-all", isCurrent ? "bg-emerald-500/20 border-emerald-500 text-emerald-400" : colors.panel)}>
+                                                    <span className="text-[10px] font-black tracking-widest uppercase">{config.label}</span>
                                                 </Button>
                                             );
                                         })}
                                     </div>
 
-                                    <Button variant="ghost" onClick={() => setScannedId(null)} className={cn("w-full mt-6", colors.ghostBtn)}>
-                                        Cerrar y escanear de nuevo
+                                    <Button variant="ghost" onClick={() => setScannedId(null)} className={cn("w-full mt-6 h-12 rounded-xl uppercase font-black tracking-widest text-xs", colors.ghostBtn)}>
+                                        Escanear siguiente
                                     </Button>
                                 </CardContent>
                             </Card>
+                        ) : isErrorBase ? (
+                            <div className={cn("h-full flex flex-col items-center justify-center border-2 border-red-500/20 border-dashed rounded-3xl p-12 text-center", colors.card)}>
+                                <AlertTriangle className="w-20 h-20 mb-6 text-red-500 opacity-50" />
+                                <h3 className={cn("text-2xl font-black uppercase tracking-widest mb-2", isLight ? "text-red-900" : "text-red-400")}>Error de Carga</h3>
+                                <p className={cn("max-w-xs text-sm", colors.mutedText)}>No se pudo conectar con la base de datos. Por favor, reintente el escaneo.</p>
+                                <Button variant="outline" onClick={() => { setScannedId(null); lastScannedRef.current = null; }} className="mt-4 border-white/10">Reiniciar Escáner</Button>
+                            </div>
+                        ) : isLoadingBase ? (
+                            <div className={cn("h-full flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-12 text-center", colors.card)}>
+                                <RefreshCw className={cn("w-20 h-20 mb-6 animate-spin", colors.softText)} />
+                                <h3 className={cn("text-2xl font-black uppercase tracking-widest mb-2", colors.softText)}>Buscando Pedido...</h3>
+                                <p className={cn("max-w-xs text-sm", colors.mutedText)}>Consultando base de datos centralizada.</p>
+                            </div>
                         ) : (
-                            <div className={cn("h-full flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-12 text-center", colors.empty)}>
-                                <div className={cn("p-8 rounded-full mb-6 ring-1", isLight ? "bg-slate-100 ring-slate-200" : "bg-black/20 ring-white/5")}>
-                                    <QrCode className={cn("w-16 h-16", isLight ? "text-slate-400" : "text-gray-600")} />
-                                </div>
-                                <h3 className={cn("text-2xl font-bold mb-2", colors.softText)}>Esperando orden</h3>
-                                <p className={cn("max-w-sm", colors.mutedText)}>
-                                    Acerca el codigo QR a la camara para cargar la orden.
-                                </p>
+                            <div className={cn("h-full flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-12 text-center", colors.card)}>
+                                <QrCode className={cn("w-20 h-20 mb-6 opacity-20", colors.softText)} />
+                                <h3 className={cn("text-2xl font-black uppercase tracking-widest mb-2", colors.softText)}>Esperando Escaneo</h3>
+                                <p className={cn("max-w-xs text-sm", colors.mutedText)}>Posicione el código QR frente al lector para visualizar los detalles del pedido.</p>
                             </div>
                         )}
                     </div>
@@ -290,37 +366,24 @@ const KioskDisplayPage: React.FC = () => {
             )}
 
             {activeTab === "list" && (
-                <div className="grid grid-cols-1 gap-4 pb-20">
-                    {workOrders?.map((order) => (
-                        <Card
-                            key={order.id}
-                            className={cn(
-                                "rounded-2xl overflow-hidden transition-all cursor-pointer",
-                                colors.card,
-                                isLight ? "hover:border-emerald-400/40" : "hover:border-emerald-500/30"
-                            )}
-                            onClick={() => {
-                                setScannedId(order.id);
-                                setActiveTab("scanner");
-                            }}
-                        >
-                            <CardContent className="p-5 flex items-center justify-between">
-                                <div className="flex items-center gap-6">
-                                    <div className={cn("p-4 rounded-xl", colors.panel)}>
-                                        <Package className={cn("w-8 h-8", colors.mutedText)} />
-                                    </div>
+                <div className="grid grid-cols-1 gap-3 pb-10">
+                    {(workOrders || []).map((order) => (
+                        <Card key={order.id} className={cn("rounded-2xl overflow-hidden cursor-pointer", colors.card)} onClick={() => {
+                            setScannedId(order.id);
+                            lastScannedRef.current = order.id; // Sincronizar para evitar re-escaneo inmediato
+                            setActiveTab("scanner");
+                        }}>
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className={cn("p-3 rounded-xl", colors.panel)}><Package className={cn("w-6 h-6", colors.mutedText)} /></div>
                                     <div>
-                                        <h4 className={cn("text-2xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</h4>
-                                        <p className={cn("text-xs font-bold tracking-widest uppercase", colors.mutedText)}>
-                                            {order.status} - Actualizado: {new Date(order.updated_at || Date.now()).toLocaleTimeString()}
-                                        </p>
+                                        <h4 className={cn("text-xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</h4>
+                                        <p className={cn("text-[10px] font-bold uppercase", colors.mutedText)}>{order.status} - {order.fabric}</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <Badge className={cn("px-3 py-1 rounded text-xs font-bold border", STATUS_CONFIG[order.status]?.color || "bg-muted text-muted-foreground border-border/60")}>
-                                        {STATUS_CONFIG[order.status]?.label || order.status}
-                                    </Badge>
-                                    <ArrowRight className={cn("w-5 h-5", colors.mutedText)} />
+                                <div className="flex items-center gap-3">
+                                    <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border", STATUS_CONFIG[order.status]?.color)}>{STATUS_CONFIG[order.status]?.label || order.status}</Badge>
+                                    <ArrowRight className={cn("w-4 h-4", colors.mutedText)} />
                                 </div>
                             </CardContent>
                         </Card>

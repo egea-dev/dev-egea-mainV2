@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 
 /**
- * Hook centralizado para obtener días SLA según región
+ * Función centralizada para obtener días SLA según región
  * Baleares: 7 días
  * Península: 10 días
  * Canarias: 15 días
  */
-export const useSLADays = (region?: string): number => {
+export const getSLADays = (region?: string): number => {
     const slaMap: Record<string, number> = {
         // Baleares - 7 días
         'MALLORCA': 7,
@@ -35,13 +35,16 @@ export const useSLADays = (region?: string): number => {
     return slaMap[normalizedRegion] || slaMap['DEFAULT'];
 };
 
+// Alias para compatibilidad con código existente que lo use como hook
+export const useSLADays = getSLADays;
+
 /**
  * Calcula la fecha de vencimiento basada en delivery_date + SLA días
  */
 export const calculateDueDate = (deliveryDate: string | null, region?: string): Date | null => {
     if (!deliveryDate) return null;
 
-    const slaDays = useSLADays(region);
+    const slaDays = getSLADays(region);
     const dueDate = new Date(deliveryDate);
     dueDate.setDate(dueDate.getDate() + slaDays);
 

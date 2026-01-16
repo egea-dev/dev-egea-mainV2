@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS comercial_calendar_events (
     title TEXT NOT NULL,
     event_date DATE NOT NULL,
     
-    -- Relación con pedido
-    order_id UUID REFERENCES comercial_orders(id) ON DELETE CASCADE,
+    -- Relación con pedido (Añadido UNIQUE para permitir UPSERT)
+    order_id UUID UNIQUE REFERENCES comercial_orders(id) ON DELETE CASCADE,
     
     -- Información adicional
     customer_name TEXT,
@@ -35,6 +35,9 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Borrar el trigger si ya existe para evitar errores al re-ejecutar el script
+DROP TRIGGER IF EXISTS trigger_update_comercial_calendar_events_updated_at ON comercial_calendar_events;
 
 CREATE TRIGGER trigger_update_comercial_calendar_events_updated_at
     BEFORE UPDATE ON comercial_calendar_events

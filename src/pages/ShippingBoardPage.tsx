@@ -4,9 +4,10 @@ import { supabaseProductivity } from "@/integrations/supabase";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, Truck, Package, Clock, CheckCircle2 } from "lucide-react";
+import { Clock, CheckCircle2, Package, Truck } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { summarizeMaterials } from "@/lib/materials";
 
 interface ShippingOrder {
     id: string;
@@ -18,20 +19,18 @@ interface ShippingOrder {
     fabric: string;
     color: string;
     quantity_total: number;
-    quantity?: number;
     packages_count: number;
     scanned_packages: number;
-    tracking_number?: string;
     shipping_date?: string;
-    needs_shipping_validation: boolean;
     created_at: string;
     admin_code?: string;
-    delivery_address?: string;
     packageProgress: number;
     isUrgent: boolean;
     isRecentShipment: boolean;
-    daysElapsed: number;
     due_date?: string | null;
+    lines?: any[];
+    dueBadge: { label: string; color: string; boxValue: string; boxLabel: string };
+    needs_shipping_validation?: boolean;
 }
 
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
@@ -55,11 +54,10 @@ export default function ShippingBoardPage() {
                 .maybeSingle();
 
             if (error) throw error;
-            return data?.config;
+            return (data as any)?.config;
         }
     });
 
-    // Clock Ticker
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
@@ -73,33 +71,36 @@ export default function ShippingBoardPage() {
         }
     }, [kioskConfig]);
 
-    const isMissingRelation = (error: any) => {
-        const message = String(error?.message || "");
-        return message.includes("does not exist") || message.includes("relation") || message.includes("schema");
-    };
-
-    // Data Fetching
     useEffect(() => {
         fetchOrders();
-        const interval = setInterval(fetchOrders, 30000); // 30s refresh
+        const interval = setInterval(fetchOrders, 10000);
         return () => clearInterval(interval);
     }, []);
 
     const fetchOrders = async () => {
-        const { data, error } = await supabaseProductivity
+        const { data: ordersData, error: ordersError } = await supabaseProductivity
             .from("produccion_work_orders")
             .select("*")
-            .or("status.eq.PTE_ENVIO,status.eq.LISTO_ENVIO,status.eq.TERMINADO,and(status.eq.EN_PROCESO,needs_shipping_validation.eq.true),status.eq.ENVIADO")
+            .or("status.eq.PTE_ENVIO,status.eq.LISTO_ENVIO,status.eq.TERMINADO,and(status.eq.EN_PROCESO,needs_shipping_validation.eq.true),status.eq.ENVIADO,status.eq.ENTREGADO")
             .order("priority", { ascending: false })
             .order("created_at", { ascending: false })
             .limit(200);
 
-        if (error) {
-            console.error("Error fetching shipping board data:", error);
+        if (ordersError) {
+            console.error("Error fetching shipping board data:", ordersError);
             return;
         }
 
-        // Transform data for display
+        const { data: linesData } = await supabaseProductivity
+            .from("produccion_work_order_lines")
+            .select("*")
+            .in("work_order_id", ordersData?.map((o: any) => o.id) || []);
+
+        const { data: commercialOrders } = await supabaseProductivity
+            .from('comercial_orders')
+            .select('order_number, lines, fabric, color')
+            .in('order_number', ordersData?.map((o: any) => o.order_number) || []);
+
         const normalizeStatus = (raw?: string) => {
             const normalized = (raw || "").toUpperCase();
             const map: Record<string, string> = {
@@ -111,55 +112,63 @@ export default function ShippingBoardPage() {
             return map[normalized] || normalized;
         };
 
-        const transformed = (data || []).map((order: any) => {
+        const transformed = (ordersData || []).map((order: any) => {
+            const commOrder = commercialOrders?.find((c: any) => c.order_number === order.order_number);
             const specs = order.technical_specs || {};
-            // Extraer material de lines si existe
-            const lines = order.lines || [];
-            const firstLine = lines[0] || {};
-            const fabric = firstLine.material || specs.fabric || order.fabric || "N/D";
-            const color = firstLine.color || specs.color || order.color || "N/D";
-            const normalizedStatus = normalizeStatus(order.status);
 
-            // Calculate package progress
-            const scannedPackages = order.scanned_packages || 0;
-            const totalPackages = order.packages_count || 1;
-            const packageProgress = (scannedPackages / totalPackages) * 100;
+            const lines = (Array.isArray(commOrder?.lines) && commOrder.lines.length > 0)
+                ? commOrder.lines
+                : (Array.isArray(order.lines) && order.lines.length > 0)
+                    ? order.lines
+                    : (linesData?.filter((l: any) => l.work_order_id === order.id) || []);
+            const materialList = summarizeMaterials(lines, commOrder?.fabric || specs.fabric || order.fabric || "N/D");
 
-            // Calculate urgency
-            const dueDateDays = order.due_date
-                ? Math.ceil((new Date(order.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                : 999;
-            const isUrgent = order.needs_shipping_validation || dueDateDays <= 2;
+            const colorList = lines.length > 0
+                ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
+                : (commOrder?.color || specs.color || order.color || "N/D");
 
-            // Check if recent shipment (last 12h)
-            const isRecentShipment =
-                normalizedStatus === "ENVIADO" &&
-                order.shipping_date &&
-                Date.now() - new Date(order.shipping_date).getTime() < TWELVE_HOURS_MS;
+            const nStatus = normalizeStatus(order.status);
+            const now = new Date();
+            const due = order.due_date ? new Date(order.due_date) : null;
+            const diffDays = due ? Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
-            // Calculate days elapsed
-            const daysElapsed = Math.floor(
-                (Date.now() - new Date(order.created_at).getTime()) / (1000 * 60 * 60 * 24)
-            );
+            let dueBadge = { label: "SIN FECHA", color: "bg-gray-100 text-gray-500 border-gray-200", boxValue: "-", boxLabel: "DÍAS" };
+            if (diffDays !== null) {
+                if (diffDays < 0) {
+                    dueBadge = {
+                        label: "VENCIDO",
+                        color: "bg-red-100 text-red-600 border-red-200",
+                        boxValue: Math.abs(diffDays).toString(),
+                        boxLabel: Math.abs(diffDays) === 1 ? "DÍA" : "DÍAS"
+                    };
+                } else {
+                    dueBadge = {
+                        label: diffDays <= 3 ? "URGENTE" : "A TIEMPO",
+                        color: diffDays <= 3 ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-emerald-100 text-emerald-600 border-emerald-200",
+                        boxValue: diffDays.toString(),
+                        boxLabel: diffDays === 1 ? "DÍA" : "DÍAS"
+                    };
+                }
+            }
 
             return {
                 ...order,
                 order_number: order.order_number || order.work_order_number || order.id,
                 customer_name: order.customer_company || order.customer_name || specs.customer_name || "Cliente Final",
                 region: order.region || specs.region || "PENINSULA",
-                fabric,
-                color,
+                fabric: materialList || "N/D",
+                color: colorList || "N/D",
                 quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
-                packageProgress,
-                isUrgent,
-                isRecentShipment,
-                daysElapsed,
-                due_date: order.due_date || order.estimated_completion || null,
-                status: normalizedStatus
-            } as ShippingOrder;
+                packageProgress: order.packages_count ? (order.scanned_packages / order.packages_count) * 100 : 0,
+                isUrgent: order.needs_shipping_validation || (diffDays !== null && diffDays <= 2),
+                isRecentShipment: nStatus === "ENVIADO" && order.shipping_date && (Date.now() - new Date(order.shipping_date).getTime() < TWELVE_HOURS_MS),
+                dueBadge,
+                status: nStatus,
+                lines
+            };
         });
 
-        setOrders(transformed);
+        setOrders(transformed as any);
     };
 
     const isLight = theme === "light";
@@ -171,25 +180,10 @@ export default function ShippingBoardPage() {
         progress: isLight ? "bg-slate-200" : "bg-black/50",
         stat: isLight ? "bg-slate-50 border-slate-200 text-slate-700" : "bg-[#0F1113] border-[#45474A]/60",
         footer: isLight ? "bg-white border-slate-200 text-slate-500" : "bg-black border-white/5 text-gray-500",
-        urgent: isLight ? "bg-amber-100 border-amber-200 text-amber-700" : "bg-amber-900/30 border-amber-500/50 text-amber-300",
-    };
-
-    const getStatusBadge = (order: ShippingOrder) => {
-        if (order.status === "ENVIADO") {
-            return { label: "Enviado", color: isLight ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-gray-900/20 text-gray-400 border-gray-500/30" };
-        }
-        if (order.status === "LISTO_ENVIO") {
-            return { label: "Listo", color: isLight ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-emerald-900/20 text-emerald-300 border-emerald-500/30" };
-        }
-        if (order.status === "PTE_ENVIO") {
-            return { label: "Pendiente", color: isLight ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-blue-900/20 text-blue-300 border-blue-500/30" };
-        }
-        return { label: order.status, color: isLight ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-gray-900/20 text-gray-400 border-gray-500/30" };
     };
 
     return (
         <div className={cn("min-h-screen font-sans overflow-hidden flex flex-col", colors.page)}>
-            {/* HEADER */}
             <header className={cn("px-8 py-6 flex items-center justify-between border-b", colors.header)}>
                 <div className="flex items-center gap-6">
                     <img src="/img/Egea- Evolucio Gold.png" alt="Egea Gold" className="h-12 w-auto object-contain" />
@@ -217,17 +211,15 @@ export default function ShippingBoardPage() {
                 </div>
             </header>
 
-            {/* TABLE HEADER */}
             <div className={cn("px-8 py-4 grid grid-cols-12 gap-4 font-bold text-sm uppercase tracking-wider border-b", colors.tableHeader)}>
                 <div className="col-span-2">PEDIDO / REF</div>
-                <div className="col-span-2">CLIENTE / DESTINO</div>
+                <div className="col-span-2">CLIENTE</div>
                 <div className="col-span-3">MATERIAL</div>
                 <div className="col-span-1">UNIDADES</div>
                 <div className="col-span-2">BULTOS</div>
                 <div className="col-span-2 text-right">ESTADO</div>
             </div>
 
-            {/* BODY / SCROLL AREA */}
             <div className="flex-1 px-8 py-4 space-y-3 overflow-y-auto custom-scrollbar">
                 {orders.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-700 space-y-4 opacity-50">
@@ -236,104 +228,65 @@ export default function ShippingBoardPage() {
                     </div>
                 ) : (
                     orders.map((order) => {
-                        const statusBadge = getStatusBadge(order);
-
-                        // Border color logic based on due_date
                         const getMarkerStyle = () => {
-                            if (!order.due_date) return { color: 'bg-gray-600', pulse: false };
-                            const days = Math.ceil((new Date(order.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                            if (days <= 0) return { color: 'bg-red-400', pulse: true }; // Vencido
-                            if (days <= 2) return { color: 'bg-amber-500', pulse: false }; // Urgente
-                            return { color: 'bg-[#D4AF37]', pulse: false }; // Normal (Egea Gold)
+                            if (order.status === "ENVIADO") return { color: 'bg-gray-600', pulse: false };
+                            if (order.dueBadge.label === "VENCIDO") return { color: 'bg-red-400', pulse: true };
+                            if (order.dueBadge.label === "URGENTE") return { color: 'bg-amber-500', pulse: false };
+                            return { color: 'bg-[#D4AF37]', pulse: false };
                         };
 
                         return (
-                            <div
-                                key={order.id}
-                                className={cn(
-                                    "relative grid grid-cols-12 gap-4 items-center p-4 rounded-lg shadow-lg animate-in fade-in duration-500 pl-7",
-                                    colors.row,
-                                    getMarkerStyle().pulse && "bg-red-500/10 animate-pulse"
-                                )}
-                            >
+                            <div key={order.id} className={cn("relative grid grid-cols-12 gap-4 items-center p-4 rounded-lg shadow-lg pl-7", colors.row, getMarkerStyle().pulse && "bg-red-500/10 animate-pulse")}>
                                 {(() => {
                                     const marker = getMarkerStyle();
-                                    return (
-                                        <span
-                                            className={cn(
-                                                "absolute left-0 top-0 h-full w-3 rounded-l-lg",
-                                                marker.color,
-                                                marker.pulse && "shadow-[0_0_12px_2px_rgba(248,113,113,0.6)]"
-                                            )}
-                                        />
-                                    );
+                                    return <span className={cn("absolute left-0 top-0 h-full w-3 rounded-l-lg", marker.color, marker.pulse && "shadow-[0_0_12px_2px_rgba(248,113,113,0.6)]")} />;
                                 })()}
-                                {/* COL 1: REF */}
                                 <div className="col-span-2">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</div>
                                     <div className="text-xs text-gray-500 font-mono mt-1">{order.admin_code || order.id.slice(0, 8)}</div>
                                 </div>
-
-                                {/* COL 2: CLIENTE / DESTINO */}
-                                <div className="col-span-2 ml-3">
+                                <div className="col-span-2">
                                     <div className={cn("text-2xl font-black truncate", isLight ? "text-slate-900" : "text-white")}>{order.customer_name}</div>
                                     <div className={cn("text-2xl font-black uppercase tracking-wider mt-1", isLight ? "text-slate-900" : "text-white")}>{order.region}</div>
                                 </div>
-
-                                {/* COL 3: MATERIAL (3 cols) */}
                                 <div className="col-span-3">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-gray-300")}>{order.fabric}</div>
-                                    <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-gray-400")}>{order.color}</div>
+                                    <div className={cn("text-2xl font-black mb-2", isLight ? "text-slate-900" : "text-gray-400")}>{order.color}</div>
+                                    {order.lines && order.lines.length > 0 && (
+                                        <div className="space-y-1 mt-2 border-t border-white/5 pt-2">
+                                            {order.lines.map((l: any, i: number) => (
+                                                <div key={i} className="flex justify-between items-center text-[10px] font-bold uppercase opacity-70">
+                                                    <span>{l.quantity}x {l.material || l.fabric || 'Pieza'}</span>
+                                                    {l.width && l.height && <span>{l.width}x{l.height}</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-
-                                {/* COL 4: UNIDADES */}
                                 <div className="col-span-1">
-                                    <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>
-                                        {order.quantity_total} uds
-                                    </div>
+                                    <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>{order.quantity_total} uds</div>
                                 </div>
-
-                                {/* COL 5: BULTOS - SEPARATE & LARGE (2 cols) */}
-                                <div className="col-span-2">
+                                <div className="col-span-2 pr-10">
                                     <div className="flex items-center gap-3">
-                                        <Package className={`w-6 h-6 ${order.packageProgress === 100 ? 'text-emerald-500' :
-                                            order.packageProgress >= 50 ? 'text-blue-400' :
-                                                'text-amber-500'
-                                            }`} />
+                                        <Package className={`w-8 h-8 ${order.packageProgress === 100 ? 'text-emerald-500' : order.packageProgress >= 50 ? 'text-blue-400' : 'text-amber-500'}`} />
                                         <div className="flex-1">
-                                            <div className={cn("text-base font-black mb-1", isLight ? "text-slate-900" : "text-white")}>
-                                                {order.scanned_packages}/{order.packages_count}
+                                            <div className={cn("text-2xl font-black mb-1", isLight ? "text-slate-900" : "text-white")}>
+                                                {order.scanned_packages || 0}/{order.packages_count || 1}
                                             </div>
                                             <Progress
                                                 value={order.packageProgress}
-                                                className={cn("h-2.5", colors.progress)}
+                                                className={cn("h-3", colors.progress)}
                                                 indicatorClassName={order.packageProgress === 100 ? "bg-emerald-500" : order.packageProgress >= 50 ? "bg-blue-500" : "bg-amber-500"}
                                             />
                                         </div>
                                     </div>
+                                    <div className="text-[10px] text-gray-600 mt-2 uppercase tracking-wide text-right font-bold">Fase: {order.status}</div>
                                 </div>
-
-                                {/* COL 5: ESTADO - WITH TEXT & DAYS (3 cols) */}
                                 <div className="col-span-2 flex items-center justify-end gap-3">
-                                    {/* Urgency Badge */}
-                                    {order.isUrgent && (
-                                        <div className={cn("flex items-center gap-1 border px-2 py-1 rounded-lg", colors.urgent)}>
-                                            <AlertTriangle className="w-3 h-3 text-amber-500 animate-pulse" />
-                                        </div>
-                                    )}
-
-                                    {/* Status Badge with Icon AND Text */}
-                                    <div className={`px-3 py-1.5 rounded-lg border-2 text-sm font-black uppercase flex items-center gap-2 ${statusBadge.color}`}>
-                                        {order.status === "ENVIADO" && <CheckCircle2 className="w-4 h-4" />}
-                                        {order.status === "LISTO_ENVIO" && <Truck className="w-4 h-4" />}
-                                        {order.status === "PTE_ENVIO" && <Clock className="w-4 h-4" />}
-                                        {statusBadge.label}
-                                    </div>
-
-                                    {/* Days Elapsed */}
-                                    <div className={cn("text-center border rounded-lg px-3 py-1.5", colors.stat)}>
-                                        <span className={cn("text-2xl font-black tracking-tighter", isLight ? "text-slate-900" : "text-white")}>{order.daysElapsed}</span>
-                                        <span className="text-xs text-gray-500 uppercase font-bold ml-1">{order.daysElapsed === 1 ? 'día' : 'días'}</span>
+                                    <div className={`px-2 py-1 rounded-lg border text-[10px] font-black uppercase ${order.dueBadge.color}`}>{order.dueBadge.label}</div>
+                                    <div className={cn("text-center border rounded-lg px-3 py-1.5 min-w-[80px]", colors.stat)}>
+                                        <span className={cn("text-2xl font-black tracking-tighter", isLight ? "text-slate-900" : "text-white")}>{order.dueBadge.boxValue}</span>
+                                        <span className="text-[10px] text-gray-500 uppercase font-black ml-1">{order.dueBadge.boxLabel}</span>
                                     </div>
                                 </div>
                             </div>
@@ -342,16 +295,15 @@ export default function ShippingBoardPage() {
                 )}
             </div>
 
-            {/* FOOTER LEGEND */}
             <footer className={cn("px-8 py-3 border-t flex gap-8 justify-end text-[10px] uppercase font-bold tracking-widest", colors.footer)}>
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-amber-500"></div> Urgente
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Completo
+                    <div className="w-2 h-2 rounded-full bg-[#D4AF37]"></div> Egea Gold
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-700"></div> Enviado
+                    <div className="w-2 h-2 rounded-full bg-red-400"></div> Vencido
                 </div>
             </footer>
         </div>

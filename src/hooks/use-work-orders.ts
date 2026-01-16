@@ -2,72 +2,65 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabaseProductivity as supabase } from "@/integrations/supabase";
 import { WorkOrder, WorkOrderStatus, WorkOrderWithDetails } from "@/types/production";
 import { toast } from "sonner";
+import { summarizeMaterials } from "@/lib/materials";
+
+export const normalizeStatus = (raw?: string) => {
+    const normalized = (raw || '').toUpperCase();
+    const map: Record<string, string> = {
+        EN_CORTE: 'CORTE',
+        EN_CONFECCION: 'CONFECCION',
+        EN_CONTROL_CALIDAD: 'CONTROL_CALIDAD',
+        TERMINADO: 'LISTO_ENVIO'
+    };
+    return map[normalized] || normalized;
+};
 
 // Hook para obtener todas las work orders
 export const useWorkOrders = () => {
     return useQuery({
         queryKey: ['work-orders'],
+        staleTime: 5000,
         queryFn: async () => {
-            const isMissingRelation = (error: any) => {
-                const message = String(error?.message || '');
-                return message.includes('does not exist') || message.includes('relation') || message.includes('schema');
-            };
-
-            let data: any[] | null = null;
-            let error: any = null;
-
-            const schemaProbe = await supabase
+            const { data, error } = await supabase
                 .from('produccion_work_orders')
-                .select('id')
-                .limit(1);
-
-            if (!schemaProbe.error && (schemaProbe.data?.length || 0) > 0) {
-                const fallback = await supabase
-                    .from('produccion_work_orders')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-                data = fallback.data as any[] | null;
-                error = fallback.error;
-            } else {
-                const primary = await supabase
-                    .from('produccion_work_orders')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-                data = primary.data as any[] | null;
-                error = primary.error;
-
-                if (error && isMissingRelation(error)) {
-                    const fallback = await supabase
-                        .from('produccion_work_orders')
-                        .select('*')
-                        .order('created_at', { ascending: false });
-                    data = fallback.data as any[] | null;
-                    error = fallback.error;
-                }
-            }
+                .select('*')
+                .order('priority', { ascending: false })
+                .order('created_at', { ascending: false });
 
             if (error) {
                 console.error("Error fetching work orders:", error);
                 throw error;
             }
 
-            const normalizeStatus = (raw?: string) => {
-                const normalized = (raw || '').toUpperCase();
-                const map: Record<string, string> = {
-                    EN_CORTE: 'CORTE',
-                    EN_CONFECCION: 'CONFECCION',
-                    EN_CONTROL_CALIDAD: 'CONTROL_CALIDAD',
-                    TERMINADO: 'LISTO_ENVIO'
-                };
-                return map[normalized] || normalized;
-            };
+            let linesData: any[] | null = null;
+            if (data && data.length > 0) {
+                const { data: linesResponse } = await supabase
+                    .from('produccion_work_order_lines')
+                    .select('*')
+                    .in('work_order_id', data.map((o: any) => o.id));
+                linesData = linesResponse as any[] | null;
+            }
 
-            return (data || []).map((order: any) => ({
-                ...order,
-                order_number: order.order_number || order.work_order_number || order.id,
-                quantity_total: order.quantity_total || order.quantity || order.technical_specs?.quantity,
-                status: normalizeStatus(order.status),
-            })) as WorkOrderWithDetails[];
+            return (data || []).map((order: any) => {
+                const specs = order.technical_specs || {};
+                const lines = (Array.isArray(order.lines) && order.lines.length > 0)
+                    ? order.lines
+                    : (linesData?.filter((line: any) => line.work_order_id === order.id) || []);
+                const materialList = summarizeMaterials(lines, specs.fabric || order.fabric || "N/D");
+
+                const colorList = lines.length > 0
+                    ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
+                    : (specs.color || order.color || "N/D");
+
+                return {
+                    ...order,
+                    order_number: order.order_number || order.work_order_number || order.id,
+                    quantity_total: order.quantity_total || order.quantity || specs.quantity,
+                    status: normalizeStatus(order.status),
+                    fabric: materialList,
+                    color: colorList
+                };
+            }) as WorkOrderWithDetails[];
         },
     });
 };
@@ -76,23 +69,8 @@ export const useWorkOrders = () => {
 export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
     return useQuery({
         queryKey: ['work-orders', status],
+        staleTime: 5000,
         queryFn: async () => {
-            const isMissingRelation = (error: any) => {
-                const message = String(error?.message || '');
-                return message.includes('does not exist') || message.includes('relation') || message.includes('schema');
-            };
-
-            const normalizeStatus = (raw?: string) => {
-                const normalized = (raw || '').toUpperCase();
-                const map: Record<string, string> = {
-                    EN_CORTE: 'CORTE',
-                    EN_CONFECCION: 'CONFECCION',
-                    EN_CONTROL_CALIDAD: 'CONTROL_CALIDAD',
-                    TERMINADO: 'LISTO_ENVIO'
-                };
-                return map[normalized] || normalized;
-            };
-
             const normalizedToLegacy = (raw?: WorkOrderStatus) => {
                 if (!raw) return raw;
                 switch (raw) {
@@ -104,65 +82,52 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
                 }
             };
 
-            let data: any[] | null = null;
-            let error: any = null;
-
-            const schemaProbe = await supabase
+            let query = supabase
                 .from('produccion_work_orders')
-                .select('id')
-                .limit(1);
+                .select('*')
+                .order('priority', { ascending: false })
+                .order('created_at', { ascending: false });
 
-            if (!schemaProbe.error && (schemaProbe.data?.length || 0) > 0) {
-                let fallbackQuery = supabase
-                    .from('produccion_work_orders')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-                if (status) {
-                    fallbackQuery = fallbackQuery.eq('status', normalizedToLegacy(status) as any);
-                }
-                const fallback = await fallbackQuery;
-                data = fallback.data as any[] | null;
-                error = fallback.error;
-            } else {
-                let query = supabase
-                    .from('produccion_work_orders')
-                    .select('*')
-                    .order('priority', { ascending: false })
-                    .order('created_at', { ascending: false });
-
-                if (status) {
-                    query = query.eq('status', status as any);
-                }
-
-                const primary = await query;
-                data = primary.data as any[] | null;
-                error = primary.error;
-
-                if (error && isMissingRelation(error)) {
-                    let fallbackQuery = supabase
-                        .from('produccion_work_orders')
-                        .select('*')
-                        .order('created_at', { ascending: false });
-                    if (status) {
-                        fallbackQuery = fallbackQuery.eq('status', normalizedToLegacy(status) as any);
-                    }
-                    const fallback = await fallbackQuery;
-                    data = fallback.data as any[] | null;
-                    error = fallback.error;
-                }
+            if (status) {
+                query = query.eq('status', normalizedToLegacy(status) as any);
             }
 
+            const { data, error } = await query;
+
             if (error) {
-                console.error("Error fetching work orders:", error);
+                console.error("Error fetching work orders by status:", error);
                 throw error;
             }
 
-            return (data || []).map((order: any) => ({
-                ...order,
-                order_number: order.order_number || order.work_order_number || order.id,
-                quantity_total: order.quantity_total || order.quantity || order.technical_specs?.quantity,
-                status: normalizeStatus(order.status),
-            })) as WorkOrderWithDetails[];
+            let linesData: any[] | null = null;
+            if (data && data.length > 0) {
+                const { data: linesResponse } = await supabase
+                    .from('produccion_work_order_lines')
+                    .select('*')
+                    .in('work_order_id', data.map((o: any) => o.id));
+                linesData = linesResponse as any[] | null;
+            }
+
+            return (data || []).map((order: any) => {
+                const specs = order.technical_specs || {};
+                const lines = (Array.isArray(order.lines) && order.lines.length > 0)
+                    ? order.lines
+                    : (linesData?.filter((line: any) => line.work_order_id === order.id) || []);
+                const materialList = summarizeMaterials(lines, specs.fabric || order.fabric || "N/D");
+
+                const colorList = lines.length > 0
+                    ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
+                    : (specs.color || order.color || "N/D");
+
+                return {
+                    ...order,
+                    order_number: order.order_number || order.work_order_number || order.id,
+                    quantity_total: order.quantity_total || order.quantity || specs.quantity,
+                    status: normalizeStatus(order.status),
+                    fabric: materialList,
+                    color: colorList
+                };
+            }) as WorkOrderWithDetails[];
         },
     });
 };
@@ -171,71 +136,48 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
 export const useWorkOrder = (id: string) => {
     return useQuery({
         queryKey: ['work-order', id],
+        staleTime: 5000,
         queryFn: async () => {
-            const isMissingRelation = (error: any) => {
-                const message = String(error?.message || '');
-                return message.includes('does not exist') || message.includes('relation') || message.includes('schema');
-            };
-
-            let data: any = null;
-            let error: any = null;
-
-            const schemaProbe = await supabase
+            const { data, error } = await supabase
                 .from('produccion_work_orders')
-                .select('id')
-                .limit(1);
-
-            if (!schemaProbe.error && (schemaProbe.data?.length || 0) > 0) {
-                const fallback = await supabase
-                    .from('produccion_work_orders')
-                    .select('*')
-                    .eq('id', id)
-                    .single();
-                data = fallback.data;
-                error = fallback.error;
-            } else {
-                const primary = await supabase
-                    .from('produccion_work_orders')
-                    .select('*')
-                    .eq('id', id)
-                    .single();
-                data = primary.data;
-                error = primary.error;
-
-                if (error && isMissingRelation(error)) {
-                    const fallback = await supabase
-                        .from('produccion_work_orders')
-                        .select('*')
-                        .eq('id', id)
-                        .single();
-                    data = fallback.data;
-                    error = fallback.error;
-                }
-            }
+                .select('*')
+                .eq('id', id)
+                .maybeSingle();
 
             if (error) {
-                console.error("Error fetching work order:", error);
+                console.error("Error fetching work order by ID:", error);
                 throw error;
             }
 
-            if (!data) return data as WorkOrderWithDetails;
+            if (!data) return null;
 
-            const normalizeStatus = (raw?: string) => {
-                const normalized = (raw || '').toUpperCase();
-                const map: Record<string, string> = {
-                    EN_CORTE: 'CORTE',
-                    EN_CONFECCION: 'CONFECCION',
-                    EN_CONTROL_CALIDAD: 'CONTROL_CALIDAD',
-                    TERMINADO: 'LISTO_ENVIO'
-                };
-                return map[normalized] || normalized;
-            };
+            const order = data as any;
+            const specs = order.technical_specs || {};
+            let linesData: any[] | null = null;
+            if (!(Array.isArray(order.lines) && order.lines.length > 0)) {
+                const { data: linesResponse } = await supabase
+                    .from('produccion_work_order_lines')
+                    .select('*')
+                    .eq('work_order_id', order.id);
+                linesData = linesResponse as any[] | null;
+            }
+
+            const lines = (Array.isArray(order.lines) && order.lines.length > 0)
+                ? order.lines
+                : (linesData || []);
+            const materialList = summarizeMaterials(lines, specs.fabric || order.fabric || "N/D");
+
+            const colorList = lines.length > 0
+                ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
+                : (specs.color || order.color || "N/D");
 
             return {
-                ...data,
-                order_number: data.order_number || data.work_order_number || data.id,
-                quantity_total: data.quantity_total || data.quantity || data.technical_specs?.quantity,
-                status: normalizeStatus(data.status),
+                ...order,
+                order_number: order.order_number || order.work_order_number || order.id,
+                quantity_total: order.quantity_total || order.quantity || specs.quantity,
+                status: normalizeStatus(order.status),
+                fabric: materialList,
+                color: colorList
             } as WorkOrderWithDetails;
         },
         enabled: !!id,

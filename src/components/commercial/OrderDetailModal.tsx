@@ -23,9 +23,11 @@ import {
     generateProduccionInicioEmail,
     generateProduccionInicioSubject
 } from '@/utils/email-templates';
-import { useUpdateOrder } from '@/hooks/use-orders';
 import { generateOrderPDF } from '@/utils/pdf-generator';
 import { generateQRPayload } from '@/lib/qr-utils';
+import { toast } from 'sonner';
+import { useSLADays } from '@/hooks/use-sla-days';
+import { useUpdateOrder, useCreateOrder, useUpdateOrderStatus } from '@/hooks/use-orders';
 
 // --- Types & Constants ---
 
@@ -55,6 +57,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
     const [formData, setFormData] = useState<Order>({ ...order });
     const uploadDocument = useUploadOrderDocument();
     const updateOrder = useUpdateOrder();
+    const updateOrderStatus = useUpdateOrderStatus();
+    const createOrder = useCreateOrder();
     const { data: materials } = useMaterials();
     const [savingDoc, setSavingDoc] = useState<DocType | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -72,6 +76,25 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
             if (!order.id || !order.order_number) setIsEditing(true);
         }
     }, [order, isOpen]);
+
+    // --- AUTOMATIZACIÓN SLA POR REGIÓN ---
+    // Recalcular delivery_date al cambiar la región (si no tiene fecha)
+    useEffect(() => {
+        const region = formData.delivery_region || formData.region;
+        const hasNoDate = !formData.delivery_date;
+
+        if (region && hasNoDate) {
+            const slaDays = useSLADays(region);
+
+            const target = new Date();
+            target.setDate(target.getDate() + slaDays);
+
+            setFormData(prev => ({
+                ...prev,
+                delivery_date: target.toISOString().split('T')[0]
+            }));
+        }
+    }, [formData.delivery_region, formData.region, formData.delivery_date]);
 
     useEffect(() => {
         const total = (formData.lines || []).reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
@@ -144,7 +167,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
 
     const addLine = () => {
         const newLine: OrderLine = {
-            width: '', height: '', material: formData.fabric || '', quantity: 1, notes: ''
+            width: '', height: '', material: '', quantity: 1, notes: ''
         };
         setFormData(prev => ({ ...prev, lines: [...(prev.lines || []), newLine] }));
     };
@@ -210,15 +233,12 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
             if (formData.id) {
                 await updateOrder.mutateAsync(payload);
             } else {
-                // Para creación nueva, usamos el método directo de supabase o añadimos un useCreateOrder si es necesario
-                // Pero como este modal suele usarse para editar, nos enfocamos en el update
-                const { error } = await supabase.from('comercial_orders').insert([{
+                await createOrder.mutateAsync({
                     ...payload,
                     order_number: formData.order_number,
                     documents: formData.documents || [],
                     status: formData.status || 'PENDIENTE_PAGO'
-                } as any]);
-                if (error) throw error;
+                });
             }
 
             setIsEditing(false);
@@ -292,12 +312,13 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                             <Button
                                 onClick={async () => {
                                     try {
-                                        await updateOrder.mutateAsync({
-                                            id: formData.id,
-                                            status: 'PAGADO'
+                                        await updateOrderStatus.mutateAsync({
+                                            orderId: formData.id,
+                                            status: 'PAGADO',
+                                            comment: 'Validación desde detalle de pedido'
                                         });
                                         setFormData(prev => ({ ...prev, status: 'PAGADO' }));
-                                        toast.success('Pedido marcado como PAGADO');
+                                        toast.success('Pedido marcado como PAGADO y enviado a producción');
                                         if (onSave) onSave({ ...formData, status: 'PAGADO' });
                                     } catch (error: any) {
                                         toast.error(`Error: ${error.message}`);
@@ -430,11 +451,22 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                     <SelectValue placeholder="Selecciona" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="PENINSULA">PENÍNSULA</SelectItem>
-                                                    <SelectItem value="BALEARES">BALEARES</SelectItem>
-                                                    <SelectItem value="CANARIAS">CANARIAS</SelectItem>
+                                                    <SelectItem value="PENINSULA">PENÍNSULA (+10d)</SelectItem>
+                                                    <SelectItem value="BALEARES">BALEARES (+7d)</SelectItem>
+                                                    <SelectItem value="CANARIAS">CANARIAS (+15d)</SelectItem>
                                                 </SelectContent>
                                             </Select>
+                                            {isEditing && (
+                                                <div className="mt-1 text-[10px] text-[#14CC7F] font-bold">
+                                                    SLA: {
+                                                        {
+                                                            'PENINSULA': '10 días naturales',
+                                                            'BALEARES': '7 días naturales',
+                                                            'CANARIAS': '15 días naturales'
+                                                        }[formData.delivery_region || formData.region || 'PENINSULA']
+                                                    }
+                                                </div>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="text-xs text-[#8B8D90] uppercase font-bold">Teléfono</label>

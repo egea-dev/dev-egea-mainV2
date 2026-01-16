@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { supabaseProductivity } from '@/integrations/supabase';
-import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon, FileText } from 'lucide-react';
+import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon, FileText, History, ListFilter } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import PageShell from '@/components/layout/PageShell';
 import QRScanner from '@/components/common/QRScanner';
 import { RoleBasedRender } from '@/components/common/RoleBasedRender';
@@ -10,6 +11,7 @@ import { IncidentReportModal } from '@/components/incidents/IncidentReportModal'
 import { toast } from 'sonner';
 import { printHtmlToIframe } from '@/utils/print';
 import { parseQRCode, validateQRWithLines, extractOrderNumber } from '@/lib/qr-utils';
+import { summarizeMaterials } from '@/lib/materials';
 
 function escapeZpl(str: string): string {
   if (!str) return "";
@@ -26,10 +28,17 @@ const getDueBadge = (order: Order) => {
   return { label: `${days} días`, badge: 'text-emerald-300 bg-emerald-900/20 border border-emerald-500/30 rounded-full px-3 py-0.5 text-xs font-bold' };
 };
 
+type GlobalProductionPolling = typeof globalThis & {
+  __productionPollingOwner?: string | null;
+};
+
+const globalProductionPolling = globalThis as GlobalProductionPolling;
+
 // Tipos simplificados
 interface Order {
   id: string;
   order_number: string;
+  admin_code?: string | null;
   customer_name: string;
   status: string;
   fabric?: string;
@@ -54,6 +63,7 @@ interface Order {
     height: number;
     notes?: string;
   }>;
+  updated_at?: string | null;
 }
 
 const slaConfig: Record<string, number> = {
@@ -98,15 +108,61 @@ const escapeHtml = (value: string) =>
     .replace(/'/g, '&#39;');
 
 export function ProductionPage() {
+  const STORAGE_SELECTED_KEY = "production.selectedOrderId";
+  const STORAGE_SELECTED_PERSIST_KEY = "production.selectedOrderId.persist";
+  const STORAGE_ORDERS_KEY = "production.ordersCache";
   const [orders, setOrders] = useState<Order[]>([]);
   const [qrInput, setQrInput] = useState('');
   const [scannedOrder, setScannedOrder] = useState<Order | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [packagesInput, setPackagesInput] = useState<number>(1);
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [isPersisting, setIsPersisting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const ordersSignatureRef = useRef("");
+  const loadInFlightRef = useRef(false);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollPausedRef = useRef(false);
+  const lastLoadAtRef = useRef(0);
+  const instanceIdRef = useRef(`prod-${Math.random().toString(36).slice(2)}`);
+  const activeQueueRef = useRef<Order[]>([]);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    const cachedSelected = localStorage.getItem(STORAGE_SELECTED_PERSIST_KEY)
+      || sessionStorage.getItem(STORAGE_SELECTED_KEY);
+    if (cachedSelected) setSelectedOrderId(cachedSelected);
+
+    const cachedOrders = sessionStorage.getItem(STORAGE_ORDERS_KEY);
+    if (cachedOrders && !hasLoaded) {
+      try {
+        const parsed = JSON.parse(cachedOrders) as Order[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setOrders(parsed);
+          setHasLoaded(true);
+          setIsLoading(false);
+          if (cachedSelected) {
+            const cachedMatch = parsed.find((o) => o.id === cachedSelected);
+            if (cachedMatch) setScannedOrder(cachedMatch);
+          }
+        }
+      } catch {
+        sessionStorage.removeItem(STORAGE_ORDERS_KEY);
+      }
+    }
+  }, [hasLoaded]);
+
+  React.useEffect(() => {
+    if (selectedOrderId) {
+      sessionStorage.setItem(STORAGE_SELECTED_KEY, selectedOrderId);
+      localStorage.setItem(STORAGE_SELECTED_PERSIST_KEY, selectedOrderId);
+    } else {
+      sessionStorage.removeItem(STORAGE_SELECTED_KEY);
+      localStorage.removeItem(STORAGE_SELECTED_PERSIST_KEY);
+    }
+  }, [selectedOrderId]);
 
   // Estado para alertas móviles
   const [alertState, setAlertState] = useState<{
@@ -145,15 +201,75 @@ export function ProductionPage() {
     setIsIncidentModalOpen(true);
   };
 
+  React.useEffect(() => {
+    if (scannedOrder) {
+      pollPausedRef.current = true;
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
+    } else {
+      pollPausedRef.current = false;
+      if (!pollTimeoutRef.current) {
+        pollTimeoutRef.current = setTimeout(() => {
+          void loadOrders();
+        }, 0);
+      }
+    }
+  }, [scannedOrder]);
+
   // Cargar órdenes al montar
   React.useEffect(() => {
-    loadOrders();
+    if (globalProductionPolling.__productionPollingOwner && globalProductionPolling.__productionPollingOwner !== instanceIdRef.current) return;
+    globalProductionPolling.__productionPollingOwner = instanceIdRef.current;
+    const scheduleNext = (delay: number) => {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+      pollTimeoutRef.current = setTimeout(() => {
+        void loadOrders();
+      }, delay);
+    };
+
+    const handleVisibility = () => {
+      pollPausedRef.current = document.hidden;
+      if (document.hidden) {
+        if (pollTimeoutRef.current) {
+          clearTimeout(pollTimeoutRef.current);
+          pollTimeoutRef.current = null;
+        }
+      } else {
+        scheduleNext(0);
+      }
+    };
+
+    handleVisibility();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
+      if (globalProductionPolling.__productionPollingOwner === instanceIdRef.current) {
+        globalProductionPolling.__productionPollingOwner = null;
+      }
+    };
   }, []);
 
   const loadOrders = async () => {
+    if (globalProductionPolling.__productionPollingOwner && globalProductionPolling.__productionPollingOwner !== instanceIdRef.current) return;
+    if (pollPausedRef.current) return;
+    if (loadInFlightRef.current) return;
+    if (isPersisting) return;
+    const now = Date.now();
+    if (now - lastLoadAtRef.current < 3000) return;
+    lastLoadAtRef.current = now;
+    loadInFlightRef.current = true;
+    const isFirstLoad = !hasLoaded;
     try {
-      setIsLoading(true);
-      console.log('Loading production orders...');
+      if (isFirstLoad) setIsLoading(true);
+      // Keep logs quiet to avoid noise in production.
 
       const isMissingRelation = (error: any) => {
         const message = String(error?.message || '');
@@ -165,8 +281,6 @@ export function ProductionPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('Orders received:', ordersData);
-      console.log('Orders error:', ordersError);
 
       if (ordersError) throw ordersError;
 
@@ -182,19 +296,76 @@ export function ProductionPage() {
           console.warn('Work order lines unavailable:', lineError);
         }
 
+        let commercialOrders: any[] | null = null;
+        try {
+          const orderNumbers = ordersData
+            .map((o: any) => o.order_number)
+            .filter(Boolean);
+          const adminCodes = ordersData
+            .map((o: any) => o.admin_code)
+            .filter(Boolean);
+          if (orderNumbers.length > 0 || adminCodes.length > 0) {
+            const escapedOrders = orderNumbers
+              .map((value: any) => `"${String(value).replace(/"/g, '""')}"`)
+              .join(',');
+            const escapedAdmins = adminCodes
+              .map((value: any) => `"${String(value).replace(/"/g, '""')}"`)
+              .join(',');
+            const orFilters = [
+              escapedOrders ? `order_number.in.(${escapedOrders})` : null,
+              escapedAdmins ? `admin_code.in.(${escapedAdmins})` : null
+            ].filter(Boolean).join(',');
+            const { data: commData, error: commError } = await supabaseProductivity
+              .from('comercial_orders')
+              .select('order_number, admin_code, lines, fabric')
+              .or(orFilters);
+            if (commError) {
+              console.warn('Commercial orders unavailable:', commError);
+            } else {
+              commercialOrders = commData as any[] | null;
+            }
+          }
+        } catch (commError) {
+          console.warn('Commercial orders lookup failed:', commError);
+        }
+
         const normalizeStatus = (raw?: string) => {
           const normalized = (raw || "").toUpperCase();
           const map: Record<string, string> = {
-            EN_CORTE: "CORTE",
-            EN_CONFECCION: "CONFECCION",
-            EN_CONTROL_CALIDAD: "CONTROL_CALIDAD",
-            TERMINADO: "LISTO_ENVIO"
+            'PAGADO': 'PENDIENTE',
+            'EN_PROCESO': 'CORTE',
+            'EN_CORTE': 'CORTE',
+            'EN_CONFECCION': 'CONFECCION',
+            'EN_CONTROL_CALIDAD': 'CONTROL_CALIDAD',
+            'TERMINADO': 'LISTO_ENVIO'
           };
           return map[normalized] || normalized;
         };
 
         const ordersWithLines = ordersData.map((order: any) => {
+          const commOrder = commercialOrders?.find((c: any) => c.order_number === order.order_number || (order.admin_code && c.admin_code === order.admin_code) || c.admin_code === order.order_number);
           const specs = order.technical_specs || {};
+          // Priorizar lineas de comercial, luego JSON, si no, usar la tabla relacional
+          const rawLines = (Array.isArray(commOrder?.lines) && commOrder.lines.length > 0)
+            ? commOrder.lines
+            : (Array.isArray(order.lines) && order.lines.length > 0)
+              ? order.lines
+              : (linesData?.filter((line: any) => line.work_order_id === order.id) || []);
+          const lines = Array.isArray(rawLines) ? rawLines : [];
+          const materialLines = [...lines].sort((a: any, b: any) => {
+            const left = String(a.material || a.fabric || "").trim().toLowerCase();
+            const right = String(b.material || b.fabric || "").trim().toLowerCase();
+            return left.localeCompare(right);
+          });
+          const materialList = summarizeMaterials(materialLines, commOrder?.fabric || specs.fabric || order.fabric || "N/D");
+
+          const colorList = lines.length > 0
+            ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
+            : (specs.color || order.color || "N/D");
+
+          const fabric = materialList || "N/D";
+          const color = colorList || "N/D";
+
           const normalizedStatus = normalizeStatus(order.status);
           const dueDate = order.due_date || order.estimated_completion || null;
           const processStartAt = order.process_start_at || order.started_at || null;
@@ -202,43 +373,102 @@ export function ProductionPage() {
             ...order,
             order_number: order.order_number || order.work_order_number || order.id,
             status: normalizedStatus,
-            fabric: specs.fabric || order.fabric || 'Estandar',
-            color: specs.color || order.color || 'N/D',
+            fabric,
+            color,
             quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
             due_date: dueDate,
             process_start_at: processStartAt,
-            lines: linesData?.filter((line: any) => line.work_order_id === order.id) || []
+            lines
           };
         });
 
-        setOrders(ordersWithLines);
+        const signature = ordersWithLines
+          .map((o) => `${o.id}:${o.order_number || ''}:${o.status || ''}:${o.quantity_total || ''}:${o.fabric || ''}:${o.packages_count || ''}:${o.lines?.length || 0}`)
+          .sort()
+          .join('|');
+        if (signature !== ordersSignatureRef.current) {
+          setOrders(ordersWithLines);
+          ordersSignatureRef.current = signature;
+          sessionStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(ordersWithLines));
+        }
+
+        const selectedId = selectedOrderId || scannedOrder?.id;
+        if (selectedId) {
+          const refreshed = ordersWithLines.find((o) => o.id === selectedId);
+          if (refreshed) {
+            if (!scannedOrder || scannedOrder.id !== refreshed.id || scannedOrder.status !== refreshed.status ||
+              scannedOrder.fabric !== refreshed.fabric || scannedOrder.quantity_total !== refreshed.quantity_total ||
+              (scannedOrder.lines?.length || 0) !== (refreshed.lines?.length || 0)) {
+              setScannedOrder(refreshed);
+            }
+          }
+        } else {
+          const inProgress = ordersWithLines.find((o) =>
+            ['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'EN_PROCESO'].includes(o.status)
+          );
+          if (inProgress) {
+            setScannedOrder(inProgress);
+            setSelectedOrderId(inProgress.id);
+          }
+        }
       } else {
-        setOrders([]);
+        if (orders.length > 0) {
+          setOrders([]);
+          ordersSignatureRef.current = "";
+        }
+        sessionStorage.removeItem(STORAGE_ORDERS_KEY);
       }
     } catch (error: any) {
       console.error('Error loading orders:', error);
       toast.error('Error al cargar ordenes: ' + error.message);
-      setOrders([]);
     } finally {
-      setIsLoading(false);
+      loadInFlightRef.current = false;
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
+      if (!pollPausedRef.current) {
+        pollTimeoutRef.current = setTimeout(() => {
+          void loadOrders();
+        }, 10000);
+      }
+      if (isFirstLoad) {
+        setIsLoading(false);
+        setHasLoaded(true);
+      }
     }
   };
 
-  const productionQueue = useMemo(() => {
-    const now = Date.now();
-    return orders
+  const activeQueue = useMemo(() => {
+    const nextQueue = orders
       .filter(order => {
-        const allowed = ['EN_PROCESO', 'PAGADO', 'PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'];
-        if (!allowed.includes(order.status)) return false;
-        if (order.status !== 'LISTO_ENVIO') return true;
-        if (!order.updated_at) return true;
-        const updatedAt = new Date(order.updated_at).getTime();
-        return now - updatedAt <= 30 * 60 * 1000;
+        const activeStatuses = ['PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'PAGADO', 'EN_PROCESO'];
+        return activeStatuses.includes(order.status);
       })
       .sort((a, b) => {
-        const aDate = a.due_date ? new Date(a.due_date).getTime() : Infinity;
-        const bDate = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+        const aDate = a.created_at ? new Date(a.created_at).getTime() : Infinity;
+        const bDate = b.created_at ? new Date(b.created_at).getTime() : Infinity;
         return aDate - bDate;
+      });
+
+    if (!isPersisting) {
+      activeQueueRef.current = nextQueue;
+      return nextQueue;
+    }
+
+    return activeQueueRef.current;
+  }, [orders, isPersisting]);
+
+  const historyQueue = useMemo(() => {
+    return orders
+      .filter(order => {
+        const historyStatuses = ['TERMINADO', 'LISTO_ENVIO', 'ENVIADO', 'ENTREGADO', 'CANCELADO'];
+        return historyStatuses.includes(order.status);
+      })
+      .sort((a, b) => {
+        const aDate = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const bDate = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        return bDate - aDate; // Más recientes arriba
       });
   }, [orders]);
 
@@ -247,28 +477,14 @@ export function ProductionPage() {
     setScannedOrder(prev => prev && prev.id === orderId ? { ...prev, ...patch } as Order : prev);
     try {
       const payload: any = { ...patch };
-      if (Object.prototype.hasOwnProperty.call(payload, 'due_date')) {
-        payload.estimated_completion = payload.due_date || null;
-        delete payload.due_date;
-      }
-      if (Object.prototype.hasOwnProperty.call(payload, 'process_start_at')) {
-        payload.started_at = payload.process_start_at || null;
-        delete payload.process_start_at;
-      }
-      if (Object.prototype.hasOwnProperty.call(payload, 'sla_days')) {
-        delete payload.sla_days;
-      }
 
       // @ts-ignore
-      const { error } = await supabaseProductivity
+      const { error } = await (supabaseProductivity as any)
         .from('produccion_work_orders')
         .update(payload)
-        .eq('id', orderId)
-        .select('id')
-        .maybeSingle();
+        .eq('id', orderId);
 
       if (error) throw error;
-      await loadOrders();
     } catch (error: any) {
       toast.error('Error sincronizando con Supabase: ' + error.message);
     }
@@ -294,6 +510,7 @@ export function ProductionPage() {
       });
 
       setScannedOrder(order);
+      setSelectedOrderId(order.id);
       setCameraActive(false);
       setQrInput('');
       setPackagesInput(order.packages_count || 1);
@@ -354,7 +571,6 @@ export function ProductionPage() {
       };
       await persistOrderUpdate(scannedOrder.id, updated);
       toast.success('Producción iniciada exitosamente');
-      setScannedOrder(null);
     } finally {
       setIsPersisting(false);
     }
@@ -682,7 +898,7 @@ export function ProductionPage() {
         </div>
       }
     >
-      <div className="flex flex-col gap-2 relative">
+      <div className="flex flex-col gap-6 relative">
         {/* ESCÁNER - PANTALLA COMPLETA */}
         <RoleBasedRender hideForRoles={['admin', 'manager']}>
           <div className="w-full">
@@ -733,288 +949,376 @@ export function ProductionPage() {
           </div>
         </RoleBasedRender>
 
-        {/* COLA DE PRODUCCIÓN - DEBAJO */}
-        <div className="w-full lg:flex-1">
-          <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-lg p-2">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-[#FF6B35]" />
-                <h3 className="text-white font-bold text-sm">Cola de producción</h3>
+        {/* CONTENEDOR DE COLA Y DETALLE - LADO A LADO EN DESKTOP */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
+          {/* COLA DE PRODUCCIÓN */}
+          <div className="w-full lg:w-[450px] shrink-0 flex flex-col gap-4">
+            <Tabs defaultValue="active" className="w-full">
+              <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-xl p-1 mb-4">
+                <TabsList className="grid w-full grid-cols-2 bg-transparent">
+                  <TabsTrigger
+                    value="active"
+                    className="data-[state=active]:bg-[#2A2D31] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center justify-center gap-2 h-11"
+                  >
+                    <ListFilter className="w-4 h-4" />
+                    Activos ({activeQueue.length})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="history"
+                    className="data-[state=active]:bg-[#2A2D31] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center justify-center gap-2 h-11"
+                  >
+                    <History className="w-4 h-4" />
+                    Historial
+                  </TabsTrigger>
+                </TabsList>
               </div>
-              <span className="text-xs text-[#B5B8BA] bg-[#2A2D31] px-2 py-1 rounded-full">{productionQueue.length} activos</span>
-            </div>
-            {isLoading && <div className="text-sm text-[#B5B8BA] py-4">Cargando órdenes...</div>}
-            {!isLoading && productionQueue.length === 0 && (
-              <div className="text-sm text-[#B5B8BA] py-4">No hay órdenes pendientes.</div>
-            )}
-            {!isLoading && productionQueue.length > 0 && (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {productionQueue.slice(0, 10).map((order) => {
-                  const due = getDueBadge(order);
-                  const isSelected = scannedOrder?.id === order.id;
-                  const progressWidth = order.status === 'PENDIENTE' ? 0 :
-                    order.status === 'CORTE' ? 25 :
-                      order.status === 'CONFECCION' ? 50 :
-                        order.status === 'TAPICERIA' ? 75 :
-                          order.status === 'CONTROL_CALIDAD' ? 90 :
-                            order.status === 'LISTO_ENVIO' ? 100 : 10;
 
-                  return (
-                    <div
-                      key={order.id}
-                      onClick={() => {
-                        setScannedOrder(order);
-                        setPackagesInput(order.packages_count || 1);
-                      }}
-                      className={`p-3 rounded-lg border cursor-pointer transition relative overflow-hidden ${isSelected
-                        ? 'bg-[#FF6B35]/10 border-[#FF6B35]'
-                        : 'bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41]'
-                        }`}
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <span className={`font-mono font-bold text-sm ${isSelected ? 'text-[#FF6B35]' : 'text-white'}`}>
-                          {order.order_number}
-                        </span>
-                        <span className={due.badge}>{due.label}</span>
-                      </div>
-                      <div className="flex flex-col gap-0.5 text-xs text-[#B5B8BA]">
-                        <span className="font-semibold text-white/90">{order.customer_name || 'Cliente Nuevo'}</span>
-                        <span className="text-[#8B8D90]">{order.fabric || 'Sin materialSpecified'}</span>
-                        <span className="text-[#6E6F71] text-[10px] leading-tight">{renderLinePreview(order)}</span>
-                      </div>
+              <TabsContent value="active" className="m-0 focus-visible:ring-0">
+                <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl p-4 flex flex-col min-h-[500px]">
+                  <h3 className="text-[#B5B8BA] font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
+                    <Clock className="w-4 h-4 mr-2 text-indigo-400" />
+                    Cola de producción activa
+                  </h3>
+                  {isLoading && <div className="text-sm text-[#B5B8BA] py-4">Cargando órdenes...</div>}
+                  {!isLoading && activeQueue.length === 0 && (
+                    <div className="flex-1 flex flex-col items-center justify-center text-[#B5B8BA] text-center opacity-40 py-12">
+                      <CheckCircle className="w-12 h-12 mb-3" />
+                      <p className="text-sm font-medium">Todo al día</p>
+                      <p className="text-xs uppercase tracking-tighter">No hay pedidos pendientes</p>
+                    </div>
+                  )}
+                  {!isLoading && activeQueue.length > 0 && (
+                    <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-2">
+                      {activeQueue.map((order) => {
+                        const isSelected = scannedOrder?.id === order.id;
+                        const dueInfo = getDueBadge(order);
+                        return (
+                          <button
+                            key={order.id}
+                            onClick={() => {
+                              setScannedOrder(order);
+                              setSelectedOrderId(order.id);
+                              setPackagesInput(order.packages_count || 1);
+                            }}
+                            className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden ${isSelected
+                              ? 'bg-indigo-900/10 border-indigo-500/50 ring-1 ring-indigo-500/20'
+                              : 'bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41] hover:bg-[#121417]'
+                              }`}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-indigo-400' : 'text-[#B5B8BA]'}`}>
+                                {order.order_number}
+                              </span>
+                              <div className={dueInfo.badge}>{dueInfo.label}</div>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="font-bold text-white text-base leading-tight">
+                                {order.customer_name}
+                              </p>
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#B5B8BA]">
+                                <span className="flex items-center gap-1">
+                                  <Package className="w-3 h-3" /> {order.quantity_total} uds
+                                </span>
+                                <span className="opacity-50">•</span>
+                                <span>{order.fabric}</span>
+                              </div>
+                              <div className="mt-2">
+                                <div className="flex justify-between text-[10px] text-[#B5B8BA] transition-all mb-1">
+                                  <span className="uppercase font-bold tracking-wider">{order.status}</span>
+                                  <span>{Math.round((['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'].indexOf(order.status) + 1) / 5 * 100)}%</span>
+                                </div>
+                                <div className="w-full bg-[#0D0F11] border border-[#2A2D31] rounded-full h-1.5 overflow-hidden">
+                                  <div
+                                    className="h-1.5 rounded-full bg-indigo-500 transition-all duration-500"
+                                    style={{ width: `${(['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'].indexOf(order.status) + 1) / 5 * 100}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
 
-                      {/* Cuadro de info adicional (Producción) */}
-                      <div className="mt-2 bg-[#1A1D1F]/50 border border-[#2A2D31] rounded-lg p-2">
-                        <div className="flex justify-between text-[10px] text-[#6E6F71] uppercase tracking-wide mb-1 font-bold">
-                          <span>PRODUCCIÓN</span>
-                          <span>{order.due_date ? new Date(order.due_date).toLocaleDateString() : 'SIN FECHA'}</span>
+              <TabsContent value="history" className="m-0 focus-visible:ring-0">
+                <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl p-4 flex flex-col min-h-[500px]">
+                  <h3 className="text-[#B5B8BA] font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
+                    <History className="w-4 h-4 mr-2 text-emerald-400" />
+                    Historial de pedidos finalizados
+                  </h3>
+                  {!isLoading && historyQueue.length === 0 && (
+                    <div className="flex-1 flex flex-col items-center justify-center text-[#B5B8BA] text-center opacity-40 py-12">
+                      <p className="text-sm font-medium">Historial vacío</p>
+                    </div>
+                  )}
+                  {!isLoading && historyQueue.length > 0 && (
+                    <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-2">
+                      {historyQueue.map((order) => {
+                        const isSelected = scannedOrder?.id === order.id;
+                        return (
+                          <button
+                            key={order.id}
+                            onClick={() => {
+                              setScannedOrder(order);
+                              setSelectedOrderId(order.id);
+                              setPackagesInput(order.packages_count || 1);
+                            }}
+                            className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden ${isSelected
+                              ? 'bg-emerald-900/10 border-emerald-500/50 ring-1 ring-emerald-500/20'
+                              : 'bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41] opacity-75 hover:opacity-100'
+                              }`}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="font-mono font-bold text-sm text-[#B5B8BA]">
+                                {order.order_number}
+                              </span>
+                              <div className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full px-2 py-0.5 font-bold uppercase">
+                                {order.status}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="font-bold text-white text-sm">
+                                {order.customer_name}
+                              </p>
+                              <p className="text-[10px] text-[#B5B8BA]">
+                                Finalizado: {order.updated_at ? new Date(order.updated_at).toLocaleString() : '---'}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* COLUMNA DERECHA */}
+          <div className="flex-1">
+            {scannedOrder ? (
+              <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl h-full flex flex-col">
+                <div className="border-b border-[#2A2D31] p-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">{scannedOrder.order_number}</h2>
+                      <p className="text-sm text-[#B5B8BA]">{scannedOrder.customer_name || 'Cliente Nuevo'}</p>
+                    </div>
+                    <span className="text-sm px-3 py-1 bg-[#2A2D31] text-white rounded-full">{scannedOrder.status}</span>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {/* Protocolo de revisión detallado */}
+                  {['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'EN_PROCESO'].includes(scannedOrder.status) && (
+                    <div className="bg-amber-900/10 border border-amber-500/30 p-5 rounded-xl flex items-start gap-4">
+                      <AlertOctagon className="w-8 h-8 text-amber-500 shrink-0 mt-1" />
+                      <div className="text-sm">
+                        <h4 className="font-bold text-amber-400 uppercase mb-2 tracking-wide text-lg">PROTOCOLO DE REVISIÓN</h4>
+                        <ul className="space-y-2 text-[#B5B8BA]">
+                          <li>• Atención: revisa que <strong>color y medidas</strong> coincidan con la orden.</li>
+                          <li>• Introduce el número correcto de bultos al finalizar.</li>
+                          <li>• Valida e imprime las etiquetas correspondientes.</li>
+                          <li>• Si la impresión falla, usa el botón <strong>REIMPRIMIR</strong>.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Información de producción */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
+                      <p className="text-xs text-[#B5B8BA]">Material</p>
+                      <p className="font-bold text-white">{scannedOrder.fabric || 'Sin especificar'}</p>
+                    </div>
+                    <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
+                      <p className="text-xs text-[#B5B8BA]">Total Uds</p>
+                      <p className="font-bold text-white">{scannedOrder.quantity_total || 0}</p>
+                    </div>
+                    <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
+                      <p className="text-xs text-[#B5B8BA]">Bultos</p>
+                      <p className="font-bold text-white">{scannedOrder.packages_count || 'Por definir'}</p>
+                    </div>
+                  </div>
+
+                  {/* Modal de finalización */}
+                  {showFinishModal && (
+                    <div className="bg-indigo-900/20 border border-indigo-500/50 p-6 rounded-xl">
+                      <h3 className="text-indigo-400 font-bold text-lg mb-4 flex items-center">
+                        <Package className="w-5 h-5 mr-2" />
+                        Generación de Bultos
+                      </h3>
+                      <p className="text-[#B5B8BA] text-sm mb-4">
+                        Indica el número total de bultos generados. Esta información se imprimirá en la etiqueta.
+                      </p>
+                      <div className="flex flex-col lg:flex-row items-stretch gap-4">
+                        <div className="production-stepper flex items-center justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setPackagesInput((prev) => Math.max(1, (prev || 1) - 1))}
+                            className="h-12 w-12 rounded-xl border border-[#2A2D31] bg-transparent text-white text-2xl font-bold hover:bg-transparent transition"
+                            aria-label="Reducir bultos"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={packagesInput}
+                            onChange={(e) => setPackagesInput(parseInt(e.target.value) || 1)}
+                            className="w-24 sm:w-28 bg-transparent border border-[#2A2D31] rounded-xl p-3 text-center text-2xl font-bold text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPackagesInput((prev) => (prev || 1) + 1)}
+                            className="h-12 w-12 rounded-xl border border-[#2A2D31] bg-transparent text-white text-2xl font-bold hover:bg-transparent transition"
+                            aria-label="Aumentar bultos"
+                          >
+                            +
+                          </button>
                         </div>
-                        <div className="text-[10px] text-[#8B8D90] flex flex-wrap gap-x-2 gap-y-0.5 mb-2">
-                          <span>Material: <span className="text-[#B5B8BA]">{order.fabric || 'N/D'}</span></span>
-                          <span>Color: <span className="text-[#B5B8BA]">{order.color || 'N/D'}</span></span>
-                          <span>Unidades: <span className="text-[#B5B8BA]">{order.quantity_total || 0}</span></span>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-[10px] text-[#8B8D90] font-bold">
-                            <span>Avance producción</span>
-                            <span>{progressWidth}%</span>
-                          </div>
-                          <div className="w-full bg-[#0D0F11] rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className="h-1.5 rounded-full bg-[#FF6B35] transition-all duration-500 shadow-[0_0_8px_rgba(255,107,53,0.3)]"
-                              style={{ width: `${progressWidth}%` }}
-                            ></div>
-                          </div>
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <button
+                            onClick={printShippingLabel}
+                            disabled={isPersisting}
+                            className="production-action-button w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
+                          >
+                            <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
+                            <span className="hidden sm:inline">Etiqueta PDF</span>
+                            <span className="sm:hidden">PDF</span>
+                          </button>
+                          <button
+                            onClick={printZebraLabel}
+                            disabled={isPersisting}
+                            className="production-action-button w-full py-3 sm:py-4 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
+                          >
+                            <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
+                            <span className="hidden sm:inline">Zebra (Red)</span>
+                            <span className="sm:hidden">Zebra</span>
+                          </button>
+                          <button
+                            onClick={printA4Document}
+                            disabled={isPersisting}
+                            className="production-action-button w-full py-3 sm:py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
+                          >
+                            <FileText className="w-5 h-5 mr-2 flex-shrink-0" />
+                            <span className="hidden sm:inline">Albarán A4</span>
+                            <span className="sm:hidden">A4</span>
+                          </button>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+                  )}
+
+                  {/* Tabla de desglose */}
+                  <div className="border border-[#2A2D31] rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-[#0D0F11]">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Cant.</th>
+                          <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Medidas</th>
+                          <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Notas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#2A2D31]">
+                        {scannedOrder.lines && scannedOrder.lines.length > 0 ? (
+                          scannedOrder.lines.map((line, idx) => (
+                            <tr key={line.id || `${scannedOrder.id}-${idx}`}>
+                              <td className="px-4 py-2 font-bold text-white">{line.quantity}</td>
+                              <td className="px-4 py-2 text-[#B5B8BA]">{line.width} x {line.height}</td>
+                              <td className="px-4 py-2 italic text-[#B5B8BA]">{line.notes || '-'}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className="px-4 py-6 text-center text-[#B5B8BA]">
+                              Sin desglose registrado
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Botones de acción */}
+                <div className="p-6 border-t border-[#2A2D31]">
+                  {scannedOrder.status === 'PENDIENTE' && (
+                    <button
+                      onClick={startProduction}
+                      disabled={isPersisting}
+                      className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-lg rounded-xl flex items-center justify-center transition disabled:opacity-50"
+                    >
+                      <Clock className="w-6 h-6 mr-2" />
+                      INICIAR PRODUCCIÓN
+                    </button>
+                  )}
+
+                  {['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD'].includes(scannedOrder.status) && !showFinishModal && (
+                    <button
+                      onClick={initiateFinish}
+                      className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm sm:text-base rounded-lg flex items-center justify-center transition gap-2"
+                    >
+                      <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                      <span className="whitespace-nowrap">Finalizar (A Envío)</span>
+                    </button>
+                  )}
+
+                  {scannedOrder.status === 'LISTO_ENVIO' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={printShippingLabel}
+                        className="flex-1 py-3 px-3 bg-[#2A2D31] hover:bg-[#3A3D41] text-white font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
+                      >
+                        <Printer className="w-4 h-4 flex-shrink-0" />
+                        <span className="whitespace-nowrap">Reimprimir</span>
+                      </button>
+                      <button
+                        onClick={printZebraLabel}
+                        className="flex-1 py-3 px-3 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
+                      >
+                        <Printer className="w-4 h-4 flex-shrink-0" />
+                      </button>
+                      <div className="flex-[2] py-3 px-3 bg-[#0D0F11] text-emerald-400 rounded-lg font-semibold text-xs sm:text-sm text-center border border-emerald-500/30 flex items-center justify-center gap-2">
+                        <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">Listo ({scannedOrder.packages_count} Bultos)</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="h-full border-2 border-dashed border-[#2A2D31] rounded-2xl flex flex-col items-center justify-center text-[#B5B8BA] bg-[#0D0F11] p-12">
+                <QrCode className="w-16 h-16 mb-4 opacity-30" />
+                <p className="text-lg font-medium">Escanea un código para ver detalles</p>
+                <p className="text-sm text-center max-w-md mt-2">
+                  Usa el escáner de la izquierda o selecciona una orden de la lista para comenzar.
+                </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* COLUMNA DERECHA */}
-        <div className="flex-1">
-          {scannedOrder ? (
-            <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl h-full flex flex-col">
-              <div className="border-b border-[#2A2D31] p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">{scannedOrder.order_number}</h2>
-                    <p className="text-sm text-[#B5B8BA]">{scannedOrder.customer_name || 'Cliente Nuevo'}</p>
-                  </div>
-                  <span className="text-sm px-3 py-1 bg-[#2A2D31] text-white rounded-full">{scannedOrder.status}</span>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* Protocolo de revisión detallado */}
-                {['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'EN_PROCESO'].includes(scannedOrder.status) && (
-                  <div className="bg-amber-900/10 border border-amber-500/30 p-5 rounded-xl flex items-start gap-4">
-                    <AlertOctagon className="w-8 h-8 text-amber-500 shrink-0 mt-1" />
-                    <div className="text-sm">
-                      <h4 className="font-bold text-amber-400 uppercase mb-2 tracking-wide text-lg">PROTOCOLO DE REVISIÓN</h4>
-                      <ul className="space-y-2 text-[#B5B8BA]">
-                        <li>• Atención: revisa que <strong>color y medidas</strong> coincidan con la orden.</li>
-                        <li>• Introduce el número correcto de bultos al finalizar.</li>
-                        <li>• Valida e imprime las etiquetas correspondientes.</li>
-                        <li>• Si la impresión falla, usa el botón <strong>REIMPRIMIR</strong>.</li>
-                      </ul>
-                    </div>
-                  </div>
-                )}
-
-                {/* Información de producción */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
-                    <p className="text-xs text-[#B5B8BA]">Material</p>
-                    <p className="font-bold text-white">{scannedOrder.fabric || 'Sin especificar'}</p>
-                  </div>
-                  <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
-                    <p className="text-xs text-[#B5B8BA]">Total Uds</p>
-                    <p className="font-bold text-white">{scannedOrder.quantity_total || 0}</p>
-                  </div>
-                  <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
-                    <p className="text-xs text-[#B5B8BA]">Bultos</p>
-                    <p className="font-bold text-white">{scannedOrder.packages_count || 'Por definir'}</p>
-                  </div>
-                </div>
-
-                {/* Modal de finalización */}
-                {showFinishModal && (
-                  <div className="bg-indigo-900/20 border border-indigo-500/50 p-6 rounded-xl">
-                    <h3 className="text-indigo-400 font-bold text-lg mb-4 flex items-center">
-                      <Package className="w-5 h-5 mr-2" />
-                      Generación de Bultos
-                    </h3>
-                    <p className="text-[#B5B8BA] text-sm mb-4">
-                      Indica el número total de bultos generados. Esta información se imprimirá en la etiqueta.
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="number"
-                        min="1"
-                        value={packagesInput}
-                        onChange={(e) => setPackagesInput(parseInt(e.target.value) || 1)}
-                        className="w-32 bg-[#0D0F11] border border-[#2A2D31] rounded-xl p-4 text-center text-2xl font-bold text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                      />
-                      <div className="flex-1 flex gap-2">
-                        <button
-                          onClick={printShippingLabel}
-                          disabled={isPersisting}
-                          className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
-                        >
-                          <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
-                          <span className="whitespace-nowrap">Etiqueta PDF</span>
-                        </button>
-                        <button
-                          onClick={printZebraLabel}
-                          disabled={isPersisting}
-                          className="flex-1 py-4 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
-                        >
-                          <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
-                          <span className="whitespace-nowrap">Zebra (Red)</span>
-                        </button>
-                        <button
-                          onClick={printA4Document}
-                          disabled={isPersisting}
-                          className="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
-                        >
-                          <FileText className="w-5 h-5 mr-2 flex-shrink-0" />
-                          <span className="whitespace-nowrap">Albarán A4</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Tabla de desglose */}
-                <div className="border border-[#2A2D31] rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[#0D0F11]">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Cant.</th>
-                        <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Medidas</th>
-                        <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Notas</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#2A2D31]">
-                      {scannedOrder.lines && scannedOrder.lines.length > 0 ? (
-                        scannedOrder.lines.map((line) => (
-                          <tr key={line.id}>
-                            <td className="px-4 py-2 font-bold text-white">{line.quantity}</td>
-                            <td className="px-4 py-2 text-[#B5B8BA]">{line.width} x {line.height}</td>
-                            <td className="px-4 py-2 italic text-[#B5B8BA]">{line.notes || '-'}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-[#B5B8BA]">
-                            Sin desglose registrado
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Botones de acción */}
-              <div className="p-6 border-t border-[#2A2D31]">
-                {scannedOrder.status === 'PENDIENTE' && (
-                  <button
-                    onClick={startProduction}
-                    disabled={isPersisting}
-                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-lg rounded-xl flex items-center justify-center transition disabled:opacity-50"
-                  >
-                    <Clock className="w-6 h-6 mr-2" />
-                    INICIAR PRODUCCIÓN
-                  </button>
-                )}
-
-                {['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD'].includes(scannedOrder.status) && !showFinishModal && (
-                  <button
-                    onClick={initiateFinish}
-                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm sm:text-base rounded-lg flex items-center justify-center transition gap-2"
-                  >
-                    <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                    <span className="whitespace-nowrap">Finalizar (A Envío)</span>
-                  </button>
-                )}
-
-                {scannedOrder.status === 'LISTO_ENVIO' && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={printShippingLabel}
-                      className="flex-1 py-3 px-3 bg-[#2A2D31] hover:bg-[#3A3D41] text-white font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
-                    >
-                      <Printer className="w-4 h-4 flex-shrink-0" />
-                      <span className="whitespace-nowrap">Reimprimir</span>
-                    </button>
-                    <button
-                      onClick={printZebraLabel}
-                      className="flex-1 py-3 px-3 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
-                    >
-                      <Printer className="w-4 h-4 flex-shrink-0" />
-                    </button>
-                    <div className="flex-[2] py-3 px-3 bg-[#0D0F11] text-emerald-400 rounded-lg font-semibold text-xs sm:text-sm text-center border border-emerald-500/30 flex items-center justify-center gap-2">
-                      <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                      <span className="truncate">Listo ({scannedOrder.packages_count} Bultos)</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="h-full border-2 border-dashed border-[#2A2D31] rounded-2xl flex flex-col items-center justify-center text-[#B5B8BA] bg-[#0D0F11] p-12">
-              <QrCode className="w-16 h-16 mb-4 opacity-30" />
-              <p className="text-lg font-medium">Escanea un código para ver detalles</p>
-              <p className="text-sm text-center max-w-md mt-2">
-                Usa el escáner de la izquierda o selecciona una orden de la lista para comenzar.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <MobileAlert
-        isOpen={alertState.isOpen}
-        type={alertState.type}
-        title={alertState.title}
-        message={alertState.message}
-        onConfirm={closeAlert}
-      />
-
-      {scannedOrder && (
-        <IncidentReportModal
-          isOpen={isIncidentModalOpen}
-          onClose={() => setIsIncidentModalOpen(false)}
-          orderId={scannedOrder.id}
-          orderNumber={scannedOrder.order_number}
+        <MobileAlert
+          isOpen={alertState.isOpen}
+          type={alertState.type}
+          title={alertState.title}
+          message={alertState.message}
+          onConfirm={closeAlert}
         />
-      )}
+
+        {scannedOrder && (
+          <IncidentReportModal
+            isOpen={isIncidentModalOpen}
+            onClose={() => setIsIncidentModalOpen(false)}
+            orderId={scannedOrder.id}
+            orderNumber={scannedOrder.order_number}
+          />
+        )}
+      </div>
     </PageShell>
   );
 }

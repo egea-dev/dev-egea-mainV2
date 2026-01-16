@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import PageShell from "@/components/layout/PageShell";
 import { useProfile } from "@/hooks/use-supabase";
 import { resolveOrderStatus } from "@/lib/order-status";
+import { summarizeMaterials } from "@/lib/materials";
 
 export default function CommercialPage() {
   const { data: orders = [], isLoading } = useOrders();
@@ -100,8 +101,9 @@ export default function CommercialPage() {
             : (order.admin_code || rawOrderNumber || null);
           const adminRef = order.admin_code;
           if ((orderRef && existingSet.has(orderRef)) || (adminRef && existingSet.has(adminRef))) continue;
-          const firstLine = (order.lines || [])[0];
-          const fabric = order.fabric || firstLine?.material || "N/D";
+          const lines = order.lines || [];
+          const firstLine = lines[0];
+          const fabric = summarizeMaterials(lines, order.fabric || "N/D");
           const color = order.color || firstLine?.color || "N/D";
           const quantity = Number(order.quantity_total) || 0;
 
@@ -122,7 +124,7 @@ export default function CommercialPage() {
             notes_internal: order.internal_notes || null
           };
 
-          const { error } = await supabaseProductivity
+          const { data: newWorkOrder, error } = await (supabaseProductivity as any)
             .from("produccion_work_orders")
             .insert([payload])
             .select("id")
@@ -133,6 +135,22 @@ export default function CommercialPage() {
             failedCount += 1;
             lastErrorMessage = error.message || "Error desconocido";
           } else {
+            if (lines.length > 0 && newWorkOrder?.id) {
+              const linePayload = lines.map((line: any) => ({
+                work_order_id: newWorkOrder.id,
+                quantity: Number(line.quantity) || 0,
+                width: Number(line.width) || 0,
+                height: Number(line.height) || 0,
+                notes: line.notes || null,
+                material: line.material || line.fabric || null
+              }));
+              const { error: linesError } = await (supabaseProductivity as any)
+                .from("produccion_work_order_lines")
+                .insert(linePayload as any[]);
+              if (linesError) {
+                console.warn("No se pudieron crear lineas de work order:", linesError);
+              }
+            }
             createdCount += 1;
           }
         }
@@ -146,6 +164,7 @@ export default function CommercialPage() {
         console.warn("Fallo al sincronizar work orders:", error);
       } finally {
         if (failedCount === 0) {
+          // Mantener en true para evitar bucles, pero permitir ejecuciones controladas
           syncRanRef.current = true;
         }
       }
@@ -264,7 +283,7 @@ export default function CommercialPage() {
       created_by: user.id,
       admin_code: "",
       customer_name: "Cliente Nuevo",
-      fabric: "Lino",
+      fabric: "",
       quantity_total: 0,
       status: "PENDIENTE_PAGO" as OrderStatus,
       lines: [],
@@ -298,7 +317,7 @@ export default function CommercialPage() {
       created_by: user.id,
       admin_code: "",
       customer_name: "Cliente Importado",
-      fabric: "Lino",
+      fabric: "",
       quantity_total: 0,
       status: "PENDIENTE_PAGO" as OrderStatus,
       lines: [],
@@ -493,8 +512,8 @@ export default function CommercialPage() {
                 className="border-border/60 bg-card/80 hover:border-primary/30 transition-all cursor-move active:scale-95"
               >
                 <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div>
+                  <div className="flex justify-between items-start">
+                    <div>
                       <CardTitle className="text-sm font-mono text-foreground">
                         {order.admin_code || order.order_number}
                       </CardTitle>

@@ -5,7 +5,31 @@ import { Order, OrderStatus } from "@/types/commercial";
 import { toast } from "sonner";
 import { ORDER_STATUS_FLOW, resolveOrderStatus } from "@/lib/order-status";
 import { generateQRPayload } from "@/lib/qr-utils";
-import { useSLADays } from "@/hooks/use-sla-days";
+import { getSLADays } from "@/hooks/use-sla-days";
+import { summarizeMaterials } from "@/lib/materials";
+
+const upsertCalendarEvent = async (order: any) => {
+    // Validación estricta: No sincronizar si no hay fecha de entrega
+    if (!order.delivery_date || order.delivery_date === 'null' || order.delivery_date === '') {
+        console.warn("Skipping calendar sync: delivery_date is missing for order", order.id);
+        return;
+    }
+
+    const { error } = await (supabase as any)
+        .from('comercial_calendar_events')
+        .upsert({
+            order_id: order.id,
+            title: `Entrega: ${order.order_number || order.admin_code || 'SIN-REF'}`,
+            event_date: order.delivery_date,
+            customer_name: order.customer_company || order.customer_name,
+            region: order.delivery_region || order.region || 'PENINSULA',
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'order_id' });
+
+    if (error) {
+        console.error("Error syncing calendar event:", error);
+    }
+};
 
 export const useOrders = () => {
     return useQuery({
@@ -36,9 +60,9 @@ export const useCreateOrder = () => {
 
     return useMutation({
         mutationFn: async (orderData: Partial<Order>) => {
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from('comercial_orders')
-                .insert([orderData])
+                .insert([orderData] as any[])
                 .select()
                 .single();
 
@@ -49,7 +73,8 @@ export const useCreateOrder = () => {
 
             return data as Order;
         },
-        onSuccess: () => {
+        onSuccess: async (data) => {
+            if (data?.id) await upsertCalendarEvent(data);
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             toast.success("Pedido creado exitosamente");
         },
@@ -63,7 +88,7 @@ export const useUpdateOrderStatus = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ orderId, status, comment }: { orderId: string; status: OrderStatus; comment: string }) => {
+        mutationFn: async ({ orderId, status, comment = "Cambio de estado balanceado" }: { orderId: string; status: OrderStatus; comment?: string }) => {
             // Get current order to track old status and apply business rules
             const { data: currentOrder, error: currentError } = await supabase
                 .from('comercial_orders')
@@ -76,7 +101,11 @@ export const useUpdateOrderStatus = () => {
                 throw currentError;
             }
 
-            const currentStatus = resolveOrderStatus(currentOrder?.status);
+            if (!currentOrder) {
+                throw new Error("Pedido no encontrado");
+            }
+
+            const currentStatus = resolveOrderStatus((currentOrder as any).status);
             const nextStatus = resolveOrderStatus(status);
 
             if (!nextStatus) {
@@ -106,17 +135,17 @@ export const useUpdateOrderStatus = () => {
                 }
             }
 
-            const firstLine = (currentOrder?.lines || [])[0];
-            const fabric = currentOrder?.fabric || firstLine?.material || "N/D";
-            const color = currentOrder?.color || firstLine?.color || "N/D";
-            const customerDisplay = currentOrder?.customer_company || currentOrder?.customer_name || "Cliente";
-            const region = currentOrder?.delivery_region || currentOrder?.region || "PENINSULA";
-            const quantity = Number(currentOrder?.quantity_total) || 0;
-            const orderNumber = currentOrder?.order_number || currentOrder?.admin_code || "SIN-REF";
+            const lines = (currentOrder as any)?.lines || [];
+            const firstLine = lines[0];
+            const fabric = summarizeMaterials(lines, (currentOrder as any)?.fabric || "N/D");
+            const color = (currentOrder as any)?.color || firstLine?.color || "N/D";
+            const customerDisplay = (currentOrder as any)?.customer_company || (currentOrder as any)?.customer_name || "Cliente";
+            const region = (currentOrder as any)?.delivery_region || (currentOrder as any)?.region || "PENINSULA";
+            const quantity = Number((currentOrder as any)?.quantity_total) || 0;
             const resolvedOrderNumber = (() => {
-                const rawOrderNumber = currentOrder?.order_number || "";
+                const rawOrderNumber = (currentOrder as any)?.order_number || "";
                 if (rawOrderNumber.toUpperCase().startsWith("INT-")) return rawOrderNumber;
-                return currentOrder?.admin_code || rawOrderNumber || "SIN-REF";
+                return (currentOrder as any)?.admin_code || rawOrderNumber || "SIN-REF";
             })();
             const createProductionWorkOrder = async ({
                 status,
@@ -134,24 +163,25 @@ export const useUpdateOrderStatus = () => {
                     customer_name: customerDisplay,
                     status,
                     region,
-                    delivery_address: currentOrder?.delivery_address || null,
-                    contact_name: currentOrder?.contact_name || null,
-                    phone: currentOrder?.phone || null,
+                    delivery_address: (currentOrder as any)?.delivery_address || null,
+                    contact_name: (currentOrder as any)?.contact_name || null,
+                    phone: (currentOrder as any)?.phone || null,
                     fabric,
                     color,
                     quantity_total: quantity,
-                    notes_internal: currentOrder?.internal_notes || null,
-                    admin_code: currentOrder?.admin_code || null,
-                    due_date: dueDate || currentOrder?.delivery_date || null,
+                    notes_internal: (currentOrder as any)?.internal_notes || null,
+                    admin_code: (currentOrder as any)?.admin_code || null,
+                    due_date: dueDate || (currentOrder as any)?.delivery_date || null,
                     process_start_at: processStartAt || null,
                     sla_days: slaDays || null,
+                    // Eliminada columna 'lines' que no existe en produccion_work_orders
                     // Generar QR con customer_company (razón social)
                     qr_payload: generateQRPayload({
                         orderNumber: resolvedOrderNumber,
-                        customerName: currentOrder?.customer_company || currentOrder?.customer_name || customerDisplay,
+                        customerName: (currentOrder as any)?.customer_company || (currentOrder as any)?.customer_name || customerDisplay,
                         region,
-                        deliveryDate: currentOrder?.delivery_date || null,
-                        lines: currentOrder?.lines?.map(line => ({
+                        deliveryDate: (currentOrder as any)?.delivery_date || null,
+                        lines: lines?.map((line: any) => ({
                             material: line.material,
                             quantity: line.quantity
                         })) || [],
@@ -166,7 +196,7 @@ export const useUpdateOrderStatus = () => {
                     }
                 };
 
-                const { data: newWorkOrder, error: createError } = await supabase
+                const { data: newWorkOrder, error: createError } = await (supabase as any)
                     .from('produccion_work_orders')
                     .insert([payload])
                     .select('id')
@@ -174,20 +204,34 @@ export const useUpdateOrderStatus = () => {
 
                 if (createError) throw createError;
 
-                // Crear evento en calendario comercial usando delivery_date + SLA días
-                if (currentOrder?.delivery_date) {
-                    const slaDays = useSLADays(region);
-                    const deliveryDate = new Date(currentOrder.delivery_date);
-                    const eventDate = new Date(deliveryDate);
-                    eventDate.setDate(eventDate.getDate() + slaDays);
+                if (lines.length > 0 && newWorkOrder?.id) {
+                    const linePayload = lines.map((line: any) => ({
+                        work_order_id: newWorkOrder.id,
+                        quantity: Number(line.quantity) || 0,
+                        width: Number(line.width) || 0,
+                        height: Number(line.height) || 0,
+                        notes: line.notes || null,
+                        material: line.material || line.fabric || null
+                    }));
+                    const { error: linesError } = await (supabase as any)
+                        .from('produccion_work_order_lines')
+                        .insert(linePayload as any[]);
+                    if (linesError) {
+                        console.error("Error creating work order lines:", linesError);
+                    }
+                }
 
-                    await supabase.from('comercial_calendar_events').insert([{
-                        title: `Entrega: ${resolvedOrderNumber}`,
-                        event_date: eventDate.toISOString().split('T')[0],
-                        order_id: currentOrder.id,
-                        customer_name: currentOrder.customer_company || currentOrder.customer_name,
-                        region: region
-                    }]);
+                // Crear/Actualizar evento en calendario comercial usando el helper
+                const finalDeliveryDate = updates.delivery_date || (currentOrder as any)?.delivery_date;
+                if (finalDeliveryDate) {
+                    await upsertCalendarEvent({
+                        id: (currentOrder as any)!.id,
+                        order_number: resolvedOrderNumber,
+                        delivery_date: finalDeliveryDate,
+                        customer_company: (currentOrder as any)!.customer_company,
+                        customer_name: (currentOrder as any)!.customer_name,
+                        delivery_region: region
+                    });
                 }
 
                 return newWorkOrder?.id;
@@ -203,22 +247,16 @@ export const useUpdateOrderStatus = () => {
             let computedSlaDays: number | null = null;
 
             if (nextStatus === "EN_PROCESO") {
-                // Removed production_start_date - column doesn't exist in DB
-
-                if (!currentOrder?.delivery_date) {
+                if (!(currentOrder as any)?.delivery_date) {
                     try {
-                        const { data: slaConfig } = await supabase
-                            .from("comercial_sla_config")
-                            .select("days")
-                            .eq("region", currentOrder?.delivery_region || currentOrder?.region || null)
-                            .maybeSingle();
-                        const days = Number(slaConfig?.days) || 7;
+                        const region = (currentOrder as any)?.delivery_region || (currentOrder as any)?.region || 'PENINSULA';
+                        const days = getSLADays(region);
                         computedSlaDays = days;
                         const target = new Date();
                         target.setDate(target.getDate() + days);
                         updates.delivery_date = target.toISOString().slice(0, 10);
                     } catch (slaError) {
-                        console.warn("No se pudo cargar SLA para calcular fecha de entrega", slaError);
+                        console.warn("No se pudo calcular SLA para fecha de entrega", slaError);
                     }
                 }
             }
@@ -236,8 +274,8 @@ export const useUpdateOrderStatus = () => {
                 return `"${String(value).replace(/"/g, '""')}"`;
             };
             const workOrderMatch = [
-                currentOrder?.order_number ? `order_number.eq.${escapeOrValue(currentOrder.order_number)}` : null,
-                currentOrder?.admin_code ? `admin_code.eq.${escapeOrValue(currentOrder.admin_code)}` : null
+                (currentOrder as any)?.order_number ? `order_number.eq.${escapeOrValue((currentOrder as any).order_number)}` : null,
+                (currentOrder as any)?.admin_code ? `admin_code.eq.${escapeOrValue((currentOrder as any).admin_code)}` : null
             ].filter(Boolean).join(',');
 
             if (nextStatus === "PAGADO" && currentStatus !== "PAGADO") {
@@ -258,7 +296,7 @@ export const useUpdateOrderStatus = () => {
             }
 
             // Update order status
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from('comercial_orders')
                 .update(updates as any)
                 .eq('id', orderId)
@@ -271,7 +309,7 @@ export const useUpdateOrderStatus = () => {
             }
 
             if (nextStatus === "EN_PROCESO" && currentStatus !== "EN_PROCESO") {
-                const { data: existingWorkOrder, error: existingError } = await supabase
+                const { data: existingWorkOrder, error: existingError } = await (supabase as any)
                     .from('produccion_work_orders')
                     .select('id, due_date')
                     .or(workOrderMatch)
@@ -290,7 +328,7 @@ export const useUpdateOrderStatus = () => {
                         sla_days: resolvedSlaDays
                     };
 
-                    const { error: updateError } = await supabase
+                    const { error: updateError } = await (supabase as any)
                         .from('produccion_work_orders')
                         .update(payload)
                         .eq('id', existingWorkOrder.id);
@@ -302,24 +340,13 @@ export const useUpdateOrderStatus = () => {
                 };
 
                 if (existingWorkOrder) {
-                    let slaDays = computedSlaDays;
-                    if (!slaDays) {
-                        try {
-                            const { data: slaConfig } = await supabase
-                                .from("comercial_sla_config")
-                                .select("days")
-                                .eq("region", currentOrder?.delivery_region || currentOrder?.region || null)
-                                .maybeSingle();
-                            slaDays = Number(slaConfig?.days) || 7;
-                        } catch (slaError) {
-                            console.warn("No se pudo cargar SLA para produccion", slaError);
-                        }
-                    }
+                    const region = (currentOrder as any)?.delivery_region || (currentOrder as any)?.region || 'PENINSULA';
+                    const slaDays = computedSlaDays || getSLADays(region);
 
-                    const dueDate = (existingWorkOrder as any)?.due_date || updates.delivery_date || currentOrder?.delivery_date || null;
+                    const dueDate = updates.delivery_date || (currentOrder as any)?.delivery_date || null;
                     await updateWorkOrder(dueDate, slaDays || null);
                 } else {
-                    const dueDate = updates.delivery_date || currentOrder?.delivery_date || null;
+                    const dueDate = updates.delivery_date || (currentOrder as any)?.delivery_date || null;
                     const workOrderId = await createProductionWorkOrder({
                         status: 'CORTE',
                         processStartAt: now,
@@ -335,7 +362,7 @@ export const useUpdateOrderStatus = () => {
                 .from('comercial_order_status_log')
                 .insert({
                     order_id: orderId,
-                    old_status: currentOrder?.status || null,
+                    old_status: (currentOrder as any)?.status || null,
                     new_status: nextStatus,
                     comment,
                     changed_by: userId
@@ -365,7 +392,7 @@ export const useUpdateOrder = () => {
         mutationFn: async (order: Partial<Order>) => {
             if (!order.id) throw new Error("ID de pedido requerido para actualizar");
 
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from('comercial_orders')
                 .update(order as any)
                 .eq('id', order.id)
@@ -379,9 +406,42 @@ export const useUpdateOrder = () => {
 
             return data as Order;
         },
-        onSuccess: () => {
+        onSuccess: async (data) => {
+            if (data?.id) {
+                await upsertCalendarEvent(data);
+
+                // Sincronizar con Orden de Producción si existe
+                const resolvedOrderNumber = (() => {
+                    const rawOrderNumber = data.order_number || "";
+                    if (rawOrderNumber.toUpperCase().startsWith("INT-")) return rawOrderNumber;
+                    return data.admin_code || rawOrderNumber || "SIN-REF";
+                })();
+
+                const escapeOrValue = (value?: string | null) => {
+                    if (!value) return null;
+                    return `"${String(value).replace(/"/g, '""')}"`;
+                };
+
+                const workOrderMatch = [
+                    data.order_number ? `order_number.eq.${escapeOrValue(data.order_number)}` : null,
+                    data.admin_code ? `admin_code.eq.${escapeOrValue(data.admin_code)}` : null
+                ].filter(Boolean).join(',');
+
+                if (workOrderMatch) {
+                    await (supabase as any)
+                        .from('produccion_work_orders')
+                        .update({
+                            due_date: data.delivery_date,
+                            customer_name: data.customer_company || data.customer_name,
+                            region: data.delivery_region || data.region,
+                            fabric: summarizeMaterials(data.lines || [], data.fabric || "N/D"),
+                            // Eliminada columna 'lines' que no existe en produccion_work_orders
+                        })
+                        .or(workOrderMatch);
+                }
+            }
             queryClient.invalidateQueries({ queryKey: ['orders'] });
-            // toast.success("Cambios guardados correctamente"); // Opcional, ya que el modal suele mostrar alert
+            toast.success("Cambios guardados correctamente");
         },
         onError: (error: any) => {
             console.error("Mutation Error:", error);

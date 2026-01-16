@@ -15,8 +15,11 @@ import {
   ExternalLink,
   Copy,
   PauseCircle,
-  AlertOctagon
+  AlertOctagon,
+  History,
+  ListFilter
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import PageShell from '@/components/layout/PageShell';
 import QRScanner from '@/components/common/QRScanner';
 import { RoleBasedRender } from '@/components/common/RoleBasedRender';
@@ -27,6 +30,7 @@ import { TrackingToggle } from '@/components/shipping/TrackingToggle';
 import { IncidentReportButton } from '@/components/incidents/IncidentReportButton';
 import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
 import { parseQRCode, validateQRWithLines, extractOrderNumber } from '@/lib/qr-utils';
+import { summarizeMaterials } from '@/lib/materials';
 
 // Tipos
 interface Order {
@@ -144,22 +148,48 @@ export default function ShippingScanPage() {
       setIsLoading(true);
       console.log('🔍 Cargando órdenes de envío...');
 
-      const { data, error } = await supabaseProductivity
+      const { data: ordersData, error: ordersError } = await supabaseProductivity
         .from('produccion_work_orders')
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('📦 Órdenes recibidas:', data);
-      console.log('❌ Error:', error);
+      console.log('📦 Órdenes recibidas:', ordersData);
+      console.log('❌ Error:', ordersError);
 
-      if (error) throw error;
-      const parsed = (data || []).map((o: any) => ({
-        ...o,
-        fabric: o.technical_specs?.fabric || o.fabric || 'Estándar',
-        color: o.technical_specs?.color || o.color || 'N/D',
-        quantity_total: o.technical_specs?.quantity || o.quantity_total || 1
-      }));
-      setOrders(parsed);
+      if (ordersError) throw ordersError;
+
+      // Fetch lines for these orders
+      const { data: linesData, error: linesError } = await supabaseProductivity
+        .from('produccion_work_order_lines')
+        .select('*')
+        .in('work_order_id', ordersData?.map((o: any) => o.id) || []);
+
+      if (linesError) {
+        console.warn('Error fetching work order lines:', linesError);
+      }
+
+      const data = ordersData?.map((o: any) => {
+        // Priorizar líneas de la columna JSON, si no, usar la tabla relacional
+        const lines = (Array.isArray(o.lines) && o.lines.length > 0)
+          ? o.lines
+          : (linesData?.filter((l: any) => l.work_order_id === o.id) || []);
+
+        const specs = o.technical_specs || {};
+        const materialList = summarizeMaterials(lines, specs.fabric || o.fabric || "N/D");
+
+        const colorList = lines.length > 0
+          ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
+          : (specs.color || o.color || "N/D");
+
+        return {
+          ...o,
+          lines,
+          fabric: materialList || "N/D",
+          color: colorList || "N/D",
+          quantity_total: o.quantity_total || specs.quantity || 1
+        };
+      });
+      setOrders(data || []);
     } catch (error: any) {
       console.error('💥 Error loading orders:', error);
       toast.error('Error al cargar órdenes: ' + error.message);
@@ -173,32 +203,26 @@ export default function ShippingScanPage() {
     loadOrders();
   }, []);
 
-  const pendingOrders = useMemo(() => {
-    console.log('🔍 Filtrando órdenes para envío...');
-    console.log('Total órdenes:', orders.length);
-
-    const filtered = orders.filter(
-      o => {
-        // Excluir órdenes ya ENVIADO (tareas terminadas)
-        if (o.status === 'ENVIADO') {
-          return false;
-        }
-
-        const isReady = o.status === 'PTE_ENVIO' ||
-          o.status === 'LISTO_ENVIO' ||
-          (o.status === 'EN_PROCESO' && o.needs_shipping_validation) ||
-          isRecentShipment(o);
-
-        if (isReady) {
-          console.log(`✅ Orden ${o.order_number} lista para envío (${o.status})`);
-        }
-
-        return isReady;
+  const activeShipments = useMemo(() => {
+    return orders.filter(o => {
+      // Excluir órdenes ya ENVIADO (para historial)
+      if (o.status === 'ENVIADO') {
+        // En la vista activa, solo mostramos los enviados muy recientes (<12h)
+        return isRecentShipment(o);
       }
-    );
 
-    console.log('Órdenes listas para envío:', filtered.length);
-    return filtered;
+      return o.status === 'PTE_ENVIO' ||
+        o.status === 'LISTO_ENVIO' ||
+        (o.status === 'EN_PROCESO' && o.needs_shipping_validation);
+    });
+  }, [orders]);
+
+  const historyShipments = useMemo(() => {
+    return orders.filter(o => {
+      if (o.status === 'ENTREGADO') return true;
+      if (o.status === 'ENVIADO' && !isRecentShipment(o)) return true;
+      return false;
+    });
   }, [orders]);
 
   const persistOrderUpdate = async (orderId: string, patch: Partial<Order>) => {
@@ -631,377 +655,404 @@ export default function ShippingScanPage() {
           </div>
         </RoleBasedRender>
 
-        {/* COLA DE ALMACÉN - DEBAJO EN MÓVIL, AL LADO EN DESKTOP */}
-        <div className="w-full lg:flex-1">
-          <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2">
-            <h3 className="font-bold text-[#8B8D90] mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
-              <span>Cola de Almacén</span>
-              <span className="bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full text-xs">{pendingOrders.length}</span>
-            </h3>
-            {isLoading && <div className="text-sm text-[#B5B8BA] py-4">Cargando órdenes...</div>}
-            {!isLoading && pendingOrders.length === 0 && (
-              <div className="text-sm text-[#B5B8BA] py-4">No hay pedidos pendientes.</div>
-            )}
-            {!isLoading && pendingOrders.length > 0 && (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
-                {pendingOrders.slice(0, 10).map((order) => {
-                  const isIncomplete = (order.scanned_packages || 0) > 0 && (order.scanned_packages || 0) < (order.packages_count || 1);
-                  const isSelected = scannedOrder?.id === order.id;
-                  const recentlyShipped = isRecentShipment(order);
-                  return (
+        {/* CONTENEDOR DE COLA Y DETALLE - LADO A LADO EN DESKTOP */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
+          {/* COLA DE ALMACÉN */}
+          <div className="w-full lg:w-[450px] shrink-0 flex flex-col gap-4">
+            <Tabs defaultValue="active" className="w-full">
+              <div className="bg-[#323438] border border-[#45474A] rounded-xl p-1 mb-4">
+                <TabsList className="grid w-full grid-cols-2 bg-transparent">
+                  <TabsTrigger
+                    value="active"
+                    className="data-[state=active]:bg-[#45474A] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center gap-2"
+                  >
+                    <ListFilter className="w-4 h-4" />
+                    Expediciones ({activeShipments.length})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="history"
+                    className="data-[state=active]:bg-[#45474A] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center gap-2"
+                  >
+                    <History className="w-4 h-4" />
+                    Historial
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent value="active" className="m-0 focus-visible:ring-0">
+                <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2 min-h-[500px]">
+                  <h3 className="font-bold text-[#8B8D90] mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
+                    <span>Cola de Almacén Activa</span>
+                    <span className="bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full text-xs">{activeShipments.length}</span>
+                  </h3>
+                  {isLoading && <div className="text-sm text-[#B5B8BA] py-4">Cargando órdenes...</div>}
+                  {!isLoading && activeShipments.length === 0 && (
+                    <div className="text-sm text-[#B5B8BA] py-12 text-center opacity-40">No hay envíos pendientes.</div>
+                  )}
+                  {!isLoading && activeShipments.length > 0 && (
+                    <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1">
+                      {activeShipments.map((order) => {
+                        const isIncomplete = (order.scanned_packages || 0) > 0 && (order.scanned_packages || 0) < (order.packages_count || 1);
+                        const isSelected = scannedOrder?.id === order.id;
+                        const recentlyShipped = isRecentShipment(order);
+                        return (
+                          <button
+                            key={order.id}
+                            onClick={() => {
+                              setScannedOrder(order);
+                              setTrackingNumber(order.tracking_number || '');
+                              setScannedPackagesCount(order.scanned_packages || 0);
+                            }}
+                            className={`w-full text-left p-3 rounded-lg border transition-all group relative overflow-hidden ${isSelected
+                              ? 'bg-indigo-900/20 border-indigo-500/50'
+                              : isIncomplete
+                                ? 'bg-amber-900/10 border-amber-500/50'
+                                : recentlyShipped
+                                  ? 'bg-emerald-900/10 border-emerald-500/40'
+                                  : 'bg-[#1A1D1F] border-[#45474A] hover:border-[#6E6F71]'
+                              }`}
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <span className={`font-mono font-bold text-sm ${isSelected ? 'text-indigo-300' : 'text-[#B5B8BA]'}`}>
+                                {order.order_number}
+                              </span>
+                              {order.needs_shipping_validation && <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />}
+                              {isIncomplete && !isSelected && <PauseCircle className="w-4 h-4 text-amber-500" />}
+                            </div>
+                            <div className="flex flex-col gap-1 text-xs text-[#8B8D90]">
+                              <span className="group-hover:text-[#B5B8BA] font-semibold">{order.customer_name}</span>
+                              <span className="text-[#B5B8BA]">{order.fabric || 'Sin material'} · {summarizeLines(order)}</span>
+                              {recentlyShipped && (
+                                <span className="text-[10px] text-emerald-300 uppercase font-bold tracking-wide">Enviado hoy</span>
+                              )}
+                              <span>{isIncomplete ? <span className="text-amber-500 font-bold">{order.scanned_packages}/{order.packages_count}</span> : <span>{order.packages_count || 1} bultos</span>}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="history" className="m-0 focus-visible:ring-0">
+                <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2 min-h-[500px]">
+                  <h3 className="font-bold text-[#8B8D90] mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
+                    <span>Historial de Envíos</span>
+                    <span className="bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full text-xs">{historyShipments.length}</span>
+                  </h3>
+                  {!isLoading && historyShipments.length === 0 && (
+                    <div className="text-sm text-[#B5B8BA] py-12 text-center opacity-40">Historial vacío.</div>
+                  )}
+                  {!isLoading && historyShipments.length > 0 && (
+                    <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1">
+                      {historyShipments.slice(0, 20).map((order) => {
+                        const isSelected = scannedOrder?.id === order.id;
+                        return (
+                          <button
+                            key={order.id}
+                            onClick={() => {
+                              setScannedOrder(order);
+                              setTrackingNumber(order.tracking_number || '');
+                              setScannedPackagesCount(order.scanned_packages || 0);
+                            }}
+                            className={`w-full text-left p-3 rounded-lg border transition-all ${isSelected
+                              ? 'bg-emerald-900/20 border-emerald-500/50'
+                              : 'bg-[#1A1D1F] border-[#45474A] opacity-60 hover:opacity-100'
+                              }`}
+                          >
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-mono font-bold text-sm text-[#B5B8BA]">
+                                {order.order_number}
+                              </span>
+                              <span className="text-[10px] bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full uppercase font-bold">
+                                {order.status}
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-0.5 text-xs text-[#8B8D90]">
+                              <span className="font-semibold">{order.customer_name}</span>
+                              <span>Enviado: {order.shipping_date ? new Date(order.shipping_date).toLocaleDateString() : '---'}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* COLUMNA DERECHA */}
+          <div className="flex-1">
+            {scannedOrder ? (
+              <div className="bg-[#323438] h-full rounded-2xl shadow-lg border border-[#45474A] flex flex-col overflow-hidden">
+                <div className="p-4 lg:p-6 border-b border-[#45474A] bg-[#1A1D1F]/50 flex justify-between items-start">
+                  <div>
+                    <h2 className="text-xl md:text-3xl font-bold text-[#FFFFFF] mb-1">{scannedOrder.order_number}</h2>
+                    <div className="text-xs text-[#8B8D90] font-mono">
+                      Ref Admin: {scannedOrder.admin_code || '---'}
+                    </div>
+                  </div>
+                  <span className="text-sm md:text-lg px-4 py-2 bg-[#45474A] text-white rounded-full">{scannedOrder.status}</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6 custom-scrollbar">
+                  {/* PROTOCOLO DE REVISIÓN */}
+                  {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
+                    <div className="bg-amber-900/10 border border-amber-500/30 p-5 rounded-xl flex items-start gap-4">
+                      <AlertOctagon className="w-8 h-8 text-amber-500 shrink-0 mt-1" />
+                      <div className="text-sm">
+                        <h4 className="font-bold text-amber-400 uppercase mb-2 tracking-wide text-lg">PROTOCOLO DE REVISIÓN</h4>
+                        <ul className="space-y-2 text-[#B5B8BA]">
+                          <li>Revisa color y medidas antes de continuar.</li>
+                          <li>No mezclar pedidos; si cambias se reinicia el conteo.</li>
+                          <li>Escanea cada bulto hasta completar el total.</li>
+                          <li>Tracking obligatorio antes de liberar envío.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Datos del cliente */}
+                  <div className="bg-[#1A1D1F] rounded-xl border border-[#45474A] p-5 shadow-inner">
+                    <div className="flex justify-between items-start mb-4">
+                      <h3 className="text-[#FFFFFF] font-bold flex items-center">
+                        <User className="w-4 h-4 mr-2 text-indigo-400" />
+                        Datos del Cliente
+                      </h3>
+                      <button
+                        onClick={() => copyToClipboard(`${scannedOrder.customer_name}\n${scannedOrder.delivery_address}\n${scannedOrder.phone}`)}
+                        className="text-xs text-[#14CC7F] hover:text-white flex items-center"
+                      >
+                        <Copy className="w-3 h-3 mr-1" /> Copiar
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="space-y-1">
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Cliente / Razón Social</p>
+                        <p className="text-[#B5B8BA] font-medium">{scannedOrder.customer_name}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Región</p>
+                        <p className="text-[#B5B8BA]">{scannedOrder.region}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Teléfono</p>
+                        <p className="text-[#B5B8BA]">{scannedOrder.phone || '---'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Nombre Contacto</p>
+                        <p className="text-[#B5B8BA]">{scannedOrder.contact_name || '---'}</p>
+                      </div>
+                      <div className="col-span-1 md:col-span-2 space-y-1">
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Dirección de Entrega</p>
+                        <p className="text-[#B5B8BA]">{scannedOrder.delivery_address || 'Sin dirección especificada'}</p>
+                      </div>
+                      <div className="col-span-1 md:col-span-2 space-y-1">
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Ubicación (Maps)</p>
+                        {scannedOrder.google_maps_link ? (
+                          <a href={scannedOrder.google_maps_link} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 flex items-center truncate">
+                            <ExternalLink className="w-3 h-3 mr-1" /> {scannedOrder.google_maps_link}
+                          </a>
+                        ) : (
+                          <span className="text-[#6E6F71] italic">No disponible</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bultos y Unidades */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-[#1A1D1F] md:border-[#45474A]">
+                      <p className="text-xs text-[#8B8D90] font-bold uppercase mb-1 flex items-center">
+                        <Package className="w-3 h-3 mr-1" /> Bultos Totales
+                      </p>
+                      <p className="font-medium text-[#B5B8BA]">{scannedOrder.packages_count || 1}</p>
+                    </div>
+                    <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-[#1A1D1F] md:border-[#45474A]">
+                      <p className="text-xs text-[#8B8D90] font-bold uppercase mb-1 flex items-center">
+                        <Truck className="w-3 h-3 mr-1" /> Total Uds
+                      </p>
+                      <p className="font-medium text-[#B5B8BA]">{scannedOrder.quantity_total}</p>
+                    </div>
+                  </div>
+
+                  {/* Tabla de desglose */}
+                  <div className="border border-[#45474A] rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-[#1A1D1F] text-[#8B8D90]">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Cant.</th>
+                          <th className="px-4 py-2 text-left">Material / Medidas</th>
+                          <th className="px-4 py-2 text-left">Notas</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#45474A]">
+                        {scannedOrder.lines && scannedOrder.lines.length > 0 ? (
+                          scannedOrder.lines.map(line => (
+                            <tr key={line.id}>
+                              <td className="px-4 py-2 font-bold text-white">{line.quantity}</td>
+                              <td className="px-4 py-2 text-[#B5B8BA]">{line.material || scannedOrder.fabric} · {line.width}x{line.height}cm</td>
+                              <td className="px-4 py-2 text-[#8B8D90] italic">{line.notes || '—'}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={3} className="px-4 py-6 text-center text-[#6E6F71]">Sin desglose registrado</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Notas internas */}
+                  {scannedOrder.notes_internal && (
+                    <div className="bg-transparent md:bg-[#1A1D1F] border border-transparent md:border-[#45474A] rounded-xl p-4">
+                      <p className="text-xs text-[#8B8D90] uppercase font-bold mb-2">Notas internas</p>
+                      <p className="text-sm text-[#B5B8BA] whitespace-pre-line">{scannedOrder.notes_internal}</p>
+                    </div>
+                  )}
+
+                  {/* Verificación de bultos */}
+                  {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
+                    <div className="bg-transparent md:bg-[#1A1D1F] p-4 rounded-xl border border-transparent md:border-[#45474A]">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-bold text-[#FFFFFF] text-sm uppercase">Verificación de Bultos</h4>
+                        <span className="font-mono text-[#B5B8BA]">{scannedPackagesCount} / {scannedOrder.packages_count || 1}</span>
+                      </div>
+                      <div className="w-full bg-[#323438] rounded-full h-4 mb-4">
+                        <div
+                          className={`h-4 rounded-full transition-all duration-300 ${scannedPackagesCount >= (scannedOrder.packages_count || 1) ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                          style={{ width: `${Math.min((scannedPackagesCount / (scannedOrder.packages_count || 1)) * 100, 100)}%` }}
+                        ></div>
+                      </div>
+                      <div className="flex justify-center gap-4">
+                        <button onClick={() => updateOrderProgress(scannedOrder.id, Math.max(0, scannedPackagesCount - 1))} className="p-2 hover:bg-[#45474A] rounded-full text-[#8B8D90]">
+                          <MinusCircle className="w-6 h-6" />
+                        </button>
+                        <button onClick={() => updateOrderProgress(scannedOrder.id, (scannedPackagesCount + 1))} className="p-2 hover:bg-[#45474A] rounded-full text-indigo-400">
+                          <PlusCircle className="w-6 h-6" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Validación de salida */}
+                  {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
+                    <div className="bg-emerald-900/10 border border-emerald-500/30 p-6 rounded-xl mt-4">
+                      <h3 className="text-emerald-400 font-bold mb-4 flex items-center">
+                        <Truck className="w-5 h-5 mr-2" />
+                        Validación de Salida
+                      </h3>
+                      <div className="flex flex-col gap-4">
+                        {/* Componente Toggle + Input de Tracking */}
+                        <div className="bg-[#1A1D1F] p-4 rounded-xl border border-[#45474A]">
+                          <TrackingToggle
+                            hasTracking={hasTrackingNow}
+                            onToggle={setHasTrackingNow}
+                            className="mb-4"
+                          />
+
+                          {hasTrackingNow && (
+                            <div>
+                              <label className="text-xs text-[#8B8D90] font-bold uppercase mb-2 block">Número de Tracking</label>
+                              <input
+                                type="text"
+                                value={trackingNumber}
+                                onChange={(e) => setTrackingNumber(e.target.value)}
+                                placeholder="Escanea o escribe el tracking final..."
+                                className="w-full bg-[#323438] border border-[#45474A] rounded-lg p-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-mono tracking-wide"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Estado ENVIADO */}
+                  {scannedOrder.status === 'ENVIADO' && (
+                    <div className="bg-emerald-900/10 border border-emerald-500/30 p-6 rounded-xl flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
+                          <CheckCircle className="w-6 h-6 text-emerald-500" />
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-bold text-emerald-400">Enviado</h4>
+                          <p className="text-[#8B8D90] text-sm">
+                            Tracking: <span className="font-mono text-white">{scannedOrder.tracking_number}</span>
+                          </p>
+                        </div>
+                      </div>
+                      <button onClick={printManifest} className="w-full md:w-auto px-4 py-2 bg-transparent md:bg-[#1A1D1F] border border-[#45474A] rounded-lg text-white hover:bg-[#45474A] flex items-center justify-center">
+                        <FileOutput className="w-4 h-4 mr-2" />
+                        Albarán
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botones de acción */}
+                <div className="p-6 border-t border-[#45474A] bg-transparent md:bg-[#323438]">
+                  {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
                     <button
-                      key={order.id}
-                      onClick={() => {
-                        setScannedOrder(order);
-                        setTrackingNumber(order.tracking_number || '');
-                        setScannedPackagesCount(order.scanned_packages || 0);
-                      }}
-                      className={`w-full text-left p-3 rounded-lg border transition-all group relative overflow-hidden ${isSelected
-                        ? 'bg-indigo-900/20 border-indigo-500/50'
-                        : isIncomplete
-                          ? 'bg-amber-900/10 border-amber-500/50'
-                          : recentlyShipped
-                            ? 'bg-emerald-900/10 border-emerald-500/40'
-                            : 'bg-[#1A1D1F] border-[#45474A] hover:border-[#6E6F71]'
+                      onClick={validateShipment}
+                      disabled={scannedPackagesCount < (scannedOrder.packages_count || 1)}
+                      className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center transition-all active:scale-95 ${scannedPackagesCount >= (scannedOrder.packages_count || 1)
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        : 'bg-[#45474A] text-[#8B8D90] cursor-not-allowed border border-[#6E6F71]'
                         }`}
                     >
-                      {order.status === 'ENVIADO' && !isSelected && (
-                        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center text-center px-4 z-20">
-                          <div className="text-sm text-white">
-                            <p className="font-bold uppercase tracking-wider">Escanea el QR para comenzar la revisión</p>
-                            <p className="text-xs text-white/70 mt-1">Aunque ya esté enviado, debes escanear para habilitar la pantalla de salida.</p>
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-start mb-1">
-                        <span className={`font-mono font-bold text-sm ${isSelected ? 'text-indigo-300' : 'text-[#B5B8BA]'}`}>
-                          {order.order_number}
-                        </span>
-                        {order.needs_shipping_validation && <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />}
-                        {isIncomplete && !isSelected && <PauseCircle className="w-4 h-4 text-amber-500" />}
-                      </div>
-                      <div className="flex flex-col gap-1 text-xs text-[#8B8D90]">
-                        <span className="group-hover:text-[#B5B8BA] font-semibold">{order.customer_name}</span>
-                        <span className="text-[#B5B8BA]">{order.fabric || 'Sin material'} · {summarizeLines(order)}</span>
-                        {recentlyShipped && (
-                          <span className="text-[10px] text-emerald-300 uppercase font-bold tracking-wide">Enviado · se oculta en 12h</span>
-                        )}
-                        {order.notes_internal && (
-                          <span className="text-amber-300 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> {order.notes_internal.slice(0, 60)}{order.notes_internal.length > 60 ? '…' : ''}
-                          </span>
-                        )}
-                        <span>
-                          {isIncomplete ? (
-                            <span className="text-amber-500 font-bold">{order.scanned_packages}/{order.packages_count}</span>
-                          ) : (
-                            <span>{order.packages_count || 1} bultos</span>
-                          )}
-                        </span>
-
-                        {/* Cuadro de avance de producción (Consistencia) */}
-                        <div className="mt-2 bg-[#0F1113] border border-[#45474A]/60 rounded-lg p-2">
-                          <div className="flex justify-between text-[10px] text-[#6E6F71] uppercase tracking-wide mb-1 font-bold">
-                            <span>PRODUCCIÓN</span>
-                            <span>{order.shipping_date ? new Date(order.shipping_date).toLocaleDateString() : '---'}</span>
-                          </div>
-                          <div className="text-[10px] text-[#8B8D90] flex flex-wrap gap-x-2 gap-y-0.5 mb-2">
-                            <span>Material: <span className="text-[#B5B8BA]">{order.fabric || 'N/D'}</span></span>
-                            <span>Color: <span className="text-[#B5B8BA]">{order.color || 'N/D'}</span></span>
-                            <span>Unidades: <span className="text-[#B5B8BA]">{order.quantity_total || 0}</span></span>
-                          </div>
-                          <div>
-                            <div className="flex justify-between text-[10px] text-[#8B8D90] font-bold mb-1">
-                              <span>Avance producción</span>
-                              <span>100%</span>
-                            </div>
-                            <div className="w-full bg-[#323438] rounded-full h-1.5 overflow-hidden">
-                              <div
-                                className="h-1.5 rounded-full bg-emerald-500 transition-all duration-500"
-                                style={{ width: '100%' }}
-                              ></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <Truck className="w-6 h-6 mr-2" />
+                      CONFIRMAR ENVÍO
                     </button>
-                  );
-                })}
+                  )}
+
+                  {scannedOrder.status === 'ENVIADO' && (
+                    <button
+                      onClick={() => {
+                        setScannedOrder(null);
+                        setTrackingNumber('');
+                        setScannedPackagesCount(0);
+                      }}
+                      className="w-full py-3 bg-[#45474A] text-white rounded-xl hover:bg-[#6E6F71] font-medium"
+                    >
+                      Volver al Escáner
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="h-full border-2 border-dashed border-[#45474A] rounded-2xl flex flex-col items-center justify-center text-[#8B8D90] bg-[#1A1D1F]/50">
+                <Truck className="w-16 h-16 mb-4 opacity-30" />
+                <h3 className="text-xl font-bold text-[#8B8D90] mb-2">Zona de Expedición</h3>
+                <p className="text-[#6E6F71] max-w-md text-center">
+                  Selecciona un pedido de la lista o escanea el QR para verificar bultos y procesar la salida.
+                </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* COLUMNA DERECHA */}
-        <div className="flex-1">
-          {scannedOrder ? (
-            <div className="bg-[#323438] h-full rounded-2xl shadow-lg border border-[#45474A] flex flex-col overflow-hidden">
-              <div className="p-4 lg:p-6 border-b border-[#45474A] bg-[#1A1D1F]/50 flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl md:text-3xl font-bold text-[#FFFFFF] mb-1">{scannedOrder.order_number}</h2>
-                  <div className="text-xs text-[#8B8D90] font-mono">
-                    Ref Admin: {scannedOrder.admin_code || '---'}
-                  </div>
-                </div>
-                <span className="text-sm md:text-lg px-4 py-2 bg-[#45474A] text-white rounded-full">{scannedOrder.status}</span>
-              </div>
 
-              <div className="flex-1 overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6 custom-scrollbar">
-                {/* PROTOCOLO DE REVISIÓN */}
-                {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
-                  <div className="bg-amber-900/10 border border-amber-500/30 p-5 rounded-xl flex items-start gap-4">
-                    <AlertOctagon className="w-8 h-8 text-amber-500 shrink-0 mt-1" />
-                    <div className="text-sm">
-                      <h4 className="font-bold text-amber-400 uppercase mb-2 tracking-wide text-lg">PROTOCOLO DE REVISIÓN</h4>
-                      <ul className="space-y-2 text-[#B5B8BA]">
-                        <li>Revisa color y medidas antes de continuar.</li>
-                        <li>No mezclar pedidos; si cambias se reinicia el conteo.</li>
-                        <li>Escanea cada bulto hasta completar el total.</li>
-                        <li>Tracking obligatorio antes de liberar envío.</li>
-                      </ul>
-                    </div>
-                  </div>
-                )}
-
-                {/* Datos del cliente */}
-                <div className="bg-[#1A1D1F] rounded-xl border border-[#45474A] p-5 shadow-inner">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-[#FFFFFF] font-bold flex items-center">
-                      <User className="w-4 h-4 mr-2 text-indigo-400" />
-                      Datos del Cliente
-                    </h3>
-                    <button
-                      onClick={() => copyToClipboard(`${scannedOrder.customer_name}\n${scannedOrder.delivery_address}\n${scannedOrder.phone}`)}
-                      className="text-xs text-[#14CC7F] hover:text-white flex items-center"
-                    >
-                      <Copy className="w-3 h-3 mr-1" /> Copiar
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="space-y-1">
-                      <p className="text-[#8B8D90] text-xs uppercase font-bold">Cliente / Razón Social</p>
-                      <p className="text-[#B5B8BA] font-medium">{scannedOrder.customer_name}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[#8B8D90] text-xs uppercase font-bold">Región</p>
-                      <p className="text-[#B5B8BA]">{scannedOrder.region}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[#8B8D90] text-xs uppercase font-bold">Teléfono</p>
-                      <p className="text-[#B5B8BA]">{scannedOrder.phone || '---'}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[#8B8D90] text-xs uppercase font-bold">Nombre Contacto</p>
-                      <p className="text-[#B5B8BA]">{scannedOrder.contact_name || '---'}</p>
-                    </div>
-                    <div className="col-span-1 md:col-span-2 space-y-1">
-                      <p className="text-[#8B8D90] text-xs uppercase font-bold">Dirección de Entrega</p>
-                      <p className="text-[#B5B8BA]">{scannedOrder.delivery_address || 'Sin dirección especificada'}</p>
-                    </div>
-                    <div className="col-span-1 md:col-span-2 space-y-1">
-                      <p className="text-[#8B8D90] text-xs uppercase font-bold">Ubicación (Maps)</p>
-                      {scannedOrder.google_maps_link ? (
-                        <a href={scannedOrder.google_maps_link} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 flex items-center truncate">
-                          <ExternalLink className="w-3 h-3 mr-1" /> {scannedOrder.google_maps_link}
-                        </a>
-                      ) : (
-                        <span className="text-[#6E6F71] italic">No disponible</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bultos y Unidades */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-[#1A1D1F] md:border-[#45474A]">
-                    <p className="text-xs text-[#8B8D90] font-bold uppercase mb-1 flex items-center">
-                      <Package className="w-3 h-3 mr-1" /> Bultos Totales
-                    </p>
-                    <p className="font-medium text-[#B5B8BA]">{scannedOrder.packages_count || 1}</p>
-                  </div>
-                  <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-[#1A1D1F] md:border-[#45474A]">
-                    <p className="text-xs text-[#8B8D90] font-bold uppercase mb-1 flex items-center">
-                      <Truck className="w-3 h-3 mr-1" /> Total Uds
-                    </p>
-                    <p className="font-medium text-[#B5B8BA]">{scannedOrder.quantity_total}</p>
-                  </div>
-                </div>
-
-                {/* Tabla de desglose */}
-                <div className="border border-[#45474A] rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[#1A1D1F] text-[#8B8D90]">
-                      <tr>
-                        <th className="px-4 py-2 text-left">Cant.</th>
-                        <th className="px-4 py-2 text-left">Material / Medidas</th>
-                        <th className="px-4 py-2 text-left">Notas</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#45474A]">
-                      {scannedOrder.lines && scannedOrder.lines.length > 0 ? (
-                        scannedOrder.lines.map(line => (
-                          <tr key={line.id}>
-                            <td className="px-4 py-2 font-bold text-white">{line.quantity}</td>
-                            <td className="px-4 py-2 text-[#B5B8BA]">{line.material || scannedOrder.fabric} · {line.width}x{line.height}cm</td>
-                            <td className="px-4 py-2 text-[#8B8D90] italic">{line.notes || '—'}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-[#6E6F71]">Sin desglose registrado</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Notas internas */}
-                {scannedOrder.notes_internal && (
-                  <div className="bg-transparent md:bg-[#1A1D1F] border border-transparent md:border-[#45474A] rounded-xl p-4">
-                    <p className="text-xs text-[#8B8D90] uppercase font-bold mb-2">Notas internas</p>
-                    <p className="text-sm text-[#B5B8BA] whitespace-pre-line">{scannedOrder.notes_internal}</p>
-                  </div>
-                )}
-
-                {/* Verificación de bultos */}
-                {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
-                  <div className="bg-transparent md:bg-[#1A1D1F] p-4 rounded-xl border border-transparent md:border-[#45474A]">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-bold text-[#FFFFFF] text-sm uppercase">Verificación de Bultos</h4>
-                      <span className="font-mono text-[#B5B8BA]">{scannedPackagesCount} / {scannedOrder.packages_count || 1}</span>
-                    </div>
-                    <div className="w-full bg-[#323438] rounded-full h-4 mb-4">
-                      <div
-                        className={`h-4 rounded-full transition-all duration-300 ${scannedPackagesCount >= (scannedOrder.packages_count || 1) ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-                        style={{ width: `${Math.min((scannedPackagesCount / (scannedOrder.packages_count || 1)) * 100, 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-center gap-4">
-                      <button onClick={() => updateOrderProgress(scannedOrder.id, Math.max(0, scannedPackagesCount - 1))} className="p-2 hover:bg-[#45474A] rounded-full text-[#8B8D90]">
-                        <MinusCircle className="w-6 h-6" />
-                      </button>
-                      <button onClick={() => updateOrderProgress(scannedOrder.id, (scannedPackagesCount + 1))} className="p-2 hover:bg-[#45474A] rounded-full text-indigo-400">
-                        <PlusCircle className="w-6 h-6" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Validación de salida */}
-                {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
-                  <div className="bg-emerald-900/10 border border-emerald-500/30 p-6 rounded-xl mt-4">
-                    <h3 className="text-emerald-400 font-bold mb-4 flex items-center">
-                      <Truck className="w-5 h-5 mr-2" />
-                      Validación de Salida
-                    </h3>
-                    <div className="flex flex-col gap-4">
-                      {/* Componente Toggle + Input de Tracking */}
-                      <div className="bg-[#1A1D1F] p-4 rounded-xl border border-[#45474A]">
-                        <TrackingToggle
-                          hasTracking={hasTrackingNow}
-                          onToggle={setHasTrackingNow}
-                          className="mb-4"
-                        />
-
-                        {hasTrackingNow && (
-                          <div>
-                            <label className="text-xs text-[#8B8D90] font-bold uppercase mb-2 block">Número de Tracking</label>
-                            <input
-                              type="text"
-                              value={trackingNumber}
-                              onChange={(e) => setTrackingNumber(e.target.value)}
-                              placeholder="Escanea o escribe el tracking final..."
-                              className="w-full bg-[#323438] border border-[#45474A] rounded-lg p-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none text-lg font-mono tracking-wide"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Estado ENVIADO */}
-                {scannedOrder.status === 'ENVIADO' && (
-                  <div className="bg-emerald-900/10 border border-emerald-500/30 p-6 rounded-xl flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0">
-                        <CheckCircle className="w-6 h-6 text-emerald-500" />
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-bold text-emerald-400">Enviado</h4>
-                        <p className="text-[#8B8D90] text-sm">
-                          Tracking: <span className="font-mono text-white">{scannedOrder.tracking_number}</span>
-                        </p>
-                      </div>
-                    </div>
-                    <button onClick={printManifest} className="w-full md:w-auto px-4 py-2 bg-transparent md:bg-[#1A1D1F] border border-[#45474A] rounded-lg text-white hover:bg-[#45474A] flex items-center justify-center">
-                      <FileOutput className="w-4 h-4 mr-2" />
-                      Albarán
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Botones de acción */}
-              <div className="p-6 border-t border-[#45474A] bg-transparent md:bg-[#323438]">
-                {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
-                  <button
-                    onClick={validateShipment}
-                    disabled={scannedPackagesCount < (scannedOrder.packages_count || 1)}
-                    className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center transition-all active:scale-95 ${scannedPackagesCount >= (scannedOrder.packages_count || 1)
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                      : 'bg-[#45474A] text-[#8B8D90] cursor-not-allowed border border-[#6E6F71]'
-                      }`}
-                  >
-                    <Truck className="w-6 h-6 mr-2" />
-                    CONFIRMAR ENVÍO
-                  </button>
-                )}
-
-                {scannedOrder.status === 'ENVIADO' && (
-                  <button
-                    onClick={() => {
-                      setScannedOrder(null);
-                      setTrackingNumber('');
-                      setScannedPackagesCount(0);
-                    }}
-                    className="w-full py-3 bg-[#45474A] text-white rounded-xl hover:bg-[#6E6F71] font-medium"
-                  >
-                    Volver al Escáner
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="h-full border-2 border-dashed border-[#45474A] rounded-2xl flex flex-col items-center justify-center text-[#8B8D90] bg-[#1A1D1F]/50">
-              <Truck className="w-16 h-16 mb-4 opacity-30" />
-              <h3 className="text-xl font-bold text-[#8B8D90] mb-2">Zona de Expedición</h3>
-              <p className="text-[#6E6F71] max-w-md text-center">
-                Selecciona un pedido de la lista o escanea el QR para verificar bultos y procesar la salida.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-
-      <MobileAlert
-        isOpen={alertState.isOpen}
-        type={alertState.type}
-        title={alertState.title}
-        message={alertState.message}
-        onConfirm={closeAlert}
-      />
-
-      {scannedOrder && (
-        <IncidentReportModal
-          isOpen={isIncidentModalOpen}
-          onClose={() => setIsIncidentModalOpen(false)}
-          orderId={scannedOrder.id}
-          orderNumber={scannedOrder.order_number}
+        <MobileAlert
+          isOpen={alertState.isOpen}
+          type={alertState.type}
+          title={alertState.title}
+          message={alertState.message}
+          onConfirm={closeAlert}
         />
-      )}
-    </PageShell >
+        {scannedOrder && (
+          <IncidentReportModal
+            isOpen={isIncidentModalOpen}
+            onClose={() => setIsIncidentModalOpen(false)}
+            orderId={scannedOrder.id}
+            orderNumber={scannedOrder.order_number}
+          />
+        )}
+      </div>
+    </PageShell>
   );
 }
