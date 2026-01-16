@@ -799,6 +799,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     </Button>
                                     <Button
                                         disabled={!canPrint}
+                                        onClick={() => generateOrderPDF(formData)}
                                         className="w-full bg-muted/40 hover:bg-muted/60 text-foreground border border-border/60 disabled:opacity-50"
                                     >
                                         <FileText className="w-4 h-4 mr-2" />
