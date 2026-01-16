@@ -173,6 +173,18 @@ export const useUpdateOrderStatus = () => {
                     .single();
 
                 if (createError) throw createError;
+
+                // Crear evento en calendario comercial usando delivery_date
+                if (currentOrder?.delivery_date) {
+                    await supabase.from('comercial_calendar_events').insert([{
+                        title: `Entrega: ${resolvedOrderNumber}`,
+                        event_date: currentOrder.delivery_date,
+                        order_id: currentOrder.id,
+                        customer_name: currentOrder.customer_company || currentOrder.customer_name,
+                        region: region
+                    }]);
+                }
+
                 return newWorkOrder?.id;
             };
 
