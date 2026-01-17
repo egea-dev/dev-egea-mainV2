@@ -179,7 +179,7 @@ export default function InstallationsPage() {
 
       // Calculate new start date (preserve time if possible, or default to 09:00 if not set)
       const oldStart = task.start_date ? new Date(task.start_date) : null;
-      let newStartDateTime = new Date(newDate);
+      const newStartDateTime = new Date(newDate);
 
       if (oldStart) {
         newStartDateTime.setHours(oldStart.getHours(), oldStart.getMinutes());

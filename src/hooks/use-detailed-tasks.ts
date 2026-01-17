@@ -542,7 +542,7 @@ export function useDashboardTasks() {
       const allTasks = [...confeccionData, ...tapiceriaData, ...pendingData];
       const taskIds = Array.from(new Set(allTasks.map((task) => task.id)));
 
-      let sessionInfoByTask: Record<string, DashboardTaskSessionInfo> = {};
+      const sessionInfoByTask: Record<string, DashboardTaskSessionInfo> = {};
       if (taskIds.length > 0) {
         const { data: sessionsData, error: sessionsError } = await supabase
           .from('work_sessions')

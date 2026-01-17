@@ -231,7 +231,7 @@ export const useUpdateWorkOrderStatus = () => {
                 data = fallback.data as any;
                 error = fallback.error;
             } else {
-                let result = await (supabase
+                const result = await (supabase
                     .from('produccion_work_orders') as any)
                     .update({
                         status,
