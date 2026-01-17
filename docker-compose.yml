@@ -5,12 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-        - VITE_SUPABASE_PRODUCTIVITY_URL=${VITE_SUPABASE_PRODUCTIVITY_URL}
-        - VITE_SUPABASE_PRODUCTIVITY_ANON_KEY=${VITE_SUPABASE_PRODUCTIVITY_ANON_KEY}
-        - VITE_PRINTER_SERVER_URL=${VITE_PRINTER_SERVER_URL}
+      # Build Args se configuran en Coolify UI → Build Arguments
+      # NO poner secretos aquí - esto es solo para desarrollo local
     container_name: egea-main-control
     ports:
       - "3000:80"
@@ -24,8 +20,17 @@ services:
       retries: 3
       start_period: 5s
     networks:
-      - egea-network
+      - egea-internal
+    # Limitar recursos (recomendado)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
 
 networks:
-  egea-network:
+  egea-internal:
     driver: bridge
