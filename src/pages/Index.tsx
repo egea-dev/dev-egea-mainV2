@@ -23,6 +23,9 @@ export default function Index() {
         <Button size="lg" onClick={() => navigate("/auth")}>
           Iniciar Sesión
         </Button>
+        <p className="text-sm text-muted-foreground pt-4">
+          Hecho con ❤️ por Hacchi
+        </p>
       </div>
     </div>
   );
