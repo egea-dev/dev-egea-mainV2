@@ -96,10 +96,26 @@ export default function ShippingBoardPage() {
             .select("*")
             .in("work_order_id", ordersData?.map((o: any) => o.id) || []);
 
-        const { data: commercialOrders } = await supabaseProductivity
-            .from('comercial_orders')
-            .select('order_number, lines, fabric, color')
-            .in('order_number', ordersData?.map((o: any) => o.order_number) || []);
+        const orderNumbers = ordersData?.map((o: any) => o.order_number).filter(Boolean) || [];
+        const adminCodes = ordersData?.map((o: any) => o.admin_code).filter(Boolean) || [];
+        let commercialOrders: any[] | null = null;
+        if (orderNumbers.length > 0 || adminCodes.length > 0) {
+            const escapedOrders = orderNumbers
+                .map((value: any) => `"${String(value).replace(/"/g, '""')}"`)
+                .join(',');
+            const escapedAdmins = adminCodes
+                .map((value: any) => `"${String(value).replace(/"/g, '""')}"`)
+                .join(',');
+            const orFilters = [
+                escapedOrders ? `order_number.in.(${escapedOrders})` : null,
+                escapedAdmins ? `admin_code.in.(${escapedAdmins})` : null
+            ].filter(Boolean).join(',');
+            const { data } = await supabaseProductivity
+                .from('comercial_orders')
+                .select('order_number, admin_code, lines, fabric')
+                .or(orFilters);
+            commercialOrders = data as any[] | null;
+        }
 
         const normalizeStatus = (raw?: string) => {
             const normalized = (raw || "").toUpperCase();
@@ -113,19 +129,22 @@ export default function ShippingBoardPage() {
         };
 
         const transformed = (ordersData || []).map((order: any) => {
-            const commOrder = commercialOrders?.find((c: any) => c.order_number === order.order_number);
+            const commOrder = commercialOrders?.find((c: any) =>
+                c.order_number === order.order_number ||
+                (order.admin_code && c.admin_code === order.admin_code) ||
+                c.admin_code === order.order_number
+            );
             const specs = order.technical_specs || {};
 
-            const lines = (Array.isArray(commOrder?.lines) && commOrder.lines.length > 0)
-                ? commOrder.lines
-                : (Array.isArray(order.lines) && order.lines.length > 0)
-                    ? order.lines
-                    : (linesData?.filter((l: any) => l.work_order_id === order.id) || []);
-            const materialList = summarizeMaterials(lines, commOrder?.fabric || specs.fabric || order.fabric || "N/D");
+            const commLines = Array.isArray(commOrder?.lines) ? commOrder.lines : [];
+            const orderLines = Array.isArray(order.lines) ? order.lines : [];
+            const relLines = linesData?.filter((l: any) => l.work_order_id === order.id) || [];
+            const lines = [...commLines, ...orderLines, ...relLines].filter(Boolean);
+            const materialList = summarizeMaterials(lines, "N/D");
 
             const colorList = lines.length > 0
                 ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
-                : (commOrder?.color || specs.color || order.color || "N/D");
+                : (specs.color || order.color || "N/D");
 
             const nStatus = normalizeStatus(order.status);
             const now = new Date();
@@ -252,14 +271,16 @@ export default function ShippingBoardPage() {
                                 <div className="col-span-3">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-gray-300")}>{order.fabric}</div>
                                     <div className={cn("text-2xl font-black mb-2", isLight ? "text-slate-900" : "text-gray-400")}>{order.color}</div>
-                                    {order.lines && order.lines.length > 0 && (
+                                    {order.lines && order.lines.some((l: any) => l.material || l.fabric || (l.width && l.height)) && (
                                         <div className="space-y-1 mt-2 border-t border-white/5 pt-2">
-                                            {order.lines.map((l: any, i: number) => (
-                                                <div key={i} className="flex justify-between items-center text-[10px] font-bold uppercase opacity-70">
-                                                    <span>{l.quantity}x {l.material || l.fabric || 'Pieza'}</span>
-                                                    {l.width && l.height && <span>{l.width}x{l.height}</span>}
-                                                </div>
-                                            ))}
+                                            {order.lines
+                                                .filter((l: any) => l.material || l.fabric || (l.width && l.height))
+                                                .map((l: any, i: number) => (
+                                                    <div key={i} className="flex justify-between items-center text-[10px] font-bold uppercase opacity-70">
+                                                        <span>{l.quantity}x {l.material || l.fabric || 'Pieza'}</span>
+                                                        {l.width && l.height && <span>{l.width}x{l.height}</span>}
+                                                    </div>
+                                                ))}
                                         </div>
                                     )}
                                 </div>

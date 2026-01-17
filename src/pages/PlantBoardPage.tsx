@@ -137,12 +137,11 @@ export default function PlantBoardPage() {
             );
             const specs = order.technical_specs || {};
 
-            const lines = (Array.isArray((commOrder as any)?.lines) && (commOrder as any).lines.length > 0)
-                ? (commOrder as any).lines
-                : (Array.isArray(order.lines) && order.lines.length > 0)
-                    ? order.lines
-                    : (linesData?.filter((l: any) => l.work_order_id === order.id) || []);
-            const materialList = summarizeMaterials(lines, (commOrder as any)?.fabric || specs.fabric || order.fabric || "N/D");
+            const commLines = Array.isArray((commOrder as any)?.lines) ? (commOrder as any).lines : [];
+            const orderLines = Array.isArray(order.lines) ? order.lines : [];
+            const relLines = linesData?.filter((l: any) => l.work_order_id === order.id) || [];
+            const lines = [...commLines, ...orderLines, ...relLines].filter(Boolean);
+            const materialList = summarizeMaterials(lines, "N/D");
 
             const colorList = lines.length > 0
                 ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
@@ -272,14 +271,16 @@ export default function PlantBoardPage() {
                                 <div className="col-span-3">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-gray-300")}>{order.fabric}</div>
                                     <div className={cn("text-2xl font-black mb-2", isLight ? "text-slate-900" : "text-gray-400")}>{order.color}</div>
-                                    {order.lines && order.lines.length > 0 && (
+                                    {order.lines && order.lines.some((l: any) => l.material || l.fabric || (l.width && l.height)) && (
                                         <div className="space-y-1 mt-2 border-t border-white/5 pt-2">
-                                            {order.lines.map((l: any, i: number) => (
-                                                <div key={i} className="flex justify-between items-center text-[10px] font-bold uppercase opacity-70">
-                                                    <span>{l.quantity}x {l.material || l.fabric || 'Pieza'}</span>
-                                                    {l.width && l.height && <span>{l.width}x{l.height}</span>}
-                                                </div>
-                                            ))}
+                                            {order.lines
+                                                .filter((l: any) => l.material || l.fabric || (l.width && l.height))
+                                                .map((l: any, i: number) => (
+                                                    <div key={i} className="flex justify-between items-center text-[10px] font-bold uppercase opacity-70">
+                                                        <span>{l.quantity}x {l.material || l.fabric || 'Pieza'}</span>
+                                                        {l.width && l.height && <span>{l.width}x{l.height}</span>}
+                                                    </div>
+                                                ))}
                                         </div>
                                     )}
                                 </div>

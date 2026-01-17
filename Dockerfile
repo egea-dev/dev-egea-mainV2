@@ -3,6 +3,23 @@
 # ================================
 FROM node:20-alpine AS builder
 
+# ================================
+# Variables de entorno para Vite (Build Time)
+# Configurar en Coolify → Variables de Entorno → Build Arguments
+# ================================
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_SUPABASE_PRODUCTIVITY_URL
+ARG VITE_SUPABASE_PRODUCTIVITY_ANON_KEY
+ARG VITE_PRINTER_SERVER_URL
+
+# Convertir ARGs a ENV para que Vite las use durante el build
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_PRODUCTIVITY_URL=$VITE_SUPABASE_PRODUCTIVITY_URL
+ENV VITE_SUPABASE_PRODUCTIVITY_ANON_KEY=$VITE_SUPABASE_PRODUCTIVITY_ANON_KEY
+ENV VITE_PRINTER_SERVER_URL=$VITE_PRINTER_SERVER_URL
+
 # Instalar dependencias del sistema necesarias
 RUN apk add --no-cache git
 

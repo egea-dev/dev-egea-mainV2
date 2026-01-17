@@ -121,18 +121,17 @@ const KioskDisplayPage: React.FC = () => {
 
             const order = base as any;
             const specs = order.technical_specs || {};
-            const lines = (Array.isArray((commData as any)?.lines) && (commData as any).lines.length > 0)
-                ? (commData as any).lines
-                : (Array.isArray(order.lines) && order.lines.length > 0)
-                    ? order.lines
-                    : (linesData || []);
-            const materialList = summarizeMaterials(lines, (commData as any)?.fabric || specs.fabric || order.fabric || "N/D");
+            const commLines = Array.isArray((commData as any)?.lines) ? (commData as any).lines : [];
+            const orderLines = Array.isArray(order.lines) ? order.lines : [];
+            const relLines = linesData || [];
+            const lines = [...commLines, ...orderLines, ...relLines].filter(Boolean);
+            const materialList = summarizeMaterials(lines, "N/D");
 
             return {
                 ...order,
                 status: normalizeStatus(order.status),
                 fabric: materialList,
-                color: (commData as any)?.color || lines.map((l: any) => l.color).filter(Boolean).join(", ") || (specs.color || order.color || "N/D"),
+                color: lines.map((l: any) => l.color).filter(Boolean).join(", ") || (specs.color || order.color || "N/D"),
                 lines: lines,
                 due_date: (commData as any)?.delivery_date || order.due_date
             };

@@ -5,6 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+        - VITE_SUPABASE_PRODUCTIVITY_URL=${VITE_SUPABASE_PRODUCTIVITY_URL}
+        - VITE_SUPABASE_PRODUCTIVITY_ANON_KEY=${VITE_SUPABASE_PRODUCTIVITY_ANON_KEY}
+        - VITE_PRINTER_SERVER_URL=${VITE_PRINTER_SERVER_URL}
     container_name: egea-main-control
     ports:
       - "3000:80"
@@ -12,7 +18,7 @@ services:
     environment:
       - NODE_ENV=production
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost/health" ]
       interval: 30s
       timeout: 3s
       retries: 3

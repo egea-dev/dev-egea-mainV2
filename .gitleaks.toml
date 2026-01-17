@@ -1,0 +1,121 @@
+# ============================================
+# Gitleaks Configuration - egea-Main-control
+# ============================================
+# Ejecutar: gitleaks detect --source . --verbose
+# Pre-commit: gitleaks protect --staged --verbose
+
+title = "Reglas de detección de secretos - EGEA"
+
+[extend]
+# Usar las reglas predeterminadas de Gitleaks
+useDefault = true
+
+# ============================================
+# REGLAS PERSONALIZADAS PARA SUPABASE
+# ============================================
+
+[[rules]]
+id = "supabase-jwt-token"
+description = "Supabase JWT Token (anon o service_role)"
+regex = '''eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'''
+keywords = ["supabase", "SUPABASE", "anon", "ANON", "service_role"]
+entropy = 3.5
+
+[[rules]]
+id = "supabase-url"
+description = "Supabase Project URL with real project ID"
+regex = '''https:\/\/[a-z]{20,}\.supabase\.co'''
+keywords = ["supabase"]
+
+[[rules]]
+id = "vite-env-exposed"
+description = "VITE_ environment variable with real value"
+regex = '''VITE_[A-Z_]+=(?:['"])?[A-Za-z0-9_\-\.\/]{20,}(?:['"])?'''
+path = '''\.ts$|\.tsx$|\.js$|\.jsx$'''
+
+# ============================================
+# REGLAS GENERALES
+# ============================================
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]?([A-Za-z0-9_-]{20,})['"]?'''
+entropy = 3.0
+
+[[rules]]
+id = "private-key-block"
+description = "Private Key Block"
+regex = '''-----BEGIN (RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----'''
+
+[[rules]]
+id = "database-connection-string"
+description = "Database Connection String"
+regex = '''(?i)(postgres|postgresql|mysql|mongodb|redis):\/\/[^:]+:[^@]+@[^\/]+'''
+
+[[rules]]
+id = "password-in-code"
+description = "Password assignment in code"
+regex = '''(?i)(password|passwd|pwd)\s*[:=]\s*['"][^'"]{8,}['"]'''
+entropy = 3.0
+
+[[rules]]
+id = "bearer-token"
+description = "Bearer Token"
+regex = '''(?i)bearer\s+[A-Za-z0-9_\-\.]+'''
+
+[[rules]]
+id = "ssh-private-key"
+description = "SSH Private Key"
+regex = '''-----BEGIN OPENSSH PRIVATE KEY-----'''
+
+# ============================================
+# EXCLUSIONES (ALLOWLIST)
+# ============================================
+
+[allowlist]
+description = "Archivos y patrones permitidos"
+
+# Rutas a ignorar completamente
+paths = [
+    '''\.env\.example$''',
+    '''\.env\.template$''',
+    '''docs/.*\.md$''',
+    '''README\.md$''',
+    '''ARCHITECTURE\.md$''',
+    '''package-lock\.json$''',
+    '''bun\.lockb$''',
+    '''node_modules/''',
+    '''dist/''',
+    '''\\.git/''',
+    '''\.husky/_/'''
+]
+
+# Commits específicos a ignorar (si hay historial problemático)
+commits = [
+    # "abc123def456789"  # Ejemplo: commit con secretos ya rotados
+]
+
+# Regex de valores a ignorar (placeholders, ejemplos)
+regexes = [
+    '''your-.*-here''',
+    '''tu-.*-aqui''',
+    '''example\.com''',
+    '''placeholder''',
+    '''xxx\.supabase\.co''',
+    '''tu-proyecto-.*\.supabase\.co''',
+    '''192\.168\.\d+\.\d+''',  # IPs locales
+    '''localhost''',
+    '''127\.0\.0\.1'''
+]
+
+# Stopwords que indican que no es un secreto real
+stopwords = [
+    "example",
+    "sample",
+    "test",
+    "dummy",
+    "fake",
+    "mock",
+    "placeholder"
+]

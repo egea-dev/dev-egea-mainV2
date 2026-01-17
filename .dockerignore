@@ -52,5 +52,5 @@ coverage
 .editorconfig
 .prettierrc
 .eslintrc*
-tsconfig.json
-vite.config.ts
+# NOTA: tsconfig.json y vite.config.ts son NECESARIOS para el build de Vite
+# No deben excluirse o el alias @/ no funcionará

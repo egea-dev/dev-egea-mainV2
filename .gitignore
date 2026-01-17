@@ -1,11 +1,84 @@
-node_modules
+# ===================================
+# DEPENDENCIAS Y BUILD
+# ===================================
+node_modules/
+dist/
+build/
+.cache/
+.vite/
+.turbo/
+
+# ===================================
+# ARCHIVOS DE ENTORNO (CRÍTICO)
+# ===================================
 .env
-.env.*
-!.env.example
 .env.local
-.env.development.local
-.env.production.local
-.env.test.local
-.DS_Store
-dist
+.env.*.local
+.env.development
+.env.production
+.env.test
+.env.staging
+!.env.example
+
+# ===================================
+# LOGS Y TEMPORALES
+# ===================================
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===================================
+# CREDENCIALES Y LLAVES (NUNCA SUBIR)
+# ===================================
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+*.pub
+credentials.json
+service-account*.json
+*secret*.json
+*password*
+*token*.json
+
+# ===================================
+# ARCHIVOS DE IDE Y SISTEMA
+# ===================================
+.idea/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/*.code-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===================================
+# ESPECÍFICOS DE COOLIFY
+# ===================================
+.coolify/
+coolify-*.json
+deployment-secrets.yaml
+
+# ===================================
+# TESTING Y COBERTURA
+# ===================================
+coverage/
+.nyc_output/
+*.lcov
+
+# ===================================
+# OTROS
+# ===================================
+*.tsbuildinfo
+.eslintcache
