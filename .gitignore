@@ -82,3 +82,45 @@ coverage/
 # ===================================
 *.tsbuildinfo
 .eslintcache
+
+# ===================================
+# ARCHIVOS DE BACKUP Y TEMPORALES
+# ===================================
+*.bak
+*.backup
+*.tmp
+*.temp
+*.orig
+*~
+
+# ===================================
+# CARPETAS BULK/ARCHIVE (históricos)
+# ===================================
+- Bulk/
+BULK/
+**/backup/
+**/backups/
+**/old-*/
+**/archive/
+**/*-archive/
+
+# ===================================
+# COOLIFY ADICIONAL
+# ===================================
+.coolify.yaml
+coolify/
+.deploy/
+
+# ===================================
+# ARCHIVOS GRANDES Y DATOS
+# ===================================
+*.sql
+*.sqlite
+*.db
+*.log.*
+b64_*.txt
+
+# ===================================
+# BUN LOCKFILE (opcional)
+# ===================================
+# bun.lockb
