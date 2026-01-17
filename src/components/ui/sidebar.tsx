@@ -70,7 +70,7 @@ export const Sidebar = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTM
       <aside
         ref={ref}
         className={cn(
-          "fixed inset-y-0 left-0 z-10 hidden h-full flex-col border-r border-border/60 bg-background/95 dark:bg-slate-950/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 dark:supports-[backdrop-filter]:bg-slate-950/75 transition-all duration-300 md:flex",
+          "fixed inset-y-0 left-0 z-10 hidden h-full flex-col border-r border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-all duration-300 md:flex",
           isCollapsed ? "w-14" : "w-64",
           className
         )}

@@ -33,7 +33,7 @@ interface ShippingOrder {
     needs_shipping_validation?: boolean;
 }
 
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+// Lógica de 12 horas eliminada para historial inmediato
 
 export default function ShippingBoardPage() {
     const [searchParams] = useSearchParams();
@@ -180,7 +180,7 @@ export default function ShippingBoardPage() {
                 quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
                 packageProgress: order.packages_count ? (order.scanned_packages / order.packages_count) * 100 : 0,
                 isUrgent: order.needs_shipping_validation || (diffDays !== null && diffDays <= 2),
-                isRecentShipment: nStatus === "ENVIADO" && order.shipping_date && (Date.now() - new Date(order.shipping_date).getTime() < TWELVE_HOURS_MS),
+                isRecentShipment: false,
                 dueBadge,
                 status: nStatus,
                 lines

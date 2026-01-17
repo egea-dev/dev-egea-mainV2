@@ -115,7 +115,7 @@ export default function GlobalCalendarPage() {
     >
       <div className={`flex flex-col gap-4 ${isMobile ? 'min-h-[50vh]' : 'h-full'}`}>
         {/* Navigation Header */}
-        <div className="flex items-center justify-between bg-background/50 p-2 rounded-lg border backdrop-blur sticky top-0 z-10">
+        <div className="flex items-center justify-between bg-background/50 p-2 rounded-lg border border-border/60 backdrop-blur sticky top-0 z-10">
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={handlePrev}>
               <ChevronLeft className="h-5 w-5" />
@@ -157,7 +157,7 @@ export default function GlobalCalendarPage() {
               />
             ) : (
               /* Desktop: Weekly Board (Reusing Logic) */
-              <div className="h-[calc(100vh-220px)] border rounded-xl overflow-hidden bg-background/50">
+              <div className="h-[calc(100vh-220px)] border border-border/60 rounded-xl overflow-hidden bg-background/50">
                 <DndContext>
                   <WeeklyBoard
                     currentDate={currentDate}

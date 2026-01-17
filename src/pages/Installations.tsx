@@ -221,20 +221,20 @@ export default function InstallationsPage() {
       <div className="h-[calc(100vh-100px)] flex flex-col gap-4">
 
         {/* Top Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-900/40 p-3 rounded-2xl border border-slate-800 backdrop-blur">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-card/40 p-3 rounded-2xl border border-border/60 backdrop-blur">
           <div>
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
               <CalendarIcon className="h-6 w-6 text-emerald-500" />
-              Instalaciones <span className="text-slate-500 font-light text-lg">| Tablero Semanal</span>
+              Instalaciones <span className="text-muted-foreground font-light text-lg">| Tablero Semanal</span>
             </h1>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-slate-950/50 rounded-lg p-1 border border-slate-800">
+            <div className="flex items-center bg-muted/50 rounded-lg p-1 border border-border/60">
               <Button variant="ghost" size="icon" onClick={() => setCurrentDate(prev => subDays(prev, 7))}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="px-4 font-mono font-bold text-slate-200 min-w-[140px] text-center">
+              <div className="px-4 font-mono font-bold text-foreground min-w-[140px] text-center">
                 {currentWeekLabel}
               </div>
               <Button variant="ghost" size="icon" onClick={() => setCurrentDate(prev => addDays(prev, 7))}>
@@ -254,14 +254,14 @@ export default function InstallationsPage() {
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 min-h-0">
 
           {/* Sidebar (Resources) */}
-          <Card className="bg-slate-950/30 border-slate-800 flex flex-col min-h-0 h-full">
-            <div className="p-3 border-b border-slate-800">
+          <Card className="bg-card/30 border-border/60 flex flex-col min-h-0 h-full">
+            <div className="p-3 border-b border-border/60">
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Usuarios</h3>
               <div className="relative">
-                <Search className="absolute left-2 top-2 h-4 w-4 text-slate-600" />
+                <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground/50" />
                 <Input
                   placeholder="Buscar..."
-                  className="h-8 pl-8 bg-slate-900 border-slate-800 text-xs"
+                  className="h-8 pl-8 bg-muted/40 border-border/60 text-xs"
                   value={userSearch}
                   onChange={e => setUserSearch(e.target.value)}
                 />
@@ -272,22 +272,22 @@ export default function InstallationsPage() {
               <div className="space-y-1">
                 {filteredUsers.map(user => (
                   <DraggableSidebarItem key={user.id} item={user}>
-                    <div className="flex items-center gap-2 p-2 rounded hover:bg-slate-800/50 cursor-grab active:cursor-grabbing border border-transparent hover:border-slate-700">
+                    <div className="flex items-center gap-2 p-2 rounded hover:bg-muted/40 cursor-grab active:cursor-grabbing border border-transparent hover:border-border/60">
                       <div className={cn("w-2 h-2 rounded-full", user.status === 'activo' ? 'bg-emerald-500' : 'bg-red-500')} />
-                      <span className="text-sm text-slate-300 truncate">{user.full_name}</span>
+                      <span className="text-sm text-muted-foreground truncate">{user.full_name}</span>
                     </div>
                   </DraggableSidebarItem>
                 ))}
               </div>
             </ScrollArea>
 
-            <div className="p-3 border-t border-b border-slate-800 mt-2">
+            <div className="p-3 border-t border-b border-border/60 mt-2">
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Vehículos</h3>
               <div className="relative">
                 <Search className="absolute left-2 top-2 h-4 w-4 text-slate-600" />
                 <Input
                   placeholder="Buscar..."
-                  className="h-8 pl-8 bg-slate-900 border-slate-800 text-xs"
+                  className="h-8 pl-8 bg-muted/40 border-border/60 text-xs"
                   value={vehicleSearch}
                   onChange={e => setVehicleSearch(e.target.value)}
                 />
@@ -298,9 +298,9 @@ export default function InstallationsPage() {
               <div className="space-y-1">
                 {filteredVehicles.map(vehicle => (
                   <DraggableSidebarItem key={vehicle.id} item={{ ...vehicle, type: 'vehicle' }}>
-                    <div className="flex items-center gap-2 p-2 rounded hover:bg-slate-800/50 cursor-grab active:cursor-grabbing border border-transparent hover:border-slate-700">
+                    <div className="flex items-center gap-2 p-2 rounded hover:bg-muted/40 cursor-grab active:cursor-grabbing border border-transparent hover:border-border/60">
                       <Car className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-sm text-slate-300 truncate">{vehicle.name}</span>
+                      <span className="text-sm text-muted-foreground truncate">{vehicle.name}</span>
                     </div>
                   </DraggableSidebarItem>
                 ))}
@@ -330,7 +330,7 @@ export default function InstallationsPage() {
           draggedItem.type === 'task' ? (
             <div className="w-[200px]"><TaskCard task={draggedItem.item} isOverlay /></div>
           ) : (
-            <div className="bg-slate-800 text-white p-2 rounded shadow-xl border border-emerald-500 font-bold flex items-center gap-2">
+            <div className="bg-card text-white p-2 rounded shadow-xl border border-primary font-bold flex items-center gap-2">
               {draggedItem.type === 'user' ? <Users className="w-4 h-4" /> : <Car className="w-4 h-4" />}
               {draggedItem.item.name || draggedItem.item.full_name}
             </div>

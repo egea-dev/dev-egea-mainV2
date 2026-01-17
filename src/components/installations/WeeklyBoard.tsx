@@ -29,20 +29,20 @@ const DayColumn = ({ day, tasks, isToday, onTaskEdit }: {
             ref={setNodeRef}
             className={cn(
                 "flex flex-col h-full min-h-[500px] rounded-xl transition-colors border",
-                isOver ? "bg-slate-800/50 border-emerald-500/50" : "bg-slate-900/20 border-slate-800/50 hover:bg-slate-900/40"
+                isOver ? "bg-muted/50 border-primary/50" : "bg-card/20 border-border/40 hover:bg-muted/40"
             )}
         >
             {/* Column Header */}
             <div className={cn(
-                "p-3 text-center border-b border-slate-800/50 rounded-t-xl",
-                isToday ? "bg-emerald-900/20" : "bg-slate-900/40"
+                "p-3 text-center border-b border-border/40 rounded-t-xl",
+                isToday ? "bg-emerald-900/20" : "bg-muted/40"
             )}>
-                <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-1">
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">
                     {format(day, 'EEE', { locale: es })}
                 </div>
                 <div className={cn(
                     "text-2xl font-bold leading-none",
-                    isToday ? "text-emerald-400" : "text-slate-300"
+                    isToday ? "text-emerald-400" : "text-foreground"
                 )}>
                     {format(day, 'd')}
                 </div>
@@ -67,7 +67,7 @@ const DayColumn = ({ day, tasks, isToday, onTaskEdit }: {
                     ))}
                 {tasks.length === 0 && (
                     <div className="h-full flex items-center justify-center pointer-events-none">
-                        <span className="text-[10px] text-slate-700 italic">Sin tareas</span>
+                        <span className="text-[10px] text-muted-foreground/60 italic">Sin tareas</span>
                     </div>
                 )}
             </div>

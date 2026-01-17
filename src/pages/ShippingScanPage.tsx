@@ -72,19 +72,13 @@ interface Order {
   tracking_pending?: boolean;
 }
 
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+// Eliminada lógica de TWELVE_HOURS_MS para que los envíos pasen al historial inmediatamente
 
 const summarizeLines = (order: Order) => {
   if (!order.lines || !order.lines.length) return 'Sin desglose cargado';
   const preview = order.lines.slice(0, 2).map(line => `${line.quantity} x ${line.width}x${line.height}cm`).join('  ·  ');
   const remaining = order.lines.length > 2 ? ` +${order.lines.length - 2}` : '';
   return `${preview}${remaining}`;
-};
-
-const isRecentShipment = (order: Order) => {
-  if (order.status !== 'ENVIADO' || !order.shipping_date) return false;
-  const shippedAt = new Date(order.shipping_date).getTime();
-  return !Number.isNaN(shippedAt) && (Date.now() - shippedAt) < TWELVE_HOURS_MS;
 };
 
 const escapeHtml = (value: string) =>
@@ -205,10 +199,9 @@ export default function ShippingScanPage() {
 
   const activeShipments = useMemo(() => {
     return orders.filter(o => {
-      // Excluir órdenes ya ENVIADO (para historial)
-      if (o.status === 'ENVIADO') {
-        // En la vista activa, solo mostramos los enviados muy recientes (<12h)
-        return isRecentShipment(o);
+      // Los pedidos con estado ENVIADO o ENTREGADO ya no aparecen en la lista activa
+      if (o.status === 'ENVIADO' || o.status === 'ENTREGADO') {
+        return false;
       }
 
       return o.status === 'PTE_ENVIO' ||
@@ -219,9 +212,8 @@ export default function ShippingScanPage() {
 
   const historyShipments = useMemo(() => {
     return orders.filter(o => {
-      if (o.status === 'ENTREGADO') return true;
-      if (o.status === 'ENVIADO' && !isRecentShipment(o)) return true;
-      return false;
+      // Cualquier pedido ENVIADO o ENTREGADO va al historial inmediatamente
+      return o.status === 'ENVIADO' || o.status === 'ENTREGADO';
     });
   }, [orders]);
 
@@ -694,7 +686,6 @@ export default function ShippingScanPage() {
                       {activeShipments.map((order) => {
                         const isIncomplete = (order.scanned_packages || 0) > 0 && (order.scanned_packages || 0) < (order.packages_count || 1);
                         const isSelected = scannedOrder?.id === order.id;
-                        const recentlyShipped = isRecentShipment(order);
                         return (
                           <button
                             key={order.id}
@@ -707,9 +698,7 @@ export default function ShippingScanPage() {
                               ? 'bg-indigo-900/20 border-indigo-500/50'
                               : isIncomplete
                                 ? 'bg-amber-900/10 border-amber-500/50'
-                                : recentlyShipped
-                                  ? 'bg-emerald-900/10 border-emerald-500/40'
-                                  : 'bg-[#1A1D1F] border-[#45474A] hover:border-[#6E6F71]'
+                                : 'bg-[#1A1D1F] border-[#45474A] hover:border-[#6E6F71]'
                               }`}
                           >
                             <div className="flex justify-between items-start mb-1">
@@ -722,9 +711,6 @@ export default function ShippingScanPage() {
                             <div className="flex flex-col gap-1 text-xs text-[#8B8D90]">
                               <span className="group-hover:text-[#B5B8BA] font-semibold">{order.customer_name}</span>
                               <span className="text-[#B5B8BA]">{order.fabric || 'Sin material'} · {summarizeLines(order)}</span>
-                              {recentlyShipped && (
-                                <span className="text-[10px] text-emerald-300 uppercase font-bold tracking-wide">Enviado hoy</span>
-                              )}
                               <span>{isIncomplete ? <span className="text-amber-500 font-bold">{order.scanned_packages}/{order.packages_count}</span> : <span>{order.packages_count || 1} bultos</span>}</span>
                             </div>
                           </button>

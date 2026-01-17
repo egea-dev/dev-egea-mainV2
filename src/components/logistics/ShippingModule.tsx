@@ -8,7 +8,7 @@ import QRScanner from '@/components/common/QRScanner';
 import Roadmap from '@/components/logistics/Roadmap';
 import {
     Truck, CheckCircle, AlertTriangle, QrCode, ArrowRight, Package, MapPin,
-    Printer, Search, Keyboard, Camera, History, Lock, PauseCircle, Copy
+    Printer, Search, Keyboard, Camera, History, Lock, PauseCircle, Copy, User
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -31,16 +31,11 @@ const ShippingModule: React.FC = () => {
 
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Lógica 1: Historial Reciente (12h)
-    const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
-    const isRecentShipment = (shipment: Shipment) => {
-        if (shipment.status !== 'TRANSITO' || !shipment.updated_at) return false;
-        const shippedAt = new Date(shipment.updated_at).getTime();
-        return !Number.isNaN(shippedAt) && (Date.now() - shippedAt) < TWELVE_HOURS_MS;
-    };
+    // Lógica 1: Historial Reciente (12h) - ELIMINADA para historial inmediato
+    const isRecentShipment = (shipment: Shipment) => false;
 
     const activeShipments = shipments?.filter(s =>
-        ['PENDIENTE', 'BULTOS_PENDIENTES'].includes(s.status) || isRecentShipment(s)
+        ['PENDIENTE', 'BULTOS_PENDIENTES'].includes(s.status)
     ) || [];
 
     // Persistencia en tiempo real (Supabase + Local State)
@@ -57,19 +52,6 @@ const ShippingModule: React.FC = () => {
             const { error } = await supabase.from('shipments')
                 .update(patch)
                 .eq('id', shipmentId); // Usamos el cliente genérico apuntando a la tabla correcta por contexto o vista
-
-            // NOTA: Como la tabla está en esquema 'almacen', aseguramos que el cliente configurado
-            // en 'use-logistics' o 'supabase/client' tenga acceso.
-            // Si falla por esquema, usaremos la función RPC o el cliente específico.
-            // En este entorno, 'supabase' es el cliente por defecto. 
-            // Si las tablas están en 'public' (por el reinit), funcionará directo.
-            // Si están en 'almacen', necesitamos apuntar a 'almacen.shipments' si la lib lo soporta o usar RPC.
-            // Dado el script de reinit, asumimos que el cliente tiene visibilidad (exposed schema).
-
-            // Fallback explícito a RPC si update directo falla es complejo aquí, 
-            // asumimos que el script de reinit expuso el esquema o movió tablas.
-            // Usaremos el hook 'updateShipment' que ya sabe manejarlo si es posible, 
-            // pero el hook 'useUpdateShipmentStatus' suele ser solo para status.
 
             if (error) throw error;
             await refreshShipments();
@@ -110,11 +92,6 @@ const ShippingModule: React.FC = () => {
             scannedPackagesCount < (selectedShipment.packages_count || 1)
         ) {
             // Verificar si el código escaneado pertenece al envío actual (ej. es un bulto del pedido)
-            // Esto requiere lógica de coincidencia. Si el código escaneado NO es el envío actual:
-
-            // Simplificación: El usuario dijo "Si intentas escanear un pedido diferente".
-            // Asumimos que el código escaneado identifica unívocamente al pedido.
-
             // Comprobamos si el código corresponde A OTRO envío activo
             const isOtherShipment = activeShipments.some(s =>
                 s.id !== selectedShipment.id &&
@@ -129,10 +106,6 @@ const ShippingModule: React.FC = () => {
 
         // Caso 1: Ya hay envío seleccionado -> Verificar Bulto
         if (selectedShipment) {
-            // Aquí la lógica de "Producción" simplemente suma contador si escaneas el QR del pedido
-            // El usuario dijo: "Si el pedido tiene múltiples bultos, el operario debe escanear el QR repetidamente"
-            // Esto implica que escanea EL MISMO código para sumar bultos.
-
             // Validamos si el código escaneado coincide con el envío actual
             const isCurrentShipment =
                 selectedShipment.tracking_number === cleanCode ||
@@ -174,9 +147,6 @@ const ShippingModule: React.FC = () => {
             setManualInput('');
             toast.success("Expedición cargada");
         } else {
-            // Si no es un envío, tal vez es un bulto suelto?
-            // Intentar buscar por items
-            // (Esta parte requeriría buscar en todos los items de la DB, omitido por eficiencia salvo requerimiento explícito)
             toast.error(`Código no reconocido: ${cleanCode}`);
         }
     };
