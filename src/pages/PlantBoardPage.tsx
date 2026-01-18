@@ -140,7 +140,17 @@ export default function PlantBoardPage() {
             const commLines = Array.isArray((commOrder as any)?.lines) ? (commOrder as any).lines : [];
             const orderLines = Array.isArray(order.lines) ? order.lines : [];
             const relLines = linesData?.filter((l: any) => l.work_order_id === order.id) || [];
-            const lines = [...commLines, ...orderLines, ...relLines].filter(Boolean);
+            // Priorizar: tabla relacional > JSON order > comercial
+            const rawLines = relLines.length > 0 ? relLines : orderLines.length > 0 ? orderLines : commLines;
+            // Deduplicar por material+dimensiones
+            const grouped = rawLines.filter(Boolean).reduce((acc: Record<string, any>, line: any) => {
+                const mat = line.material || line.fabric || 'Pieza';
+                const key = `${mat}-${line.width || 0}x${line.height || 0}`;
+                if (!acc[key]) acc[key] = { ...line, quantity: 0, material: mat };
+                acc[key].quantity += line.quantity || 1;
+                return acc;
+            }, {});
+            const lines = Object.values(grouped);
             const materialList = summarizeMaterials(lines, "N/D");
 
             const colorList = lines.length > 0
@@ -271,18 +281,7 @@ export default function PlantBoardPage() {
                                 <div className="col-span-3">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-gray-300")}>{order.fabric}</div>
                                     <div className={cn("text-2xl font-black mb-2", isLight ? "text-slate-900" : "text-gray-400")}>{order.color}</div>
-                                    {order.lines && order.lines.some((l: any) => l.material || l.fabric || (l.width && l.height)) && (
-                                        <div className="space-y-1 mt-2 border-t border-white/5 pt-2">
-                                            {order.lines
-                                                .filter((l: any) => l.material || l.fabric || (l.width && l.height))
-                                                .map((l: any, i: number) => (
-                                                    <div key={i} className="flex justify-between items-center text-[10px] font-bold uppercase opacity-70">
-                                                        <span>{l.quantity}x {l.material || l.fabric || 'Pieza'}</span>
-                                                        {l.width && l.height && <span>{l.width}x{l.height}</span>}
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    )}
+                                    {/* Desglose de líneas eliminado por solicitud - solo mostrar Material Principal y Color */}
                                 </div>
                                 <div className="col-span-1">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>{order.quantity_total} uds</div>

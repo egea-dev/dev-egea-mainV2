@@ -456,6 +456,54 @@ export default function ArchivePage() {
         </Button>
       </div>
 
+      {/* Estadísticas de Pedidos */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="bg-card border-border/60">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-blue-500/20">
+              <Package className="h-6 w-6 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-400">Total Pedidos</p>
+              <p className="text-2xl font-bold text-white">{workOrders.length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border/60">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-emerald-500/20">
+              <Truck className="h-6 w-6 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-400">Enviados</p>
+              <p className="text-2xl font-bold text-white">{workOrders.filter(o => o.status === 'ENVIADO').length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border/60">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-green-500/20">
+              <Package className="h-6 w-6 text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-400">Entregados</p>
+              <p className="text-2xl font-bold text-white">{workOrders.filter(o => o.status === 'ENTREGADO').length}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border/60">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-red-500/20">
+              <Clock className="h-6 w-6 text-red-400" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-400">Cancelados</p>
+              <p className="text-2xl font-bold text-white">{workOrders.filter(o => o.status === 'CANCELADO').length}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">

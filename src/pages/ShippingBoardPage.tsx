@@ -81,7 +81,9 @@ export default function ShippingBoardPage() {
         const { data: ordersData, error: ordersError } = await supabaseProductivity
             .from("produccion_work_orders")
             .select("*")
-            .or("status.eq.PTE_ENVIO,status.eq.LISTO_ENVIO,status.eq.TERMINADO,and(status.eq.EN_PROCESO,needs_shipping_validation.eq.true),status.eq.ENVIADO,status.eq.ENTREGADO")
+            // Solo mostrar pedidos LISTO_ENVIO (listos para escaneo de envío)
+            // Excluir ENVIADO y ENTREGADO que ya fueron procesados
+            .eq('status', 'LISTO_ENVIO')
             .order("priority", { ascending: false })
             .order("created_at", { ascending: false })
             .limit(200);
@@ -271,18 +273,7 @@ export default function ShippingBoardPage() {
                                 <div className="col-span-3">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-gray-300")}>{order.fabric}</div>
                                     <div className={cn("text-2xl font-black mb-2", isLight ? "text-slate-900" : "text-gray-400")}>{order.color}</div>
-                                    {order.lines && order.lines.some((l: any) => l.material || l.fabric || (l.width && l.height)) && (
-                                        <div className="space-y-1 mt-2 border-t border-white/5 pt-2">
-                                            {order.lines
-                                                .filter((l: any) => l.material || l.fabric || (l.width && l.height))
-                                                .map((l: any, i: number) => (
-                                                    <div key={i} className="flex justify-between items-center text-[10px] font-bold uppercase opacity-70">
-                                                        <span>{l.quantity}x {l.material || l.fabric || 'Pieza'}</span>
-                                                        {l.width && l.height && <span>{l.width}x{l.height}</span>}
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    )}
+                                    {/* Desglose de líneas eliminado - solo mostrar Material Principal y Color */}
                                 </div>
                                 <div className="col-span-1">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>{order.quantity_total} uds</div>

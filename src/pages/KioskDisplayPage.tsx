@@ -124,8 +124,28 @@ const KioskDisplayPage: React.FC = () => {
             const commLines = Array.isArray((commData as any)?.lines) ? (commData as any).lines : [];
             const orderLines = Array.isArray(order.lines) ? order.lines : [];
             const relLines = linesData || [];
-            const lines = [...commLines, ...orderLines, ...relLines].filter(Boolean);
-            const materialList = summarizeMaterials(lines, "N/D");
+            const rawLines = [...commLines, ...orderLines, ...relLines].filter(Boolean);
+
+            // Deduplicar y agrupar líneas por material+dimensiones
+            const deduplicateLines = (lines: any[]) => {
+                const grouped = lines.reduce((acc, line) => {
+                    const material = line.material || line.fabric || 'Pieza';
+                    const key = `${material}-${line.width || 0}x${line.height || 0}-${line.color || ''}`;
+                    if (!acc[key]) {
+                        acc[key] = { ...line, quantity: 0, material };
+                    }
+                    acc[key].quantity += line.quantity || 1;
+                    return acc;
+                }, {} as Record<string, any>);
+                return Object.values(grouped);
+            };
+
+            const lines = deduplicateLines(rawLines);
+            const materialList = summarizeMaterials(rawLines, "N/D");
+
+            // Verificar si el pedido ya está en estado final (archivado)
+            const finalStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
+            const isArchived = finalStatuses.includes(order.status?.toUpperCase?.() || order.status);
 
             return {
                 ...order,
@@ -133,7 +153,8 @@ const KioskDisplayPage: React.FC = () => {
                 fabric: materialList,
                 color: lines.map((l: any) => l.color).filter(Boolean).join(", ") || (specs.color || order.color || "N/D"),
                 lines: lines,
-                due_date: (commData as any)?.delivery_date || order.due_date
+                due_date: (commData as any)?.delivery_date || order.due_date,
+                is_archived: isArchived  // Flag para mostrar mensaje en UI
             };
         }
     });
@@ -273,6 +294,17 @@ const KioskDisplayPage: React.FC = () => {
                                     </div>
                                 )}
                                 <CardContent className="p-6">
+                                    {/* Alerta si el pedido ya está archivado */}
+                                    {(selectedOrder as any).is_archived && (
+                                        <div className="mb-4 p-4 rounded-xl bg-amber-900/30 border border-amber-500/50 text-amber-400">
+                                            <div className="flex items-center gap-2 font-bold text-sm mb-1">
+                                                ⚠️ PEDIDO ARCHIVADO
+                                            </div>
+                                            <p className="text-xs opacity-80">
+                                                Este pedido ya fue enviado y está en el historial. No requiere más acciones de producción.
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between items-start mb-6">
                                         <div>
                                             <Badge className="bg-emerald-900/40 text-emerald-400 border-emerald-500/30 mb-2 px-3 py-1 text-[10px] tracking-widest font-bold uppercase">
@@ -308,7 +340,7 @@ const KioskDisplayPage: React.FC = () => {
 
                                     {selectedOrder.lines && selectedOrder.lines.length > 0 && (
                                         <div className={cn("mb-6 p-4 rounded-2xl border", colors.panel)}>
-                                            <p className={cn("text-[10px] font-black tracking-widest uppercase mb-3", colors.mutedText)}>Desglose Detallado (Tareas)</p>
+                                            <p className={cn("text-[10px] font-black tracking-widest uppercase mb-3", colors.mutedText)}>Desglose Operativo</p>
                                             <div className="space-y-2">
                                                 {selectedOrder.lines.map((line: any, idx: number) => (
                                                     <div key={idx} className="flex justify-between items-center text-sm border-b border-white/5 pb-2 last:border-0 last:pb-0">
@@ -366,27 +398,33 @@ const KioskDisplayPage: React.FC = () => {
 
             {activeTab === "list" && (
                 <div className="grid grid-cols-1 gap-3 pb-10">
-                    {(workOrders || []).map((order) => (
-                        <Card key={order.id} className={cn("rounded-2xl overflow-hidden cursor-pointer", colors.card)} onClick={() => {
-                            setScannedId(order.id);
-                            lastScannedRef.current = order.id; // Sincronizar para evitar re-escaneo inmediato
-                            setActiveTab("scanner");
-                        }}>
-                            <CardContent className="p-4 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className={cn("p-3 rounded-xl", colors.panel)}><Package className={cn("w-6 h-6", colors.mutedText)} /></div>
-                                    <div>
-                                        <h4 className={cn("text-xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</h4>
-                                        <p className={cn("text-[10px] font-bold uppercase", colors.mutedText)}>{order.status} - {order.fabric}</p>
+                    {/* Filtrar solo pedidos en estados activos de producción */}
+                    {(workOrders || [])
+                        .filter(order => {
+                            const archivedStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
+                            return !archivedStatuses.includes(order.status?.toUpperCase?.() || order.status);
+                        })
+                        .map((order) => (
+                            <Card key={order.id} className={cn("rounded-2xl overflow-hidden cursor-pointer", colors.card)} onClick={() => {
+                                setScannedId(order.id);
+                                lastScannedRef.current = order.id; // Sincronizar para evitar re-escaneo inmediato
+                                setActiveTab("scanner");
+                            }}>
+                                <CardContent className="p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className={cn("p-3 rounded-xl", colors.panel)}><Package className={cn("w-6 h-6", colors.mutedText)} /></div>
+                                        <div>
+                                            <h4 className={cn("text-xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</h4>
+                                            <p className={cn("text-[10px] font-bold uppercase", colors.mutedText)}>{order.status} - {order.fabric}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border", STATUS_CONFIG[order.status]?.color)}>{STATUS_CONFIG[order.status]?.label || order.status}</Badge>
-                                    <ArrowRight className={cn("w-4 h-4", colors.mutedText)} />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                    <div className="flex items-center gap-3">
+                                        <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border", STATUS_CONFIG[order.status]?.color)}>{STATUS_CONFIG[order.status]?.label || order.status}</Badge>
+                                        <ArrowRight className={cn("w-4 h-4", colors.mutedText)} />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
                 </div>
             )}
         </div>

@@ -198,24 +198,26 @@ export default function ShippingScanPage() {
   }, []);
 
   const activeShipments = useMemo(() => {
-    return orders.filter(o => {
-      // Los pedidos con estado ENVIADO o ENTREGADO ya no aparecen en la lista activa
-      if (o.status === 'ENVIADO' || o.status === 'ENTREGADO') {
-        return false;
-      }
+    // Estados que ya NO deben aparecer en expediciones activas
+    const archivedStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
 
-      return o.status === 'PTE_ENVIO' ||
-        o.status === 'CONFECCION' ||
-        o.status === 'CONTROL_CALIDAD' ||
-        (o.status === 'EN_PROCESO' && o.needs_shipping_validation);
+    // Log para depuración
+    console.log('📋 Estados de pedidos cargados:', orders.map(o => ({ order_number: o.order_number, status: o.status })));
+
+    return orders.filter(o => {
+      // Excluir pedidos ya archivados
+      if (archivedStatuses.includes(o.status)) return false;
+
+      // Solo mostrar pedidos LISTO_ENVIO (producción terminada, listos para escanear)
+      return o.status === 'LISTO_ENVIO';
     });
   }, [orders]);
 
   const historyShipments = useMemo(() => {
     return orders.filter(o => {
-      // Cualquier pedido LISTO_ENVIO, ENVIADO o ENTREGADO va al historial
-      // LISTO_ENVIO es el estado final en produccion_work_orders
-      return o.status === 'LISTO_ENVIO' || o.status === 'ENVIADO' || o.status === 'ENTREGADO' || o.status === 'TERMINADO';
+      // Solo pedidos ya enviados o entregados van al historial
+      // LISTO_ENVIO NO está aquí porque ahora está en activeShipments
+      return o.status === 'ENVIADO' || o.status === 'ENTREGADO';
     });
   }, [orders]);
 
@@ -381,12 +383,12 @@ export default function ShippingScanPage() {
     try {
       console.log('🚀 Iniciando validación de envío para:', scannedOrder.id);
 
-      // LISTO_ENVIO es el único estado final válido en produccion_work_orders
-      // Los estados válidos son: PENDIENTE, CORTE, CONFECCION, TAPICERIA, CONTROL_CALIDAD, LISTO_ENVIO, CANCELADO
+      // Cambiar estado a ENVIADO para que aparezca en historial
+      // (ENVIADO indica que ya fue validado y despachado)
       const { data: prodData, error: prodError } = await supabaseProductivity
         .from('produccion_work_orders')
         .update({
-          status: 'LISTO_ENVIO',  // Estado final válido para "enviado" en producción
+          status: 'ENVIADO',  // Estado final después de validar envío
           updated_at: new Date().toISOString()
         } as any)
         .eq('id', scannedOrder.id)
@@ -417,6 +419,22 @@ export default function ShippingScanPage() {
           console.log(`ℹ️ No existe pedido comercial con order_number ${scannedOrder.order_number} - sincronización no aplicable (pedido solo de producción)`);
         } else {
           console.log(`✓ Sincronizado estado ENVIADO en comercial_orders para ${scannedOrder.order_number}`);
+        }
+
+        // Archivar el pedido llamando a la función de base de datos
+        console.log(`📦 Archivando pedido ${scannedOrder.order_number}...`);
+        const { data: archiveData, error: archiveError } = await supabaseProductivity
+          .rpc('archive_completed_order', {
+            p_order_number: scannedOrder.order_number,
+            p_shipped_at: new Date().toISOString(),
+            p_tracking_number: trackingNumber || null
+          });
+
+        if (archiveError) {
+          console.warn('⚠️ No se pudo archivar (función RPC puede no existir aún):', archiveError.message);
+          // No bloquear el flujo si el archivado falla - puede que la migración no se haya aplicado
+        } else {
+          console.log(`✓ Pedido archivado con ID: ${archiveData}`);
         }
       }
 
@@ -746,7 +764,7 @@ export default function ShippingScanPage() {
                     className="data-[state=active]:bg-[#45474A] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center gap-2"
                   >
                     <History className="w-4 h-4" />
-                    Historial
+                    Historial ({historyShipments.length})
                   </TabsTrigger>
                 </TabsList>
               </div>
