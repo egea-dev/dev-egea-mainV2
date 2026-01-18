@@ -402,15 +402,9 @@ export function ProductionPage() {
               setScannedOrder(refreshed);
             }
           }
-        } else {
-          const inProgress = ordersWithLines.find((o) =>
-            ['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'EN_PROCESO'].includes(o.status)
-          );
-          if (inProgress) {
-            setScannedOrder(inProgress);
-            setSelectedOrderId(inProgress.id);
-          }
         }
+        // NOTA: No seleccionamos automáticamente ningún pedido.
+        // El usuario debe escanear o seleccionar manualmente.
       } else {
         if (orders.length > 0) {
           setOrders([]);

@@ -33,6 +33,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { UnifiedHistoryModal, UnifiedHistoryItem, generateTimeline } from '@/components/history/UnifiedHistoryModal';
 
 type ArchivedTaskParticipant = {
   id: string;
@@ -68,8 +69,31 @@ type ArchivedWorkOrder = {
   customer_name: string;
   status: string;
   updated_at: string;
+  created_at?: string;
   notes: string | null;
   technical_specs?: any;
+  // Datos comerciales completos
+  admin_code?: string;
+  contact_name?: string;
+  phone?: string;
+  email?: string;
+  delivery_address?: string;
+  delivery_city?: string;
+  delivery_region?: string;
+  delivery_date?: string;
+  delivery_location_url?: string;
+  customer_code?: string;
+  customer_company?: string;
+  region?: string;
+  fabric?: string;
+  quantity_total?: number;
+  documents?: any;
+  internal_notes?: string;
+  lines?: any[];
+  // Datos de producción
+  production_status?: string;
+  production_notes?: string;
+  quality_check_status?: string;
 };
 
 const normalizeArchivedUsers = (value: unknown): ArchivedTaskParticipant[] => {
@@ -128,23 +152,61 @@ const useArchivedWorkOrders = () => {
   return useQuery<ArchivedWorkOrder[]>({
     queryKey: ['archived_work_orders'],
     queryFn: async () => {
-      const { data, error } = await supabaseProductivity
-        .from('produccion_work_orders')
+      // Cargar datos de comercial_orders (pedidos finalizados)
+      const { data: commercialData, error: commercialError } = await supabaseProductivity
+        .from('comercial_orders')
         .select('*')
-        .in('status', ['LISTO_ENVIO', 'ENVIADO', 'ENTREGADO'])
+        .in('status', ['ENVIADO', 'ENTREGADO', 'CANCELADO'])
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (commercialError) throw commercialError;
 
-      return (data ?? []).map((o: any) => ({
-        id: o.id,
-        order_number: o.order_number,
-        customer_name: o.technical_specs?.customer_name || o.order_number,
-        status: o.status,
-        updated_at: o.updated_at,
-        notes: o.notes,
-        technical_specs: o.technical_specs
-      }));
+      // Para cada pedido comercial, buscar datos de producción
+      const orders: ArchivedWorkOrder[] = await Promise.all(
+        (commercialData ?? []).map(async (co: any) => {
+          // Buscar orden de trabajo correspondiente
+          const { data: prodData } = await supabaseProductivity
+            .from('produccion_work_orders')
+            .select('status, notes, quality_check_status')
+            .eq('order_number', co.order_number)
+            .single();
+
+          return {
+            id: co.id,
+            order_number: co.order_number,
+            customer_name: co.customer_name || 'Sin cliente',
+            status: co.status,
+            updated_at: co.updated_at,
+            created_at: co.created_at,
+            notes: co.notes,
+            technical_specs: co.technical_specs,
+            // Datos comerciales
+            admin_code: co.admin_code,
+            contact_name: co.contact_name,
+            phone: co.phone,
+            email: co.email,
+            delivery_address: co.delivery_address,
+            delivery_city: co.delivery_city,
+            delivery_region: co.delivery_region,
+            delivery_date: co.delivery_date,
+            delivery_location_url: co.delivery_location_url,
+            customer_code: co.customer_code,
+            customer_company: co.customer_company,
+            region: co.region,
+            fabric: co.fabric,
+            quantity_total: co.quantity_total,
+            documents: co.documents,
+            internal_notes: co.internal_notes,
+            lines: co.lines,
+            // Datos de producción
+            production_status: prodData?.status,
+            production_notes: prodData?.notes,
+            quality_check_status: prodData?.quality_check_status
+          };
+        })
+      );
+
+      return orders;
     },
   });
 };
@@ -284,6 +346,8 @@ export default function ArchivePage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedItem, setSelectedItem] = useState<UnifiedHistoryItem | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const itemsPerPage = 50;
 
   // Filtrar tareas
@@ -520,7 +584,57 @@ export default function ArchivePage() {
                       </TableRow>
                     ) : (
                       currentItems.map((item: any) => (
-                        <TableRow key={item.id} className="border-border/40 hover:bg-muted/40 transition-colors">
+                        <TableRow
+                          key={item.id}
+                          className="border-border/40 hover:bg-muted/40 transition-colors cursor-pointer"
+                          onClick={() => {
+                            if (activeTab === 'orders') {
+                              const unifiedItem: Omit<UnifiedHistoryItem, 'timeline'> = {
+                                id: item.id,
+                                order_number: item.order_number,
+                                customer_name: item.customer_name,
+                                current_status: item.status,
+                                created_at: item.created_at || item.updated_at,
+                                updated_at: item.updated_at,
+                                commercial: {
+                                  status: item.status,
+                                  created_at: item.created_at || item.updated_at,
+                                  notes: item.notes,
+                                  products: item.lines?.map((l: any) => l.description || l.material).filter(Boolean).join(', '),
+                                  // Datos adicionales del pedido
+                                  admin_code: item.admin_code,
+                                  contact_name: item.contact_name,
+                                  phone: item.phone,
+                                  email: item.email,
+                                  delivery_address: item.delivery_address,
+                                  delivery_city: item.delivery_city,
+                                  delivery_region: item.delivery_region || item.region,
+                                  delivery_date: item.delivery_date,
+                                  delivery_location_url: item.delivery_location_url,
+                                  customer_code: item.customer_code,
+                                  customer_company: item.customer_company,
+                                  fabric: item.fabric,
+                                  quantity_total: item.quantity_total,
+                                  internal_notes: item.internal_notes,
+                                  lines: item.lines
+                                },
+                                production: {
+                                  status: item.production_status || item.status,
+                                  completed_at: item.updated_at,
+                                  quality_status: item.quality_check_status,
+                                  notes: item.production_notes
+                                },
+                                shipping: item.status === 'LISTO_ENVIO' || item.status === 'ENVIADO' || item.status === 'ENTREGADO' ? {
+                                  status: item.status,
+                                  shipped_at: item.updated_at,
+                                  address: item.delivery_address
+                                } : undefined
+                              };
+                              setSelectedItem({ ...unifiedItem, timeline: generateTimeline(unifiedItem) });
+                              setModalOpen(true);
+                            }
+                          }}
+                        >
                           {activeTab === "tasks" ? (
                             <>
                               <TableCell className="text-xs text-muted-foreground">
@@ -587,6 +701,13 @@ export default function ArchivePage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Modal de Historial Unificado */}
+      <UnifiedHistoryModal
+        item={selectedItem}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+      />
     </div>
   );
 }

@@ -43,6 +43,19 @@ import { supabase, supabaseProductivity } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrders } from '@/hooks/use-orders';
 import { OrderCard } from '@/components/commercial/OrderCard';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from "@/components/ui/dialog";
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { OrderDetailModal } from '@/components/commercial/OrderDetailModal';
+import { useDeleteOrder } from '@/hooks/use-orders';
+import { useProfile } from '@/hooks/use-supabase';
+
 
 interface CalendarModuleProps {
     className?: string;
@@ -51,6 +64,7 @@ interface CalendarModuleProps {
     onDateSelect?: (date: Date) => void;
     embedded?: boolean;
     mode?: CalendarMode;
+    onTaskClick?: (task: any) => void;
 }
 
 const getOrderColor = (status: string) => {
@@ -92,7 +106,8 @@ export const CalendarModule = ({
     selectedDate: propSelectedDate,
     onDateSelect,
     embedded = false,
-    mode: propMode
+    mode: propMode,
+    onTaskClick
 }: CalendarModuleProps) => {
     const [mode, setMode] = useState<CalendarMode>(propMode || 'commercial');
     const [displayMode, setDisplayMode] = useState<'calendar' | 'list'>('calendar');
@@ -104,6 +119,13 @@ export const CalendarModule = ({
     const [internalSelectedDate, setInternalSelectedDate] = useState<Date | undefined>(new Date());
     const [draggedItem, setDraggedItem] = useState<any>(null);
     const [dragOverDay, setDragOverDay] = useState<Date | null>(null);
+    const [isDayDetailOpen, setIsDayDetailOpen] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    const { data: profile } = useProfile();
+    const deleteOrder = useDeleteOrder();
+
+    const canDeleteOrders = profile?.role === "admin" || profile?.role === "manager";
+
 
     const { data: allOrders = [], isLoading: ordersLoading } = useOrders();
     const activeOrders = useMemo(() => {
@@ -144,7 +166,9 @@ export const CalendarModule = ({
     const handleDateClick = (date: Date) => {
         setInternalSelectedDate(date);
         if (onDateSelect) onDateSelect(date);
+        setIsDayDetailOpen(true);
     };
+
 
     const handleToday = () => {
         const today = new Date();
@@ -604,11 +628,11 @@ export const CalendarModule = ({
                                                         >
                                                             <GripVertical className="w-2 h-2 opacity-50 flex-shrink-0" />
                                                             <div className={cn("w-1 h-1 rounded-full flex-shrink-0", statusStyle.badge)} />
-                                <span className="font-mono opacity-80">{getDisplayOrderNumber(item)}</span>
-                                <span className="truncate flex-1 font-medium">{item.customer_company || item.customer_name}</span>
-                            </div>
-                        );
-                    } else {
+                                                            <span className="font-mono opacity-80">{getDisplayOrderNumber(item)}</span>
+                                                            <span className="truncate flex-1 font-medium">{item.customer_company || item.customer_name}</span>
+                                                        </div>
+                                                    );
+                                                } else {
                                                     const isUrgent = item.state === 'urgente';
                                                     const stateClass = getTaskStateColor(item.state);
                                                     const dotClass = isUrgent ? "bg-amber-400" : "bg-slate-400";
@@ -656,6 +680,89 @@ export const CalendarModule = ({
                         />
                     </div>
                 )
+            )}
+            {/* Day Detail Modal */}
+            <Dialog open={isDayDetailOpen} onOpenChange={setIsDayDetailOpen}>
+                <DialogContent className="max-w-2xl bg-card border-border/60">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <CalendarIcon className="w-5 h-5 text-primary" />
+                            {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : 'Detalle del día'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {mode === 'commercial' ? 'Pedidos programados para esta fecha.' : 'Tareas de instalación para esta fecha.'}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <ScrollArea className="max-h-[60vh] mt-4 pr-4">
+                        <div className="grid grid-cols-1 gap-3">
+                            {selectedDate && getDayData(selectedDate).length > 0 ? (
+                                getDayData(selectedDate).map((item: any) => (
+                                    <div
+                                        key={item.id}
+                                        onClick={() => {
+                                            if (mode === 'commercial') {
+                                                setSelectedOrder(item);
+                                            } else if (onTaskClick) {
+                                                onTaskClick(item);
+                                            }
+                                        }}
+                                        className={cn(
+                                            "p-4 rounded-xl border border-border/60 bg-muted/30 hover:bg-muted/50 transition-all cursor-pointer group flex items-center justify-between",
+                                            mode === 'commercial' && getOrderColor(item.status).border
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={cn("w-2 h-2 rounded-full",
+                                                mode === 'commercial'
+                                                    ? getOrderColor(item.status).badge
+                                                    : (item.state === 'urgente' ? 'bg-red-500' : 'bg-slate-500')
+                                            )} />
+                                            <div>
+                                                <p className="font-mono text-xs text-muted-foreground">
+                                                    {getDisplayOrderNumber(item)}
+                                                </p>
+                                                <p className="font-bold text-sm">
+                                                    {mode === 'commercial'
+                                                        ? (item.customer_company || item.customer_name)
+                                                        : (item.data?.site || item.description || item.client?.full_name || "Sin título")}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {mode === 'commercial' && <Badge variant="outline">{getOrderStatusLabel(item.status)}</Badge>}
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-10 text-muted-foreground border border-dashed border-border/60 rounded-xl">
+                                    No hay {mode === 'commercial' ? 'pedidos' : 'tareas'} para este día.
+                                </div>
+                            )}
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsDayDetailOpen(false)}>Cerrar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Order Detail Modal for Commercial mode inside Calendar */}
+            {selectedOrder && (
+                <OrderDetailModal
+                    isOpen={!!selectedOrder}
+                    onClose={() => setSelectedOrder(null)}
+                    order={selectedOrder}
+                    canDelete={canDeleteOrders}
+                    onDelete={async (orderId) => {
+                        await deleteOrder.mutateAsync(orderId);
+                        setSelectedOrder(null);
+                        refetch();
+                    }}
+                    onSave={() => {
+                        setSelectedOrder(null);
+                        refetch();
+                    }}
+                    userRole={profile?.role}
+                />
             )}
         </div>
     );

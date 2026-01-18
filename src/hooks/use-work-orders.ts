@@ -184,7 +184,6 @@ export const useWorkOrder = (id: string) => {
     });
 };
 
-// Hook para actualizar estado de work order
 export const useUpdateWorkOrderStatus = () => {
     const queryClient = useQueryClient();
 
@@ -278,8 +277,44 @@ export const useUpdateWorkOrderStatus = () => {
 
             return data as WorkOrder;
         },
-        onSuccess: () => {
+        onSuccess: async (data, variables) => {
+            // Sincronización Producción -> Comercial
+            if (data?.order_number) {
+                const mapProductionToCommercial = (status: string): string | null => {
+                    switch (status.toUpperCase()) {
+                        case 'LISTO_ENVIO':
+                        case 'TERMINADO':
+                            // Cuando producción marca como LISTO_ENVIO, comercial pasa a ENVIADO
+                            // para que aparezca en el historial
+                            return 'ENVIADO';
+                        case 'ENVIADO':
+                            return 'ENVIADO';
+                        case 'ENTREGADO':
+                            return 'ENTREGADO';
+                        default:
+                            return null;
+                    }
+                };
+
+                const commStatus = mapProductionToCommercial(variables.status);
+                if (commStatus) {
+                    console.log(`🔄 Sincronizando estado ${commStatus} con comercial para orden ${data.order_number}`);
+
+                    const { error: syncError } = await (supabase as any)
+                        .from('comercial_orders')
+                        .update({ status: commStatus })
+                        .eq('order_number', data.order_number);
+
+                    if (syncError) {
+                        console.warn("Error sincronizando estado con comercial:", syncError);
+                    } else {
+                        console.log(`✓ Sincronizado estado ${commStatus} en comercial`);
+                    }
+                }
+            }
+
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
             toast.success("Estado actualizado exitosamente");
         },
         onError: (error: any) => {
@@ -287,6 +322,7 @@ export const useUpdateWorkOrderStatus = () => {
         }
     });
 };
+
 
 // Hook para asignar usuario
 export const useAssignTechnician = () => {

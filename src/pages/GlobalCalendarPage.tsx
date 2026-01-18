@@ -13,6 +13,7 @@ import { MobileTaskList } from "@/components/installations/MobileTaskList"; // I
 import { WeeklyBoard } from "@/components/installations/WeeklyBoard"; // Reuse existing board
 import { TaskDialog } from "@/components/installations/TaskDialog";
 import { useAdminData } from "@/hooks/use-admin-data";
+import { CalendarModule } from "@/components/dashboard/CalendarModule";
 
 export default function GlobalCalendarPage() {
   const isMobile = useIsMobile();
@@ -30,6 +31,7 @@ export default function GlobalCalendarPage() {
   // Dialog State
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<DetailedTask | null>(null);
+  const [viewType, setViewType] = useState<'week' | 'month'>('week');
 
   // Fetch Tasks
   const fetchTasks = async () => {
@@ -128,11 +130,33 @@ export default function GlobalCalendarPage() {
             </Button>
           </div>
 
-          {!isMobile && (
-            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-              Hoy
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {!isMobile && (
+              <div className="flex p-1 bg-muted/40 rounded-lg border border-border/60 mr-2">
+                <Button
+                  variant={viewType === 'week' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewType('week')}
+                  className="h-7 px-3 text-xs font-semibold"
+                >
+                  Semana
+                </Button>
+                <Button
+                  variant={viewType === 'month' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewType('month')}
+                  className="h-7 px-3 text-xs font-semibold"
+                >
+                  Mes
+                </Button>
+              </div>
+            )}
+            {!isMobile && (
+              <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+                Hoy
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Content */}
@@ -155,7 +179,7 @@ export default function GlobalCalendarPage() {
                   setIsTaskDialogOpen(true);
                 }}
               />
-            ) : (
+            ) : viewType === 'week' ? (
               /* Desktop: Weekly Board (Reusing Logic) */
               <div className="h-[calc(100vh-220px)] border border-border/60 rounded-xl overflow-hidden bg-background/50">
                 <DndContext>
@@ -173,6 +197,21 @@ export default function GlobalCalendarPage() {
                     onDateClick={(d) => console.log('Date clicked', d)}
                   />
                 </DndContext>
+              </div>
+            ) : (
+              /* Desktop: Month View (CalendarModule) */
+              <div className="p-4 border border-border/60 rounded-xl bg-background/50">
+                <CalendarModule
+                  mode="installations"
+                  selectedDate={currentDate}
+                  onDateSelect={setCurrentDate}
+                  onTaskClick={(t) => {
+                    // Normalize task from CalendarModule to match DetailedTask expected by TaskDialog
+                    // useDashboardCalendarData might return simplified tasks
+                    setSelectedTask(t as any);
+                    setIsTaskDialogOpen(true);
+                  }}
+                />
               </div>
             )}
           </div>

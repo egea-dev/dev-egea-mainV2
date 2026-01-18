@@ -147,8 +147,8 @@ export default function ShippingScanPage() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('📦 Órdenes recibidas:', ordersData);
-      console.log('❌ Error:', ordersError);
+      console.log('📦 Órdenes recibidas:', ordersData?.length || 0, 'registros');
+      if (ordersError) console.error('❌ Error cargando órdenes:', ordersError);
 
       if (ordersError) throw ordersError;
 
@@ -205,26 +205,73 @@ export default function ShippingScanPage() {
       }
 
       return o.status === 'PTE_ENVIO' ||
-        o.status === 'LISTO_ENVIO' ||
+        o.status === 'CONFECCION' ||
+        o.status === 'CONTROL_CALIDAD' ||
         (o.status === 'EN_PROCESO' && o.needs_shipping_validation);
     });
   }, [orders]);
 
   const historyShipments = useMemo(() => {
     return orders.filter(o => {
-      // Cualquier pedido ENVIADO o ENTREGADO va al historial inmediatamente
-      return o.status === 'ENVIADO' || o.status === 'ENTREGADO';
+      // Cualquier pedido LISTO_ENVIO, ENVIADO o ENTREGADO va al historial
+      // LISTO_ENVIO es el estado final en produccion_work_orders
+      return o.status === 'LISTO_ENVIO' || o.status === 'ENVIADO' || o.status === 'ENTREGADO' || o.status === 'TERMINADO';
     });
   }, [orders]);
 
   const persistOrderUpdate = async (orderId: string, patch: Partial<Order>) => {
+    // Actualizar estado local inmediatamente
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...patch } : o));
     setScannedOrder(prev => prev && prev.id === orderId ? { ...prev, ...patch } : prev);
     if (patch.scanned_packages !== undefined) setScannedPackagesCount(patch.scanned_packages || 0);
+
     try {
-      // @ts-ignore
-      const { error } = await supabaseProductivity.from('produccion_work_orders').update(patch).eq('id', orderId);
-      if (error) throw error;
+      // Solo enviar campos que existen en produccion_work_orders
+      const validFields: Record<string, any> = {};
+
+      // Campos válidos según el esquema de produccion_work_orders
+      const allowedFields = ['status', 'priority', 'notes', 'quality_check_status', 'updated_at'];
+
+      for (const key of allowedFields) {
+        if ((patch as any)[key] !== undefined) {
+          validFields[key] = (patch as any)[key];
+        }
+      }
+
+      // Siempre actualizar updated_at
+      validFields.updated_at = new Date().toISOString();
+
+      if (Object.keys(validFields).length > 1) { // Más que solo updated_at
+        const { error } = await supabaseProductivity
+          .from('produccion_work_orders')
+          .update(validFields as any)
+          .eq('id', orderId);
+
+        if (error) {
+          console.error('Error actualizando produccion_work_orders:', error);
+          throw error;
+        }
+      }
+
+      // Sincronización con comercial_orders si el estado cambia
+      if (patch.status) {
+        const order = orders.find(o => o.id === orderId);
+        if (order && order.order_number) {
+          console.log(`🔄 Sincronizando estado ${patch.status} con comercial para orden ${order.order_number}`);
+
+          const { error: syncError } = await supabaseProductivity
+            .from('comercial_orders')
+            .update({ status: patch.status } as any)
+            .eq('order_number', order.order_number);
+
+          if (syncError) {
+            console.warn("Error sincronizando estado con comercial:", syncError);
+          } else {
+            console.log(`✓ Sincronizado estado ${patch.status} en comercial_orders para ${order.order_number}`);
+          }
+        }
+      }
+
       await loadOrders();
     } catch (error: any) {
       toast.error('Error sincronizando pedido: ' + error.message);
@@ -331,24 +378,57 @@ export default function ShippingScanPage() {
       return;
     }
 
-    const updatedOrder: Partial<Order> = {
-      status: 'ENVIADO',
-      quantity_shipped: scannedOrder.quantity_total,
-      needs_shipping_validation: false,
-      tracking_number: trackingNumber.trim() || null,
-      tracking_pending: !trackingNumber.trim(),
-      shipping_date: new Date().toISOString()
-    };
+    try {
+      console.log('🚀 Iniciando validación de envío para:', scannedOrder.id);
 
-    await persistOrderUpdate(scannedOrder.id, updatedOrder);
+      // LISTO_ENVIO es el único estado final válido en produccion_work_orders
+      // Los estados válidos son: PENDIENTE, CORTE, CONFECCION, TAPICERIA, CONTROL_CALIDAD, LISTO_ENVIO, CANCELADO
+      const { data: prodData, error: prodError } = await supabaseProductivity
+        .from('produccion_work_orders')
+        .update({
+          status: 'LISTO_ENVIO',  // Estado final válido para "enviado" en producción
+          updated_at: new Date().toISOString()
+        } as any)
+        .eq('id', scannedOrder.id)
+        .select();
 
-    // Alerta de éxito si se envió sin tracking
-    if (!trackingNumber.trim()) {
-      toast.success('Salida marcada como PENDIENTE DE TRACKING');
-    } else {
-      toast.success(`Salida validada. Tracking: ${trackingNumber}`);
+      console.log('📤 Resultado update produccion_work_orders:', { prodData, prodError });
+
+      if (prodError) {
+        console.error('❌ Error actualizando produccion_work_orders:', prodError);
+        toast.error('Error al actualizar el estado del pedido: ' + prodError.message);
+        return;
+      }
+
+      // Sincronizar con comercial_orders - aquí sí usamos ENVIADO
+      if (scannedOrder.order_number) {
+        console.log(`🔄 Sincronizando estado ENVIADO con comercial para orden ${scannedOrder.order_number}`);
+        const { data: commData, error: commError } = await supabaseProductivity
+          .from('comercial_orders')
+          .update({ status: 'ENVIADO' } as any)
+          .eq('order_number', scannedOrder.order_number)
+          .select();
+
+        console.log('📤 Resultado update comercial_orders:', { commData, commError });
+
+        if (commError) {
+          console.warn('⚠️ Error sincronizando con comercial_orders:', commError);
+        } else if (!commData || commData.length === 0) {
+          console.log(`ℹ️ No existe pedido comercial con order_number ${scannedOrder.order_number} - sincronización no aplicable (pedido solo de producción)`);
+        } else {
+          console.log(`✓ Sincronizado estado ENVIADO en comercial_orders para ${scannedOrder.order_number}`);
+        }
+      }
+
+      // Alerta de éxito
+      toast.success('✓ Envío validado correctamente');
+
+      await loadOrders();
+      setScannedOrder(null);
+    } catch (error: any) {
+      console.error('❌ Error general en validateShipment:', error);
+      toast.error('Error al validar envío: ' + error.message);
     }
-    setScannedOrder(null);
   };
 
   const printManifest = () => {
