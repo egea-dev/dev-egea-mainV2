@@ -679,32 +679,25 @@ export function ProductionPage() {
     // ZPL para Etiqueta 10x15cm (795x1200 dots @ 203dpi)
     const zpl = `
 ^XA
-^PW795
-^LL1200
-^PON
 ^CI28
-
-^FO50,60^A0N,50,50^FB695,1,0,C^FDPRODUCCIÓN^FS
-^FO50,120^A0N,60,60^FB695,1,0,C^FDDECORACIONES EGEA^FS
-^FO50,190^A0N,35,35^FB695,1,0,C^FDwww.decoracionesegea.com^FS
-
-^FO50,250^GB695,60,60^FS
-^FO60,260^A0N,45,45^FR^FB685,1,0,C^FDETIQUETA DE ENVÍO^FS
-
-^FO50,350^A0N,75,75^FB695,1,0,C^FD${orderNumber}^FS
-
-^FO60,460^A0N,40,40^FDCliente: ${customer}^FS
-^FO60,515^A0N,40,40^FDContacto: ${contact}^FS
-^FO60,570^A0N,38,38^FB695,2,0,L^FDDirección: ${address}^FS
-^FO60,650^A0N,40,40^FDRegión: ${region}^FS
-
-^FO275,730^BQN,2,5^FDQA,${qrContent}^FS
-
-^FO50,1040^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
-^FO50,1110^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
-
-^XZ
-    `;
+^CF0,30
+^FO50,50^GB700,1110,3^FS
+^FO220,115^A0N,50,50^FDPRODUCCIÓN^FS
+^FO130,175^A0N,60,60^FDDECORACIONES EGEA^FS
+^FO50,240^A0N,30,30^FB695,1,0,C^FDwww.decoracionesegea.com^FS
+^FO0,260^GB800,0,3^FS
+^FO210,310^GB380,60,60^FS
+^FO230,320^A0N,40,40^FR^FDETIQUETA DE ENVÍO^FS
+^FO0,410^GB800,0,3^FS
+^FO150,440^A0N,100,100^FD${orderNumber}^FS
+^FO50,580^A0N,30,30^FDCliente: ${customer}^FS
+^FO50,620^A0N,30,30^FDContacto: ${contact}^FS
+^FO50,660^A0N,30,30^FDDirección: ${address}^FS
+^FO50,710^A0N,30,30^FDRegión: ${region}^FS
+^FO247,730^BQN,2,8^FDQA,${qrContent}^FS
+^FO320,1030^A0N,40,40^FDBULTOS: ${packages}^FS
+^FO270,1075^A0N,30,30^FDTotal Unidades: ${units}^FS
+^XZ`;
 
     console.log('🦓 Enviando ZPL al servidor proxy en Raspberry Pi (HTTPS)');
     console.log('📍 URL:', 'https://192.168.1.236:3003/print');
@@ -1192,7 +1185,7 @@ export function ProductionPage() {
                             +
                           </button>
                         </div>
-                        <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                           <button
                             onClick={printShippingLabel}
                             disabled={isPersisting}
@@ -1224,19 +1217,22 @@ export function ProductionPage() {
                             onClick={() => {
                               showAlert(
                                 'warning',
-                                'Validar sin etiquetas',
-                                '¿Estás seguro de que quieres validar sin imprimir las etiquetas? El pedido se marcará como listo pero no habrá etiquetas físicas.',
+                                'VALIDAR SIN ETIQUETAS',
+                                '¡ATENCIÓN! Vas a finalizar el pedido SIN imprimir etiquetas físicas. ¿Estás seguro? Utiliza esta opción solo si la impresora falla.',
                                 confirmProductionFinish
                               );
                             }}
                             disabled={isPersisting}
-                            className="production-action-button w-full py-3 sm:py-4 bg-slate-600 hover:bg-slate-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-[10px] sm:text-sm"
+                            className="production-action-button w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm shadow-lg shadow-amber-900/20"
                           >
-                            <CheckCircle className="w-5 h-5 mr-1 flex-shrink-0" />
-                            <span className="hidden sm:inline">Validar</span>
-                            <span className="sm:hidden">Validar</span>
+                            <CheckCircle className="w-6 h-6 mr-2 flex-shrink-0" />
+                            <span>VALIDAR (SIN IMPRIMIR)</span>
                           </button>
                         </div>
+                        {/* Mensaje de ayuda para errores de impresión */}
+                        <p className="text-[10px] text-[#8B8D90] text-center mt-2 italic">
+                          Si Zebra da error de "Timeout", verifica que el papel no esté atascado y que la Raspberry esté encendida.
+                        </p>
                       </div>
                     </div>
                   )}
