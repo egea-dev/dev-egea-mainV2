@@ -126,11 +126,13 @@ Variable: VITE_SUPABASE_PRODUCTIVITY_ANON_KEY
 Valor: tu-anon-key-productivity-aqui
 ```
 
-#### 🖨️ Servidor de Impresión (Opcional)
+#### 🖨️ Servidor de Impresión (Opcional - Solo si tienes Zebra)
+
+⚠️ **NOTA**: Esta variable es completamente opcional. Solo agrégala si tienes una impresora Zebra configurada.
 
 ```
 Variable: VITE_PRINTER_SERVER_URL
-Valor: http://192.168.1.236:500
+Valor: http://192.168.1.236:5000  # Puerto típico, verifica tu configuración
 ```
 
 ### 3.3 Cómo Obtener las Credenciales de Supabase

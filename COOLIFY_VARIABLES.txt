@@ -86,16 +86,25 @@ Valor:
 
 
 ═══════════════════════════════════════════════════════════════════════════
-  📝 OPCIONAL: VARIABLES ADICIONALES
+  📝 OPCIONAL: IMPRESORA ZEBRA (Puedes OMITIR esta variable)
 ═══════════════════════════════════════════════════════════════════════════
 
-Si tienes configurada la impresora Zebra, agrega también:
+⚠️  NOTA: Esta variable es OPCIONAL. Solo agrégala si:
+  - Tienes una impresora Zebra configurada en tu red local
+  - Tienes el servidor de impresión corriendo (ej: en Raspberry Pi)
+  - Coolify está en la MISMA red local que la impresora
+
+Si NO tienes impresora configurada, OMITE esta variable completamente.
+
+Si SÍ la tienes:
 
 Nombre de Variable:
 VITE_PRINTER_SERVER_URL
 
-Valor:
-http://192.168.1.236:500
+Valor (EJEMPLO - ajusta según tu configuración):
+http://192.168.1.236:5000
+
+(El puerto típico es 5000, pero verifica en tu configuración de Raspberry Pi)
 
 
 ═══════════════════════════════════════════════════════════════════════════

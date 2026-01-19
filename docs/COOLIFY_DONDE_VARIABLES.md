@@ -44,7 +44,7 @@ Value: [Tu Productivity Anon Key]
 
 ```
 Name: VITE_PRINTER_SERVER_URL
-Value: http://192.168.1.236:500
+Value: http://192.168.1.236:5000  # Puerto típico (opcional)
 ```
 
 ```
@@ -87,7 +87,7 @@ VITE_SUPABASE_ANON_KEY=[tu-anon-key-main]
 VITE_SUPABASE_MAIN_ANON_KEY=[tu-main-anon-key]
 VITE_SUPABASE_PRODUCTIVITY_URL=[tu-url-productivity]
 VITE_SUPABASE_PRODUCTIVITY_ANON_KEY=[tu-productivity-anon-key]
-VITE_PRINTER_SERVER_URL=http://192.168.1.236:500
+VITE_PRINTER_SERVER_URL=http://192.168.1.236:5000  # OPCIONAL
 VITE_APP_VERSION=2.0.1-dev
 ```
 
