@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { supabaseProductivity } from '@/integrations/supabase';
 import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon, FileText, History, ListFilter } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { printHtmlToIframe } from '@/utils/print';
 import { parseQRCode, validateQRWithLines, extractOrderNumber } from '@/lib/qr-utils';
 import { summarizeMaterials } from '@/lib/materials';
+import { cn } from "@/lib/utils";
 
 function escapeZpl(str: string): string {
   if (!str) return "";
