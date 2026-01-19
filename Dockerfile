@@ -37,6 +37,10 @@ COPY . .
 # Coolify inyecta VITE_* como Build Args automáticamente
 RUN npm run build
 
+# Verificar que el build generó los archivos (debug)
+RUN ls -la /app/dist && \
+    test -f /app/dist/index.html || (echo "ERROR: index.html not found!" && exit 1)
+
 # ================================
 # Stage 2: Production (Hardened)
 # ================================
@@ -128,6 +132,10 @@ EOF
 
 # Copiar archivos build
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Verificar que los archivos se copiaron correctamente (debug)
+RUN ls -la /usr/share/nginx/html && \
+    test -f /usr/share/nginx/html/index.html || (echo "ERROR: index.html not found in nginx html!" && exit 1)
 
 # Cambiar permisos para usuario no-root
 RUN chown -R appuser:appgroup /usr/share/nginx/html \
