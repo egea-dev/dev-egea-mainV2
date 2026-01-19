@@ -1,0 +1,123 @@
+═══════════════════════════════════════════════════════════════════════════
+  📋 VARIABLES PARA COPIAR A COOLIFY - EGEA MAIN CONTROL
+═══════════════════════════════════════════════════════════════════════════
+
+⚠️  IMPORTANTE: 
+  - Ve a tu aplicación en Coolify
+  - Busca la sección "Environment Variables" o "Environment"
+  - Agrega cada una de estas variables
+  - Luego haz "Deploy" o "Redeploy"
+
+───────────────────────────────────────────────────────────────────────────
+  1️⃣  VITE_SUPABASE_URL
+───────────────────────────────────────────────────────────────────────────
+
+Nombre de Variable:
+VITE_SUPABASE_URL
+
+Valor:
+https://jyaudpctcqcuskzwmism.supabase.co
+
+
+───────────────────────────────────────────────────────────────────────────
+  2️⃣  VITE_SUPABASE_ANON_KEY
+───────────────────────────────────────────────────────────────────────────
+
+Nombre de Variable:
+VITE_SUPABASE_ANON_KEY
+
+Valor:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5YXVkcGN0Y3FjdXNrendtaXNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzOTQwMTksImV4cCI6MjA4MTk3MDAxOX0.axwqydev8DYfkhqK1eUsgl0x_9yI41OXicnHcaqeXNs
+
+
+───────────────────────────────────────────────────────────────────────────
+  3️⃣  VITE_SUPABASE_MAIN_URL
+───────────────────────────────────────────────────────────────────────────
+
+Nombre de Variable:
+VITE_SUPABASE_MAIN_URL
+
+Valor:
+https://jyaudpctcqcuskzwmism.supabase.co
+
+
+───────────────────────────────────────────────────────────────────────────
+  4️⃣  VITE_SUPABASE_MAIN_ANON_KEY
+───────────────────────────────────────────────────────────────────────────
+
+Nombre de Variable:
+VITE_SUPABASE_MAIN_ANON_KEY
+
+Valor:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5YXVkcGN0Y3FjdXNrendtaXNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzOTQwMTksImV4cCI6MjA4MTk3MDAxOX0.axwqydev8DYfkhqK1eUsgl0x_9yI41OXicnHcaqeXNs
+
+
+───────────────────────────────────────────────────────────────────────────
+  5️⃣  VITE_SUPABASE_PRODUCTIVITY_URL
+───────────────────────────────────────────────────────────────────────────
+
+Nombre de Variable:
+VITE_SUPABASE_PRODUCTIVITY_URL
+
+Valor:
+https://zslcblcetrhbsdirkvza.supabase.co
+
+
+───────────────────────────────────────────────────────────────────────────
+  6️⃣  VITE_SUPABASE_PRODUCTIVITY_ANON_KEY
+───────────────────────────────────────────────────────────────────────────
+
+Nombre de Variable:
+VITE_SUPABASE_PRODUCTIVITY_ANON_KEY
+
+Valor:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzbGNibGNldHJoYnNkaXJrdnphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzNTMxMzUsImV4cCI6MjA4MTkyOTEzNX0.-w4DP6Y3VbBy9cXgWYClv5IBu2JNhgtWBYlP2WzpKPY
+
+
+───────────────────────────────────────────────────────────────────────────
+  7️⃣  VITE_APP_VERSION
+───────────────────────────────────────────────────────────────────────────
+
+Nombre de Variable:
+VITE_APP_VERSION
+
+Valor:
+2.0.1-dev
+
+
+═══════════════════════════════════════════════════════════════════════════
+  📝 OPCIONAL: VARIABLES ADICIONALES
+═══════════════════════════════════════════════════════════════════════════
+
+Si tienes configurada la impresora Zebra, agrega también:
+
+Nombre de Variable:
+VITE_PRINTER_SERVER_URL
+
+Valor:
+http://192.168.1.236:500
+
+
+═══════════════════════════════════════════════════════════════════════════
+  🚀 DESPUÉS DE AGREGAR LAS VARIABLES
+═══════════════════════════════════════════════════════════════════════════
+
+1. ✅ GUARDA todas las variables en Coolify
+2. ✅ Haz clic en "Deploy" o "Redeploy"
+3. ✅ Observa los logs del build (debería tardar 3-5 minutos)
+4. ✅ Verifica que el build complete las 2 etapas sin errores
+5. ✅ Abre la URL de tu aplicación en el navegador
+6. ✅ Prueba el login
+
+═══════════════════════════════════════════════════════════════════════════
+  📚 SI NECESITAS MÁS AYUDA
+═══════════════════════════════════════════════════════════════════════════
+
+Consulta estos archivos:
+  - docs/COOLIFY_DONDE_VARIABLES.md (dónde encontrar la sección)
+  - docs/COOLIFY_LOCAL_DEPLOY.md (guía completa)
+  - docs/COOLIFY_DEPLOYMENT.md (troubleshooting)
+
+═══════════════════════════════════════════════════════════════════════════
+Creado: 2026-01-19 09:04
+═══════════════════════════════════════════════════════════════════════════

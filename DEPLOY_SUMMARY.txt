@@ -1,0 +1,151 @@
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│   🚀 RESUMEN: DEPLOY EN COOLIFY LOCAL DESDE GITHUB                          │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+✅ TU REPOSITORIO ESTÁ LISTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📦 Repositorio: https://github.com/egea-dev/MainControl-Egea
+  🌿 Rama principal: main
+  ✅ Último commit: docs: Agregar guía completa para deploy en Coolify local
+  📄 Dockerfile: ✅ Presente y configurado
+  🔒 .dockerignore: ✅ Configurado correctamente
+
+
+🎯 PRÓXIMOS PASOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PASO 1: Prepara tus variables de entorno
+  ─────────────────────────────────────────
+
+    Ejecuta este comando desde tu proyecto:
+    
+    cd c:\Users\Usuari\Documents\GitHub\MainV2\GitHub_Productivity\egea-Main-control
+    pwsh scripts/get-env-for-coolify.ps1
+
+    Esto te mostrará tus variables formateadas y listas para copiar.
+
+
+  PASO 2: Accede a Coolify
+  ─────────────────────────
+
+    Abre tu navegador y ve a tu instancia de Coolify:
+    👉 http://localhost:8000  (o la URL que uses)
+
+
+  PASO 3: Crea el proyecto
+  ─────────────────────────
+
+    En Coolify:
+    • Dashboard → Projects → + Add New Project
+    • Nombre: "Egea Main Control"
+    • Guardar
+
+
+  PASO 4: Agrega la aplicación
+  ─────────────────────────────
+
+    • + Add Resource → Application
+    • Tipo: GitHub (público o privado)
+    • Repository URL: https://github.com/egea-dev/MainControl-Egea
+    • Branch: main
+    • Build Pack: Dockerfile
+
+
+  PASO 5: Configura Build Arguments ⚠️ CRÍTICO
+  ──────────────────────────────────────────────
+
+    En Coolify → Build → Build Arguments, agrega:
+
+    VARIABLE                              TIPO
+    ────────────────────────────────────────────────────────────────
+    VITE_SUPABASE_URL                     🔗 URL de Supabase Main
+    VITE_SUPABASE_ANON_KEY                🔑 Anon Key de Main
+    VITE_SUPABASE_PRODUCTIVITY_URL        🔗 URL de Supabase Productivity
+    VITE_SUPABASE_PRODUCTIVITY_ANON_KEY   🔑 Anon Key de Productivity
+    VITE_PRINTER_SERVER_URL               🖨️  URL servidor impresión (opcional)
+
+    ⚠️  IMPORTANTE: Deben estar en BUILD ARGUMENTS, NO en Environment Variables
+
+
+  PASO 6: Deploy
+  ───────────────
+
+    • Click en "Deploy"
+    • Espera 3-5 minutos
+    • Observa los logs
+
+
+  PASO 7: Verificar
+  ──────────────────
+
+    ✅ Health check: curl http://tu-app/health  → debe responder "ok"
+    ✅ Navegador: Abre la URL de Coolify
+    ✅ Login: Prueba iniciar sesión
+
+
+📚 DOCUMENTACIÓN CREADA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📖 docs/COOLIFY_LOCAL_DEPLOY.md
+     → Guía completa y detallada paso a paso
+     → Troubleshooting y solución de problemas
+     → Arquitectura del deployment
+     → Checklist de verificación
+
+  🔧 scripts/get-env-for-coolify.ps1
+     → Script para extraer variables de .env
+     → Formato listo para copiar a Coolify
+     → Opción de exportar a archivo
+
+  📋 .agent/workflows/deploy-coolify-local.md
+     → Workflow interactivo
+     → Instrucciones paso a paso
+     → Comandos con // turbo para auto-ejecución
+
+
+🤖 COMANDO RÁPIDO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Para seguir el workflow completo, simplemente di:
+
+    /deploy-coolify-local
+
+  Y te guiaré paso a paso por todo el proceso.
+
+
+🆘 SOPORTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Si tienes algún problema:
+
+  ❌ Variables undefined
+     → Verifica que estén en Build Arguments (no en Environment Variables)
+     → Haz Redeploy
+
+  ❌ Error de imports (@/components)
+     → Verifica .dockerignore
+     → Asegúrate de que tsconfig.json y vite.config.ts NO estén excluidos
+
+  ❌ Build falla
+     → Revisa los logs en Coolify
+     → Verifica que Docker tenga recursos suficientes
+     → Consulta: docs/COOLIFY_LOCAL_DEPLOY.md (sección Troubleshooting)
+
+
+🎉 ¡TODO LISTO!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Tu repositorio está sincronizado con GitHub y listo para desplegar en Coolify.
+  
+  El código está en: https://github.com/egea-dev/MainControl-Egea
+  Sigue los pasos arriba o usa el comando /deploy-coolify-local
+
+  ¡Buena suerte con el deployment! 🚀
+
+
+──────────────────────────────────────────────────────────────────────────────
+Creado: 2026-01-19 08:45 | Último push: 19090b9
+──────────────────────────────────────────────────────────────────────────────
