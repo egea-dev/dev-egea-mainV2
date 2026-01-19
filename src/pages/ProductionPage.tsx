@@ -45,6 +45,7 @@ interface Order {
   color?: string;
   quantity_total?: number;
   packages_count?: number | null;
+  commercial_order_id?: string | null;
   region?: string;
   due_date?: string | null;
   created_at?: string | null;
@@ -317,7 +318,7 @@ export function ProductionPage() {
             ].filter(Boolean).join(',');
             const { data: commData, error: commError } = await supabaseProductivity
               .from('comercial_orders')
-              .select('order_number, admin_code, lines, fabric')
+              .select('id, order_number, admin_code, lines, fabric')
               .or(orFilters);
             if (commError) {
               console.warn('Commercial orders unavailable:', commError);
@@ -378,6 +379,7 @@ export function ProductionPage() {
             quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
             due_date: dueDate,
             process_start_at: processStartAt,
+            commercial_order_id: commOrder?.id || null,
             lines
           };
         });
@@ -696,7 +698,7 @@ export function ProductionPage() {
 ^FO60,570^A0N,38,38^FB695,2,0,L^FDDirección: ${address}^FS
 ^FO60,650^A0N,40,40^FDRegión: ${region}^FS
 
-^FO247,730^BQN,2,8^FDQA,${qrContent}^FS
+^FO275,730^BQN,2,5^FDQA,${qrContent}^FS
 
 ^FO50,1040^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
 ^FO50,1110^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
@@ -869,6 +871,22 @@ export function ProductionPage() {
         packages_count: packagesInput,
         needs_shipping_validation: needsValidation
       });
+
+      // Sincronizar con comercial_orders (PTE_ENVIO)
+      if (scannedOrder.commercial_order_id) {
+        console.log('🔄 Sincronizando con comercial_orders:', scannedOrder.commercial_order_id);
+        const { error: commError } = await supabaseProductivity
+          .from('comercial_orders')
+          .update({ status: 'PTE_ENVIO' })
+          .eq('id', scannedOrder.commercial_order_id);
+
+        if (commError) {
+          console.warn('⚠️ No se pudo actualizar el estado en comercial_orders:', commError);
+        } else {
+          console.log('✅ Estado comercial actualizado a PTE_ENVIO');
+        }
+      }
+
       toast.success('Producción finalizada. Orden lista para envío');
       setShowFinishModal(false);
       setScannedOrder(null);
@@ -1174,14 +1192,14 @@ export function ProductionPage() {
                             +
                           </button>
                         </div>
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <button
                             onClick={printShippingLabel}
                             disabled={isPersisting}
                             className="production-action-button w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
                           >
                             <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
-                            <span className="hidden sm:inline">Etiqueta PDF</span>
+                            <span className="hidden sm:inline">PDF</span>
                             <span className="sm:hidden">PDF</span>
                           </button>
                           <button
@@ -1190,7 +1208,7 @@ export function ProductionPage() {
                             className="production-action-button w-full py-3 sm:py-4 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
                           >
                             <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
-                            <span className="hidden sm:inline">Zebra (Red)</span>
+                            <span className="hidden sm:inline">Zebra</span>
                             <span className="sm:hidden">Zebra</span>
                           </button>
                           <button
@@ -1199,8 +1217,24 @@ export function ProductionPage() {
                             className="production-action-button w-full py-3 sm:py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
                           >
                             <FileText className="w-5 h-5 mr-2 flex-shrink-0" />
-                            <span className="hidden sm:inline">Albarán A4</span>
+                            <span className="hidden sm:inline">A4</span>
                             <span className="sm:hidden">A4</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              showAlert(
+                                'warning',
+                                'Validar sin etiquetas',
+                                '¿Estás seguro de que quieres validar sin imprimir las etiquetas? El pedido se marcará como listo pero no habrá etiquetas físicas.',
+                                confirmProductionFinish
+                              );
+                            }}
+                            disabled={isPersisting}
+                            className="production-action-button w-full py-3 sm:py-4 bg-slate-600 hover:bg-slate-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-[10px] sm:text-sm"
+                          >
+                            <CheckCircle className="w-5 h-5 mr-1 flex-shrink-0" />
+                            <span className="hidden sm:inline">Validar</span>
+                            <span className="sm:hidden">Validar</span>
                           </button>
                         </div>
                       </div>

@@ -93,8 +93,8 @@ server {
     # Permissions Policy (reemplaza Feature-Policy)
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(self), payment=()" always;
     
-    # Content Security Policy para Vite + Supabase
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'self'; base-uri 'self'; form-action 'self';" always;
+    # Content Security Policy para Vite + Supabase + Zebra + Google Fonts
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://api.qrserver.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://192.168.1.236:3003; frame-ancestors 'self'; base-uri 'self'; form-action 'self';" always;
 
     # ================================
     # Caching
