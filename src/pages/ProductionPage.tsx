@@ -740,7 +740,7 @@ export function ProductionPage() {
 ^FO70,580^A0N,40,40^FB675,2,0,L^FDDirección: ${address}^FS
 ^FO70,665^A0N,42,42^FDRegión: ${region}^FS
 
-^FO290,700^BQN,2,7^FDQA,${qrContent}^FS
+^FO320,740^BQN,2,6^FDQA,${qrContent}^FS
 
 ^FO50,1050^A0N,60,60^FB695,1,0,C^FDBULTOS: ${packages}^FS
 ^FO50,1125^A0N,50,50^FB695,1,0,C^FDTotal Unidades: ${units}^FS
@@ -778,7 +778,6 @@ export function ProductionPage() {
       console.log('✅ Resultado:', result);
 
       toast.success('Etiqueta enviada a impresora Zebra');
-      await confirmProductionFinish();
     } catch (error: any) {
       console.error('💥 Error completo:', error);
       console.error('💥 Error name:', error.name);
@@ -1269,12 +1268,22 @@ export function ProductionPage() {
                               PDF
                             </button>
                             <button
-                              onClick={printZebraLabel}
+                              onClick={() => {
+                                // 1. Lanzamos a imprimir inmediatamente (sin esperar al servidor)
+                                printZebraLabel();
+                                // 2. Al mismo tiempo mostramos la advertencia
+                                showAlert(
+                                  'success',
+                                  'ETIQUETA IMPRESA',
+                                  '¿Se ha impreso la etiqueta correctamente? Pulsa Aceptar para finalizar el pedido y pasar al siguiente paso.',
+                                  confirmProductionFinish
+                                );
+                              }}
                               disabled={isPersisting}
                               className="w-full py-4 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-[11px] uppercase"
                             >
                               <Printer className="w-4 h-4 mr-2 hidden sm:block" />
-                              Zebra
+                              Etiqueta
                             </button>
                             <button
                               onClick={printA4Document}
