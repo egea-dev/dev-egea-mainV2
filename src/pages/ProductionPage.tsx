@@ -130,6 +130,7 @@ export function ProductionPage() {
   const instanceIdRef = useRef(`prod-${Math.random().toString(36).slice(2)}`);
   const activeQueueRef = useRef<Order[]>([]);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+  const [printerStatus, setPrinterStatus] = useState<'online' | 'offline' | 'checking'>('checking');
 
   React.useEffect(() => {
     const cachedSelected = localStorage.getItem(STORAGE_SELECTED_PERSIST_KEY)
@@ -178,6 +179,30 @@ export function ProductionPage() {
     title: '',
     message: ''
   });
+
+  const checkPrinterStatus = useCallback(async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+      const response = await fetch('https://192.168.1.236:3003/print', {
+        method: 'GET', // El servidor proxy debería responder a GET o simplemente no fallar por timeout
+        signal: controller.signal
+      }).catch(() => ({ ok: false }));
+
+      clearTimeout(timeoutId);
+      setPrinterStatus(response.ok || (response as any).status === 404 ? 'online' : 'offline');
+    } catch (e) {
+      setPrinterStatus('offline');
+    }
+  }, []);
+
+  // Zebra Keep-Alive Ping
+  useEffect(() => {
+    checkPrinterStatus();
+    const interval = setInterval(checkPrinterStatus, 30000); // Cada 30 seg
+    return () => clearInterval(interval);
+  }, [checkPrinterStatus]);
 
   const showAlert = (type: AlertType, title: string, message: string, onConfirm?: () => void) => {
     setAlertState({
@@ -676,27 +701,33 @@ export function ProductionPage() {
     const units = String(scannedOrder.quantity_total || 0);
     const qrContent = scannedOrder.qr_payload || scannedOrder.order_number;
 
-    // ZPL para Etiqueta 10x15cm (795x1200 dots @ 203dpi)
+    // ZPL para Etiqueta 10x15cm (795x1200 dots @ 203dpi) - RESTAURADO A FOTO 2
     const zpl = `
 ^XA
+^PW795
+^LL1200
+^PON
 ^CI28
-^CF0,30
-^FO50,50^GB700,1110,3^FS
-^FO220,115^A0N,50,50^FDPRODUCCIÓN^FS
-^FO130,175^A0N,60,60^FDDECORACIONES EGEA^FS
-^FO50,240^A0N,30,30^FB695,1,0,C^FDwww.decoracionesegea.com^FS
-^FO0,260^GB800,0,3^FS
-^FO210,310^GB380,60,60^FS
-^FO230,320^A0N,40,40^FR^FDETIQUETA DE ENVÍO^FS
-^FO0,410^GB800,0,3^FS
-^FO150,440^A0N,100,100^FD${orderNumber}^FS
-^FO50,580^A0N,30,30^FDCliente: ${customer}^FS
-^FO50,620^A0N,30,30^FDContacto: ${contact}^FS
-^FO50,660^A0N,30,30^FDDirección: ${address}^FS
-^FO50,710^A0N,30,30^FDRegión: ${region}^FS
+
+^FO50,60^A0N,50,50^FB695,1,0,C^FDPRODUCCIÓN^FS
+^FO50,120^A0N,60,60^FB695,1,0,C^FDDECORACIONES EGEA^FS
+^FO50,190^A0N,35,35^FB695,1,0,C^FDwww.decoracionesegea.com^FS
+
+^FO50,250^GB695,60,60^FS
+^FO60,260^A0N,45,45^FR^FB685,1,0,C^FDETIQUETA DE ENVÍO^FS
+
+^FO50,350^A0N,75,75^FB695,1,0,C^FD${orderNumber}^FS
+
+^FO60,460^A0N,40,40^FDCliente: ${customer}^FS
+^FO60,515^A0N,40,40^FDContacto: ${contact}^FS
+^FO60,570^A0N,38,38^FB695,2,0,L^FDDirección: ${address}^FS
+^FO60,650^A0N,40,40^FDRegión: ${region}^FS
+
 ^FO247,730^BQN,2,8^FDQA,${qrContent}^FS
-^FO320,1030^A0N,40,40^FDBULTOS: ${packages}^FS
-^FO270,1075^A0N,30,30^FDTotal Unidades: ${units}^FS
+
+^FO50,1040^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
+^FO50,1110^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
+
 ^XZ`;
 
     console.log('🦓 Enviando ZPL al servidor proxy en Raspberry Pi (HTTPS)');
@@ -892,14 +923,27 @@ export function ProductionPage() {
     <PageShell
       title="Producción y Corte"
       description="Control de fabricación y corte de material"
+      className="space-y-0"
       actions={
-        <div className="flex gap-2">
-          {scannedOrder && (
-            <IncidentReportButton
-              onClick={handleIncidentClick}
-              size="sm"
-            />
-          )}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-[#1A1D1F] px-3 py-1.5 rounded-full border border-[#2A2D31]">
+            <div className={cn(
+              "w-2 h-2 rounded-full animate-pulse",
+              printerStatus === 'online' ? "bg-emerald-500" :
+                printerStatus === 'offline' ? "bg-red-500" : "bg-amber-500"
+            )} />
+            <span className="text-[10px] font-bold text-[#B5B8BA] uppercase tracking-wider">
+              Zebra {printerStatus === 'online' ? 'OK' : printerStatus === 'offline' ? 'Error' : '...'}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {scannedOrder && (
+              <IncidentReportButton
+                onClick={handleIncidentClick}
+                size="sm"
+              />
+            )}
+          </div>
         </div>
       }
     >
@@ -1282,13 +1326,30 @@ export function ProductionPage() {
                   )}
 
                   {['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD'].includes(scannedOrder.status) && !showFinishModal && (
-                    <button
-                      onClick={initiateFinish}
-                      className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm sm:text-base rounded-lg flex items-center justify-center transition gap-2"
-                    >
-                      <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                      <span className="whitespace-nowrap">Finalizar (A Envío)</span>
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={initiateFinish}
+                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg rounded-xl flex items-center justify-center transition gap-2 shadow-lg shadow-emerald-900/20"
+                      >
+                        <CheckCircle className="w-6 h-6 flex-shrink-0" />
+                        <span>FINALIZAR (A ENVÍO)</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          showAlert(
+                            'warning',
+                            'FINALIZAR SIN ETIQUETAS',
+                            '¿Confirmas finalizar el pedido SIN imprimir etiquetas físicas? Usa esta opción si la Zebra no responde.',
+                            confirmProductionFinish
+                          );
+                        }}
+                        className="w-full py-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 font-bold text-sm rounded-xl flex items-center justify-center transition border border-amber-500/30"
+                      >
+                        <AlertTriangle className="w-4 h-4 mr-2" />
+                        OMITIR IMPRESIÓN Y FINALIZAR
+                      </button>
+                    </div>
                   )}
 
                   {scannedOrder.status === 'LISTO_ENVIO' && (
@@ -1343,7 +1404,7 @@ export function ProductionPage() {
           />
         )}
       </div>
-    </PageShell>
+    </PageShell >
   );
 }
 
