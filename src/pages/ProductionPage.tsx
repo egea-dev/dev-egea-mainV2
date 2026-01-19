@@ -113,6 +113,7 @@ export function ProductionPage() {
   const STORAGE_SELECTED_KEY = "production.selectedOrderId";
   const STORAGE_SELECTED_PERSIST_KEY = "production.selectedOrderId.persist";
   const STORAGE_ORDERS_KEY = "production.ordersCache";
+  const STORAGE_ACTIVE_TAB_KEY = "production.activeTab";
   const [orders, setOrders] = useState<Order[]>([]);
   const [qrInput, setQrInput] = useState('');
   const [scannedOrder, setScannedOrder] = useState<Order | null>(null);
@@ -131,7 +132,16 @@ export function ProductionPage() {
   const instanceIdRef = useRef(`prod-${Math.random().toString(36).slice(2)}`);
   const activeQueueRef = useRef<Order[]>([]);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
-  const [printerStatus, setPrinterStatus] = useState<'online' | 'offline' | 'checking'>('checking');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [printerStatus, setPrinterStatus] = useState<any>('checking');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return localStorage.getItem(STORAGE_ACTIVE_TAB_KEY) || "active";
+  });
+
+  // Guardar la pestaña activa cuando cambie
+  useEffect(() => {
+    localStorage.setItem(STORAGE_ACTIVE_TAB_KEY, activeTab);
+  }, [activeTab]);
 
   React.useEffect(() => {
     const cachedSelected = localStorage.getItem(STORAGE_SELECTED_PERSIST_KEY)
@@ -192,6 +202,7 @@ export function ProductionPage() {
       }).catch(() => ({ ok: false }));
 
       clearTimeout(timeoutId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setPrinterStatus(response.ok || (response as any).status === 404 ? 'online' : 'offline');
     } catch (e) {
       setPrinterStatus('offline');
@@ -495,12 +506,17 @@ export function ProductionPage() {
   }, [orders]);
 
   const persistOrderUpdate = async (orderId: string, patch: Partial<Order>) => {
-    setOrders((prev: Order[]) => prev.map(o => o.id === orderId ? { ...o, ...patch } as Order : o));
+    const nextOrders = orders.map(o => o.id === orderId ? { ...o, ...patch } as Order : o);
+    setOrders(nextOrders);
+
+    // Sincronización inmediata con caché de sesión para evitar pérdida de memoria al recargar
+    sessionStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(nextOrders));
+
     setScannedOrder(prev => prev && prev.id === orderId ? { ...prev, ...patch } as Order : prev);
     try {
       const payload: any = { ...patch };
 
-      // @ts-ignore
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabaseProductivity as any)
         .from('produccion_work_orders')
         .update(payload)
@@ -702,7 +718,7 @@ export function ProductionPage() {
     const units = String(scannedOrder.quantity_total || 0);
     const qrContent = scannedOrder.qr_payload || scannedOrder.order_number;
 
-    // ZPL para Etiqueta 10x15cm (795x1200 dots @ 203dpi) - RESTAURADO A FOTO 2
+    // ZPL para Etiqueta 10x15cm (795x1200 dots @ 203dpi) - RESTAURADO A FOTO 2 (VERSIÓN QR EXTRA GRANDE)
     const zpl = `
 ^XA
 ^PW795
@@ -715,19 +731,19 @@ export function ProductionPage() {
 ^FO50,190^A0N,35,35^FB695,1,0,C^FDwww.decoracionesegea.com^FS
 
 ^FO50,250^GB695,60,60^FS
-^FO60,260^A0N,45,45^FR^FB685,1,0,C^FDETIQUETA DE ENVÍO^FS
+^FO50,260^A0N,45,45^FR^FB695,1,0,C^FDETIQUETA DE ENVÍO^FS
 
 ^FO50,350^A0N,75,75^FB695,1,0,C^FD${orderNumber}^FS
 
-^FO60,460^A0N,40,40^FDCliente: ${customer}^FS
-^FO60,515^A0N,40,40^FDContacto: ${contact}^FS
-^FO60,570^A0N,38,38^FB695,2,0,L^FDDirección: ${address}^FS
-^FO60,650^A0N,40,40^FDRegión: ${region}^FS
+^FO70,470^A0N,45,45^FDCliente: ${customer}^FS
+^FO70,525^A0N,45,45^FDContacto: ${contact}^FS
+^FO70,580^A0N,42,42^FB675,2,0,L^FDDirección: ${address}^FS
+^FO70,665^A0N,45,45^FDRegión: ${region}^FS
 
-^FO247,730^BQN,2,8^FDQA,${qrContent}^FS
+^FO150,715^BQN,2,15^FDHA,${qrContent}^FS
 
-^FO50,1040^A0N,55,55^FB695,1,0,C^FDBULTOS: ${packages}^FS
-^FO50,1110^A0N,45,45^FB695,1,0,C^FDTotal Unidades: ${units}^FS
+^FO50,1050^A0N,70,70^FB695,1,0,C^FDBULTOS: ${packages}^FS
+^FO50,1125^A0N,50,50^FB695,1,0,C^FDTotal Unidades: ${units}^FS
 
 ^XZ`;
 
@@ -898,23 +914,35 @@ export function ProductionPage() {
       });
 
       // Sincronizar con comercial_orders (PTE_ENVIO)
-      if (scannedOrder.commercial_order_id) {
-        console.log('🔄 Sincronizando con comercial_orders:', scannedOrder.commercial_order_id);
-        const { error: commError } = await supabaseProductivity
-          .from('comercial_orders')
-          .update({ status: 'PTE_ENVIO' })
-          .eq('id', scannedOrder.commercial_order_id);
+      // Buscamos tanto por ID como por número de pedido para asegurar que "siga el proceso de venta"
+      if (scannedOrder.commercial_order_id || scannedOrder.order_number) {
+        console.log('🔄 Sincronizando con comercial_orders:', scannedOrder.order_number);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const query = (supabaseProductivity as any).from('comercial_orders').update({ status: 'PTE_ENVIO' });
 
-        if (commError) {
-          console.warn('⚠️ No se pudo actualizar el estado en comercial_orders:', commError);
+        if (scannedOrder.commercial_order_id) {
+          await query.eq('id', scannedOrder.commercial_order_id);
         } else {
-          console.log('✅ Estado comercial actualizado a PTE_ENVIO');
+          await query.eq('order_number', scannedOrder.order_number);
         }
+
+        console.log('✅ Estado comercial sincronizado');
       }
 
       toast.success('Producción finalizada. Orden lista para envío');
       setShowFinishModal(false);
-      setScannedOrder(null);
+
+      // Auto-continuidad: Buscar el siguiente pedido en la cola de producción
+      const nextInQueue = activeQueue.find(o => o.id !== scannedOrder.id);
+
+      if (nextInQueue) {
+        setScannedOrder(nextInQueue);
+        setSelectedOrderId(nextInQueue.id);
+        setPackagesInput(nextInQueue.packages_count || 1);
+        toast.info(`Siguiente pedido cargado: ${nextInQueue.order_number}`);
+      } else {
+        setScannedOrder(null);
+      }
     } finally {
       setIsPersisting(false);
     }
@@ -1003,8 +1031,8 @@ export function ProductionPage() {
         <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
           {/* COLA DE PRODUCCIÓN */}
           <div className="w-full lg:w-[450px] shrink-0 flex flex-col gap-4">
-            <Tabs defaultValue="active" className="w-full">
-              <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-xl p-1 mb-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div className="p-1 mb-4">
                 <TabsList className="grid w-full grid-cols-2 bg-transparent">
                   <TabsTrigger
                     value="active"
@@ -1024,7 +1052,7 @@ export function ProductionPage() {
               </div>
 
               <TabsContent value="active" className="m-0 focus-visible:ring-0">
-                <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl p-4 flex flex-col min-h-[500px]">
+                <div className="flex flex-col min-h-[500px]">
                   <h3 className="text-[#B5B8BA] font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
                     <Clock className="w-4 h-4 mr-2 text-indigo-400" />
                     Cola de producción activa
@@ -1094,7 +1122,7 @@ export function ProductionPage() {
               </TabsContent>
 
               <TabsContent value="history" className="m-0 focus-visible:ring-0">
-                <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl p-4 flex flex-col min-h-[500px]">
+                <div className="flex flex-col min-h-[500px]">
                   <h3 className="text-[#B5B8BA] font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
                     <History className="w-4 h-4 mr-2 text-emerald-400" />
                     Historial de pedidos finalizados
@@ -1196,7 +1224,7 @@ export function ProductionPage() {
 
                   {/* Modal de finalización */}
                   {showFinishModal && (
-                    <div className="bg-indigo-900/20 border border-indigo-500/50 p-6 rounded-xl">
+                    <div className="py-2 mt-4">
                       <h3 className="text-indigo-400 font-bold text-lg mb-4 flex items-center">
                         <Package className="w-5 h-5 mr-2" />
                         Generación de Bultos
@@ -1204,7 +1232,7 @@ export function ProductionPage() {
                       <p className="text-[#B5B8BA] text-sm mb-4">
                         Indica el número total de bultos generados. Esta información se imprimirá en la etiqueta.
                       </p>
-                      <div className="flex flex-col lg:flex-row items-stretch gap-4">
+                      <div className="flex flex-col lg:flex-row items-center gap-6 py-4">
                         <div className="production-stepper flex items-center justify-center gap-3">
                           <button
                             type="button"
@@ -1230,54 +1258,53 @@ export function ProductionPage() {
                             +
                           </button>
                         </div>
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                          <button
-                            onClick={printShippingLabel}
-                            disabled={isPersisting}
-                            className="production-action-button w-full py-3 sm:py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
-                          >
-                            <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
-                            <span className="hidden sm:inline">PDF</span>
-                            <span className="sm:hidden">PDF</span>
-                          </button>
-                          <button
-                            onClick={printZebraLabel}
-                            disabled={isPersisting}
-                            className="production-action-button w-full py-3 sm:py-4 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
-                          >
-                            <Printer className="w-5 h-5 mr-2 flex-shrink-0" />
-                            <span className="hidden sm:inline">Zebra</span>
-                            <span className="sm:hidden">Zebra</span>
-                          </button>
-                          <button
-                            onClick={printA4Document}
-                            disabled={isPersisting}
-                            className="production-action-button w-full py-3 sm:py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm"
-                          >
-                            <FileText className="w-5 h-5 mr-2 flex-shrink-0" />
-                            <span className="hidden sm:inline">A4</span>
-                            <span className="sm:hidden">A4</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              showAlert(
-                                'warning',
-                                'VALIDAR SIN ETIQUETAS',
-                                '¡ATENCIÓN! Vas a finalizar el pedido SIN imprimir etiquetas físicas. ¿Estás seguro? Utiliza esta opción solo si la impresora falla.',
-                                confirmProductionFinish
-                              );
-                            }}
-                            disabled={isPersisting}
-                            className="production-action-button w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-sm shadow-lg shadow-amber-900/20"
-                          >
-                            <CheckCircle className="w-6 h-6 mr-2 flex-shrink-0" />
-                            <span>VALIDAR (SIN IMPRIMIR)</span>
-                          </button>
+                        <div className="flex-1 w-full min-w-0">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <button
+                              onClick={printShippingLabel}
+                              disabled={isPersisting}
+                              className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-[11px] uppercase"
+                            >
+                              <Printer className="w-4 h-4 mr-2 hidden sm:block" />
+                              PDF
+                            </button>
+                            <button
+                              onClick={printZebraLabel}
+                              disabled={isPersisting}
+                              className="w-full py-4 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-[11px] uppercase"
+                            >
+                              <Printer className="w-4 h-4 mr-2 hidden sm:block" />
+                              Zebra
+                            </button>
+                            <button
+                              onClick={printA4Document}
+                              disabled={isPersisting}
+                              className="w-full py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-[11px] uppercase"
+                            >
+                              <FileText className="w-4 h-4 mr-2 hidden sm:block" />
+                              A4
+                            </button>
+                            <button
+                              onClick={() => {
+                                showAlert(
+                                  'warning',
+                                  'VALIDAR SIN ETIQUETAS',
+                                  '¡ATENCIÓN! Vas a finalizar el pedido SIN imprimir etiquetas físicas. ¿Estás seguro? Utiliza esta opción solo si la impresora falla.',
+                                  confirmProductionFinish
+                                );
+                              }}
+                              disabled={isPersisting}
+                              className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center justify-center transition disabled:opacity-50 text-[11px] uppercase shadow-lg shadow-amber-900/20"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-2 hidden sm:block" />
+                              Validar
+                            </button>
+                          </div>
+                          {/* Mensaje de ayuda para errores de impresión */}
+                          <p className="text-[10px] text-[#8B8D90] text-center mt-3 italic">
+                            Si Zebra da error de "Timeout", verifica el papel o la Raspberry.
+                          </p>
                         </div>
-                        {/* Mensaje de ayuda para errores de impresión */}
-                        <p className="text-[10px] text-[#8B8D90] text-center mt-2 italic">
-                          Si Zebra da error de "Timeout", verifica que el papel no esté atascado y que la Raspberry esté encendida.
-                        </p>
                       </div>
                     </div>
                   )}
