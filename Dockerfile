@@ -57,7 +57,7 @@ RUN addgroup -g 1001 -S appgroup \
 # Copiar configuración de nginx hardened
 COPY <<'EOF' /etc/nginx/conf.d/default.conf
 server {
-    listen 80;
+    listen 8050;
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
@@ -147,9 +147,9 @@ RUN chown -R appuser:appgroup /usr/share/nginx/html \
 # Cambiar a usuario no-root
 USER appuser
 
-EXPOSE 80
+EXPOSE 8050
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/health || exit 1
+    CMD curl -f http://localhost:8050/health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
