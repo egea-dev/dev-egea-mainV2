@@ -110,6 +110,13 @@ const escapeHtml = (value: string) =>
     .replace(/'/g, '&#39;');
 
 export function ProductionPage() {
+  const printerBaseUrl = import.meta.env.VITE_PRINTER_SERVER_URL || '';
+  const printerApiKey = import.meta.env.VITE_PRINTER_API_KEY || '';
+  const buildPrinterUrl = useCallback((path: string) => {
+    if (!printerBaseUrl) return '';
+    return `${printerBaseUrl.replace(/\/$/, '')}${path}`;
+  }, [printerBaseUrl]);
+
   const STORAGE_SELECTED_KEY = "production.selectedOrderId";
   const STORAGE_SELECTED_PERSIST_KEY = "production.selectedOrderId.persist";
   const STORAGE_ORDERS_KEY = "production.ordersCache";
@@ -192,22 +199,27 @@ export function ProductionPage() {
   });
 
   const checkPrinterStatus = useCallback(async () => {
+    if (!printerBaseUrl) {
+      setPrinterStatus('offline');
+      return;
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-      const response = await fetch('https://192.168.1.236:3003/print', {
-        method: 'GET', // El servidor proxy debería responder a GET o simplemente no fallar por timeout
+      const response = await fetch(buildPrinterUrl('/health'), {
+        method: 'GET',
+        headers: printerApiKey ? { 'X-API-Key': printerApiKey } : undefined,
         signal: controller.signal
       }).catch(() => ({ ok: false }));
 
       clearTimeout(timeoutId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setPrinterStatus(response.ok || (response as any).status === 404 ? 'online' : 'offline');
+      setPrinterStatus(response.ok ? 'online' : 'offline');
     } catch (e) {
       setPrinterStatus('offline');
     }
-  }, []);
+  }, [buildPrinterUrl, printerApiKey, printerBaseUrl]);
 
   // Zebra Keep-Alive Ping
   useEffect(() => {
@@ -708,6 +720,10 @@ export function ProductionPage() {
 
   const printZebraLabel = async () => {
     if (!scannedOrder) return;
+    if (!printerBaseUrl) {
+      toast.error('Servidor de impresion no configurado.');
+      return;
+    }
 
     const orderNumber = escapeZpl(scannedOrder.order_number);
     const customer = escapeZpl(scannedOrder.customer_name || 'Sin cliente');
@@ -747,15 +763,19 @@ export function ProductionPage() {
 
 ^XZ`;
 
-    console.log('🦓 Enviando ZPL al servidor proxy en Raspberry Pi (HTTPS)');
-    console.log('📍 URL:', 'https://192.168.1.236:3003/print');
+    const printerUrl = buildPrinterUrl('/print');
+    console.log('Enviando ZPL al servidor proxy en Raspberry Pi (HTTPS)');
+    console.log('URL:', printerUrl);
     console.log('📦 Tamaño ZPL:', zpl.length, 'bytes');
 
     try {
       // Enviar al servidor proxy HTTPS en Raspberry Pi (puerto 3003)
-      const response = await fetch('https://192.168.1.236:3003/print', {
+      const response = await fetch(printerUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
+        headers: {
+          'Content-Type': 'text/plain',
+          ...(printerApiKey ? { 'X-API-Key': printerApiKey } : {})
+        },
         body: zpl
       });
 
