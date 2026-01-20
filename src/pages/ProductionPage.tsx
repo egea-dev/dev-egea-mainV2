@@ -314,16 +314,27 @@ export function ProductionPage() {
         return message.includes('does not exist') || message.includes('relation') || message.includes('schema');
       };
 
-      const { data: ordersData, error: ordersError } = await supabaseProductivity
+      const { data: prodData, error: prodError } = await supabaseProductivity
         .from('produccion_work_orders')
         .select('*')
         .order('created_at', { ascending: false });
 
+      if (prodError) throw prodError;
 
-      if (ordersError) throw ordersError;
+      // CASCADA: Consultar pedidos comerciales PAGADOS o EN_PROCESO
+      const { data: commData, error: commError } = await supabaseProductivity
+        .from('comercial_orders')
+        .select('*')
+        .in('status', ['PAGADO', 'EN_PROCESO']);
 
-      if (ordersData && ordersData.length > 0) {
-        let linesData: any[] | null = null;
+      if (commError) console.warn("Error consultando comercial_orders para cascada:", commError);
+
+      const ordersData = prodData || [];
+      const commercialOrders = commData || [];
+
+      // Obtener líneas de producción
+      let linesData: any[] | null = null;
+      if (ordersData.length > 0) {
         try {
           const linesResponse = await supabaseProductivity
             .from('produccion_work_order_lines')
@@ -333,125 +344,92 @@ export function ProductionPage() {
         } catch (lineError) {
           console.warn('Work order lines unavailable:', lineError);
         }
-
-        let commercialOrders: any[] | null = null;
-        try {
-          const orderNumbers = ordersData
-            .map((o: any) => o.order_number)
-            .filter(Boolean);
-          const adminCodes = ordersData
-            .map((o: any) => o.admin_code)
-            .filter(Boolean);
-          if (orderNumbers.length > 0 || adminCodes.length > 0) {
-            const escapedOrders = orderNumbers
-              .map((value: any) => `"${String(value).replace(/"/g, '""')}"`)
-              .join(',');
-            const escapedAdmins = adminCodes
-              .map((value: any) => `"${String(value).replace(/"/g, '""')}"`)
-              .join(',');
-            const orFilters = [
-              escapedOrders ? `order_number.in.(${escapedOrders})` : null,
-              escapedAdmins ? `admin_code.in.(${escapedAdmins})` : null
-            ].filter(Boolean).join(',');
-            const { data: commData, error: commError } = await supabaseProductivity
-              .from('comercial_orders')
-              .select('id, order_number, admin_code, lines, fabric')
-              .or(orFilters);
-            if (commError) {
-              console.warn('Commercial orders unavailable:', commError);
-            } else {
-              commercialOrders = commData as any[] | null;
-            }
-          }
-        } catch (commError) {
-          console.warn('Commercial orders lookup failed:', commError);
-        }
-
-        const normalizeStatus = (raw?: string) => {
-          const normalized = (raw || "").toUpperCase();
-          const map: Record<string, string> = {
-            'PAGADO': 'PENDIENTE',
-            'EN_PROCESO': 'CORTE',
-            'EN_CORTE': 'CORTE',
-            'EN_CONFECCION': 'CONFECCION',
-            'EN_CONTROL_CALIDAD': 'CONTROL_CALIDAD',
-            'TERMINADO': 'LISTO_ENVIO'
-          };
-          return map[normalized] || normalized;
-        };
-
-        const ordersWithLines = ordersData.map((order: any) => {
-          const commOrder = commercialOrders?.find((c: any) => c.order_number === order.order_number || (order.admin_code && c.admin_code === order.admin_code) || c.admin_code === order.order_number);
-          const specs = order.technical_specs || {};
-          // Priorizar lineas de comercial, luego JSON, si no, usar la tabla relacional
-          const rawLines = (Array.isArray(commOrder?.lines) && commOrder.lines.length > 0)
-            ? commOrder.lines
-            : (Array.isArray(order.lines) && order.lines.length > 0)
-              ? order.lines
-              : (linesData?.filter((line: any) => line.work_order_id === order.id) || []);
-          const lines = Array.isArray(rawLines) ? rawLines : [];
-          const materialLines = [...lines].sort((a: any, b: any) => {
-            const left = String(a.material || a.fabric || "").trim().toLowerCase();
-            const right = String(b.material || b.fabric || "").trim().toLowerCase();
-            return left.localeCompare(right);
-          });
-          const materialList = summarizeMaterials(materialLines, commOrder?.fabric || specs.fabric || order.fabric || "N/D");
-
-          const colorList = lines.length > 0
-            ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
-            : (specs.color || order.color || "N/D");
-
-          const fabric = materialList || "N/D";
-          const color = colorList || "N/D";
-
-          const normalizedStatus = normalizeStatus(order.status);
-          const dueDate = order.due_date || order.estimated_completion || null;
-          const processStartAt = order.process_start_at || order.started_at || null;
-          return {
-            ...order,
-            order_number: order.admin_code || order.order_number || order.work_order_number || order.id,
-            admin_code: order.admin_code || null,
-            status: normalizedStatus,
-            fabric,
-            color,
-            quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
-            due_date: dueDate,
-            process_start_at: processStartAt,
-            commercial_order_id: commOrder?.id || null,
-            lines
-          };
-        });
-
-        const signature = ordersWithLines
-          .map((o) => `${o.id}:${o.order_number || ''}:${o.status || ''}:${o.quantity_total || ''}:${o.fabric || ''}:${o.packages_count || ''}:${o.lines?.length || 0}`)
-          .sort()
-          .join('|');
-        if (signature !== ordersSignatureRef.current) {
-          setOrders(ordersWithLines);
-          ordersSignatureRef.current = signature;
-          sessionStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(ordersWithLines));
-        }
-
-        const selectedId = selectedOrderId || scannedOrder?.id;
-        if (selectedId) {
-          const refreshed = ordersWithLines.find((o) => o.id === selectedId);
-          if (refreshed) {
-            if (!scannedOrder || scannedOrder.id !== refreshed.id || scannedOrder.status !== refreshed.status ||
-              scannedOrder.fabric !== refreshed.fabric || scannedOrder.quantity_total !== refreshed.quantity_total ||
-              (scannedOrder.lines?.length || 0) !== (refreshed.lines?.length || 0)) {
-              setScannedOrder(refreshed);
-            }
-          }
-        }
-        // NOTA: No seleccionamos automáticamente ningún pedido.
-        // El usuario debe escanear o seleccionar manualmente.
-      } else {
-        if (orders.length > 0) {
-          setOrders([]);
-          ordersSignatureRef.current = "";
-        }
-        sessionStorage.removeItem(STORAGE_ORDERS_KEY);
       }
+
+      const normalizeStatus = (raw?: string) => {
+        const normalized = (raw || "").toUpperCase();
+        const map: Record<string, string> = {
+          'PAGADO': 'PENDIENTE',
+          'EN_PROCESO': 'CORTE',
+          'EN_CORTE': 'CORTE',
+          'EN_CONFECCION': 'CONFECCION',
+          'EN_CONTROL_CALIDAD': 'CONTROL_CALIDAD',
+          'TERMINADO': 'LISTO_ENVIO'
+        };
+        return map[normalized] || normalized;
+      };
+
+      // FUSIÓN HÍBRIDA (CASCADA)
+      const mappedOrders = ordersData.map((order: any) => {
+        const commRef = commercialOrders.find((c: any) =>
+          c.order_number === order.order_number ||
+          (order.admin_code && c.admin_code === order.admin_code) ||
+          c.admin_code === order.order_number
+        );
+        const specs = order.technical_specs || {};
+        const rawLines = (Array.isArray(commRef?.lines) && commRef.lines.length > 0)
+          ? commRef.lines
+          : (Array.isArray(order.lines) && order.lines.length > 0)
+            ? order.lines
+            : (linesData?.filter((line: any) => line.work_order_id === order.id) || []);
+
+        const fabric = summarizeMaterials(rawLines, commRef?.fabric || specs.fabric || order.fabric || "N/D");
+        return {
+          ...order,
+          order_number: order.admin_code || order.order_number || order.work_order_number || order.id,
+          status: normalizeStatus(order.status),
+          fabric,
+          commercial_order_id: commRef?.id || null,
+          lines: rawLines
+        };
+      });
+
+      // Añadir pedidos comerciales que NO tienen orden de producción aún
+      commercialOrders.forEach((c: any) => {
+        const exists = mappedOrders.some(m => m.order_number === c.order_number || (c.admin_code && m.admin_code === c.admin_code));
+        if (!exists) {
+          mappedOrders.push({
+            id: `temp-${c.id}`,
+            order_number: c.admin_code || c.order_number,
+            admin_code: c.admin_code,
+            customer_name: c.customer_company || c.customer_name || 'Cliente',
+            status: normalizeStatus(c.status),
+            fabric: summarizeMaterials(c.lines || [], c.fabric || "N/D"),
+            quantity_total: c.quantity_total || 0,
+            region: c.delivery_region || c.region,
+            created_at: c.created_at,
+            commercial_order_id: c.id,
+            lines: c.lines || [],
+            is_virtual: true // Indicador de que es un respaldo comercial
+          });
+        }
+      });
+
+      const signature = mappedOrders
+        .map((o) => `${o.id}:${o.order_number || ''}:${o.status || ''}:${o.quantity_total || ''}`)
+        .sort()
+        .join('|');
+
+      if (signature !== ordersSignatureRef.current) {
+        setOrders(mappedOrders);
+        ordersSignatureRef.current = signature;
+        sessionStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(mappedOrders));
+      }
+
+      const selectedId = selectedOrderId || scannedOrder?.id;
+      if (selectedId) {
+        const refreshed = mappedOrders.find((o: any) => o.id === selectedId);
+        if (refreshed) {
+          if (!scannedOrder || scannedOrder.id !== refreshed.id || scannedOrder.status !== refreshed.status ||
+            scannedOrder.fabric !== refreshed.fabric || (scannedOrder as any).quantity_total !== refreshed.quantity_total ||
+            (scannedOrder.lines?.length || 0) !== (refreshed.lines?.length || 0)) {
+            setScannedOrder(refreshed);
+          }
+        }
+      }
+      // NOTA: No seleccionamos automáticamente ningún pedido.
+      // El usuario debe escanear o seleccionar manualmente.
+
     } catch (error: any) {
       console.error('Error loading orders:', error);
       toast.error('Error al cargar ordenes: ' + error.message);
