@@ -1,0 +1,343 @@
+/**
+ * Estilos CSS para sistema responsive
+ * 
+ * Incluye:
+ * - Media queries centralizadas
+ * - Utilities responsive
+ * - Touch target optimization
+ * - Orientation-specific styles
+ */
+
+/* ===== Variables CSS ===== */
+:root {
+    --mobile-max: 768px;
+    --tablet-max: 1024px;
+    --desktop-min: 1025px;
+
+    --touch-target-min: 48px;
+    --touch-target-comfortable: 56px;
+
+    --scanner-sidebar-width: 450px;
+    --scanner-sidebar-tablet: 360px;
+    --scanner-sidebar-landscape: 320px;
+}
+
+/* ===== Utilities de Orientación ===== */
+
+.portrait-only {
+    display: none;
+}
+
+.landscape-only {
+    display: none;
+}
+
+@media (orientation: portrait) {
+    .portrait-only {
+        display: block;
+    }
+
+    .landscape-hidden {
+        display: none !important;
+    }
+}
+
+@media (orientation: landscape) {
+    .landscape-only {
+        display: block;
+    }
+
+    .portrait-hidden {
+        display: none !important;
+    }
+}
+
+/* ===== Touch Targets (Mobile/Tablet) ===== */
+
+@media (max-width: 1024px) {
+
+    /* Botones principales */
+    .btn-primary-mobile,
+    .touch-target {
+        min-height: var(--touch-target-comfortable);
+        min-width: var(--touch-target-comfortable);
+    }
+
+    /* Botones secundarios */
+    .btn-secondary-mobile {
+        min-height: var(--touch-target-min);
+        min-width: var(--touch-target-min);
+    }
+
+    /* Cards clickeables */
+    .clickable-card {
+        min-height: 72px;
+        padding: 16px;
+    }
+}
+
+/* ===== Layout Principal: Mobile Portrait ===== */
+
+@media (max-width: 768px) and (orientation: portrait) {
+
+    .production-layout,
+    .shipping-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 12px;
+    }
+
+    .scanner-section {
+        order: 1;
+        width: 100%;
+    }
+
+    .queue-section {
+        order: 2;
+        width: 100%;
+    }
+
+    .detail-section {
+        order: 3;
+        width: 100%;
+    }
+}
+
+/* ===== Layout: Mobile Landscape (Split Screen) ===== */
+
+@media (max-width: 926px) and (orientation: landscape) {
+
+    .production-layout,
+    .shipping-layout {
+        display: grid;
+        grid-template-columns: 40% 60%;
+        grid-template-rows: 100vh;
+        gap: 0;
+        padding: 0;
+    }
+
+    .queue-section {
+        grid-column: 1;
+        overflow-y: auto;
+        border-right: 1px solid var(--border);
+        padding: 12px;
+    }
+
+    .scanner-detail-area {
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+        overflow-y: auto;
+    }
+
+    .scanner-section {
+        flex-shrink: 0;
+    }
+
+    .detail-section {
+        flex: 1;
+        overflow-y: auto;
+    }
+}
+
+/* ===== Layout: Tablet Portrait ===== */
+
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+
+    .production-layout,
+    .shipping-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        padding: 16px;
+    }
+
+    .scanner-section {
+        width: 100%;
+    }
+
+    .queue-section {
+        width: 100%;
+        max-width: var(--scanner-sidebar-tablet);
+        margin: 0 auto;
+    }
+
+    .detail-section {
+        width: 100%;
+    }
+}
+
+/* ===== Layout: Tablet Landscape ===== */
+
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+
+    .production-layout,
+    .shipping-layout {
+        display: grid;
+        grid-template-columns: var(--scanner-sidebar-landscape) 1fr;
+        gap: 20px;
+        padding: 16px;
+        min-height: 100vh;
+    }
+
+    .queue-section {
+        grid-column: 1;
+        overflow-y: auto;
+    }
+
+    .scanner-detail-area {
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+}
+
+/* ===== Layout: Desktop ===== */
+
+@media (min-width: 1025px) {
+
+    .production-layout,
+    .shipping-layout {
+        display: grid;
+        grid-template-columns: var(--scanner-sidebar-width) 1fr;
+        gap: 24px;
+        padding: 20px;
+    }
+
+    .queue-section {
+        grid-column: 1;
+    }
+
+    .scanner-detail-area {
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+}
+
+/* ===== Scrollable Areas ===== */
+
+.custom-scrollbar-mobile {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.custom-scrollbar-mobile::-webkit-scrollbar {
+    width: 4px;
+}
+
+.custom-scrollbar-mobile::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar-mobile::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+}
+
+/* ===== Animaciones Responsive ===== */
+
+/* Prevenir transiciones durante resize */
+.resizing * {
+    transition: none !important;
+}
+
+/* Slide-up para móvil */
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.slide-up-mobile {
+    animation: slideUp 0.3s ease-out;
+}
+
+/* ===== Typography Responsive ===== */
+
+@media (max-width: 768px) {
+    .text-responsive-sm {
+        font-size: 0.875rem;
+        /* 14px */
+    }
+
+    .text-responsive-base {
+        font-size: 1rem;
+        /* 16px */
+    }
+
+    .text-responsive-lg {
+        font-size: 1.125rem;
+        /* 18px */
+    }
+
+    .text-responsive-xl {
+        font-size: 1.25rem;
+        /* 20px */
+    }
+}
+
+@media (min-width: 768px) {
+    .text-responsive-sm {
+        font-size: 0.875rem;
+        /* 14px */
+    }
+
+    .text-responsive-base {
+        font-size: 1rem;
+        /* 16px */
+    }
+
+    .text-responsive-lg {
+        font-size: 1.25rem;
+        /* 20px */
+    }
+
+    .text-responsive-xl {
+        font-size: 1.5rem;
+        /* 24px */
+    }
+}
+
+/* ===== Spacing Responsive ===== */
+
+@media (max-width: 768px) {
+    .gap-responsive {
+        gap: 12px;
+    }
+
+    .p-responsive {
+        padding: 12px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+    .gap-responsive {
+        gap: 16px;
+    }
+
+    .p-responsive {
+        padding: 16px;
+    }
+}
+
+@media (min-width: 1025px) {
+    .gap-responsive {
+        gap: 20px;
+    }
+
+    .p-responsive {
+        padding: 20px;
+    }
+}

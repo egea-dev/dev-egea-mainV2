@@ -31,6 +31,10 @@ import { IncidentReportButton } from '@/components/incidents/IncidentReportButto
 import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
 import { parseQRCode, validateQRWithLines, extractOrderNumber } from '@/lib/qr-utils';
 import { summarizeMaterials } from '@/lib/materials';
+import { ScannerButton } from '@/components/scanner/ScannerButton';
+import { ScannerModal } from '@/components/scanner/ScannerModal';
+import { useOrientation, useDeviceType } from '@/hooks/useOrientation';
+import { sortWorkOrdersByPriority, daysToDueDate, getUrgencyBadge } from '@/services/priority-service';
 
 // Tipos
 interface Order {
@@ -94,11 +98,16 @@ export default function ShippingScanPage() {
   const [qrInput, setQrInput] = useState('');
   const [scannedOrder, setScannedOrder] = useState<Order | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [scannerModalOpen, setScannerModalOpen] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState('');
   const [scannedPackagesCount, setScannedPackagesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasTrackingNow, setHasTrackingNow] = useState(true);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+
+  // Hooks responsive
+  const orientation = useOrientation();
+  const deviceType = useDeviceType();
 
   // Estado para alertas móviles
   const [alertState, setAlertState] = useState<{
@@ -204,13 +213,16 @@ export default function ShippingScanPage() {
     // Log para depuración
     console.log('📋 Estados de pedidos cargados:', orders.map(o => ({ order_number: o.order_number, status: o.status })));
 
-    return orders.filter(o => {
+    const filtered = orders.filter(o => {
       // Excluir pedidos ya archivados
       if (archivedStatuses.includes(o.status)) return false;
 
       // Solo mostrar pedidos LISTO_ENVIO (producción terminada, listos para escanear)
       return o.status === 'LISTO_ENVIO';
     });
+
+    // APLICAR PRIORIZACIÓN DINÁMICA
+    return sortWorkOrdersByPriority(filtered as any);
   }, [orders]);
 
   const historyShipments = useMemo(() => {
@@ -695,55 +707,54 @@ export default function ShippingScanPage() {
       }
     >
       <div className="flex flex-col gap-2">
-        {/* ESCÁNER - PANTALLA COMPLETA EN MÓVIL */}
+        {/* ESCÁNER RESPONSIVE CON BOTÓN CTA */}
         <RoleBasedRender hideForRoles={['admin', 'manager']}>
           <div className="w-full">
-            {/* Escáner */}
-            <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2">
-              <div className="flex items-center gap-2 mb-2">
+            {/* Scanner Button - Reemplaza área de escáner estático */}
+            <div className="bg-[#323438] border border-[#45474A] rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
                 <QrCode className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-white font-bold">Egea QR Cam</h3>
+                <h3 className="text-white font-bold">Escaneo QR</h3>
               </div>
-              {!cameraActive ? (
-                <button
-                  onClick={() => setCameraActive(true)}
-                  className="w-full aspect-[3/4] min-h-[600px] bg-[#1A1D1F] rounded-lg border-2 border-dashed border-[#45474A] flex flex-col items-center justify-center gap-3 text-[#B5B8BA] hover:text-white hover:border-indigo-500/40 transition"
-                >
-                  <Camera className="w-16 h-16" />
-                  <span className="text-lg font-semibold">Activar cámara</span>
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  <QRScanner onScan={handleScan} onClose={() => setCameraActive(false)} />
-                  <button
-                    onClick={() => setCameraActive(false)}
-                    className="w-full py-3 bg-[#45474A] text-white rounded-lg hover:bg-[#6E6F71] transition font-medium"
-                  >
-                    Cerrar cámara
-                  </button>
-                </div>
-              )}
-            </div>
 
-            {/* Input Manual Debajo */}
-            <div className="flex gap-2 mt-2">
-              <input
-                type="text"
-                placeholder="Código del pedido o escanea QR..."
-                className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
-                value={qrInput}
-                onChange={(e) => setQrInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
+              <ScannerButton
+                onActivate={() => setScannerModalOpen(true)}
+                isActive={scannerModalOpen}
+                size={deviceType === 'mobile' ? 'mobile' : deviceType === 'tablet' ? 'tablet' : 'desktop'}
+                fullWidth
               />
-              <button
-                onClick={() => handleScan(qrInput)}
-                className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold flex items-center justify-center min-w-[60px]"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
+
+              {/* Input Manual Debajo */}
+              <div className="flex gap-2 mt-3">
+                <input
+                  type="text"
+                  placeholder="O introduce código manualmente..."
+                  className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
+                  value={qrInput}
+                  onChange={(e) => setQrInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
+                />
+                <button
+                  onClick={() => handleScan(qrInput)}
+                  className="px-5 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-semibold flex items-center justify-center min-w-[60px]"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         </RoleBasedRender>
+
+        {/* Scanner Modal */}
+        <ScannerModal
+          isOpen={scannerModalOpen}
+          onClose={() => setScannerModalOpen(false)}
+          onScan={(code) => {
+            handleScan(code);
+            setScannerModalOpen(false);
+          }}
+          title="Escanear Pedido de Envío"
+        />
 
         {/* CONTENEDOR DE COLA Y DETALLE - LADO A LADO EN DESKTOP */}
         <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
@@ -781,9 +792,16 @@ export default function ShippingScanPage() {
                   )}
                   {!isLoading && activeShipments.length > 0 && (
                     <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1">
-                      {activeShipments.map((order) => {
+                      {activeShipments.map((order: any) => {
                         const isIncomplete = (order.scanned_packages || 0) > 0 && (order.scanned_packages || 0) < (order.packages_count || 1);
                         const isSelected = scannedOrder?.id === order.id;
+
+                        // Detectar prioridades
+                        const isPriorityCanarias = order._is_canarias_urgent || false;
+                        const isGrouped = order._is_grouped_material || false;
+                        const daysRemaining = order.due_date ? daysToDueDate(order.due_date) : null;
+                        const urgencyBadge = daysRemaining !== null ? getUrgencyBadge(daysRemaining) : null;
+
                         return (
                           <button
                             key={order.id}
@@ -793,16 +811,36 @@ export default function ShippingScanPage() {
                               setScannedPackagesCount(order.scanned_packages || 0);
                             }}
                             className={`w-full text-left p-3 rounded-lg border transition-all group relative overflow-hidden ${isSelected
-                              ? 'bg-indigo-900/20 border-indigo-500/50'
-                              : isIncomplete
-                                ? 'bg-amber-900/10 border-amber-500/50'
-                                : 'bg-[#1A1D1F] border-[#45474A] hover:border-[#6E6F71]'
-                              }`}
+                                ? 'bg-indigo-900/20 border-indigo-500/50'
+                                : isIncomplete
+                                  ? 'bg-amber-900/10 border-amber-500/50'
+                                  : isGrouped
+                                    ? 'agrupado-material'
+                                    : 'bg-[#1A1D1F] border-[#45474A] hover:border-[#6E6F71]'
+                              } ${isPriorityCanarias ? 'prioridad-canarias' : ''}`}
                           >
                             <div className="flex justify-between items-start mb-1">
-                              <span className={`font-mono font-bold text-sm ${isSelected ? 'text-indigo-300' : 'text-[#B5B8BA]'}`}>
-                                {order.order_number}
-                              </span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`font-mono font-bold text-sm ${isSelected ? 'text-indigo-300' : 'text-[#B5B8BA]'}`}>
+                                  {order.order_number}
+                                </span>
+                                {/* Badges de Prioridad */}
+                                {isPriorityCanarias && (
+                                  <span className="px-2 py-0.5 bg-red-600/20 border border-red-500/50 rounded text-[10px] font-bold text-red-300">
+                                    🔥 CANARIAS L-M
+                                  </span>
+                                )}
+                                {isGrouped && (
+                                  <span className="px-2 py-0.5 bg-green-600/20 border border-green-500/50 rounded text-[10px] font-bold text-green-300">
+                                    📦 AGRUPADO
+                                  </span>
+                                )}
+                                {urgencyBadge && (
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${urgencyBadge.color}`}>
+                                    {urgencyBadge.label}
+                                  </span>
+                                )}
+                              </div>
                               {order.needs_shipping_validation && <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />}
                               {isIncomplete && !isSelected && <PauseCircle className="w-4 h-4 text-amber-500" />}
                             </div>
