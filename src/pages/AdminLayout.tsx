@@ -25,17 +25,20 @@ function AdminLayout() {
   const isLoading = isLoadingUsers || isLoadingVehicles || isLoadingProfile;
 
   useEffect(() => {
-    // Modificado: Ahora redirige si estamos en raiz O en la ruta antigua 'workday'
-    if (isLoading || (location.pathname !== '/admin' && location.pathname !== '/admin/workday')) {
+    // No hacer nada mientras estemos cargando los datos iniciales
+    if (isLoadingProfile || !profile) {
       return;
     }
 
-    if (!useCompactLayout) {
-      return;
+    // Si el rol efectivo requiere CompactLayout (no es admin/manager)
+    // y no estamos en una de las rutas permitidas para el rol, redirigir.
+    if (useCompactLayout) {
+      // Si estamos en la raíz /admin, redirigir a instalaciones
+      if (location.pathname === '/admin' || location.pathname === '/admin/') {
+        navigate('/admin/installations', { replace: true });
+      }
     }
-
-    navigate('/admin/installations', { replace: true });
-  }, [isLoading, useCompactLayout, location.pathname, navigate]);
+  }, [isLoadingProfile, profile, useCompactLayout, location.pathname, navigate]);
 
   if (isLoading) {
     return <div>Loading...</div>;

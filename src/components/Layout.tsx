@@ -427,7 +427,7 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
               Hola, {resolvedProfile?.full_name ?? "Usuario"}
             </p>
             <h1 className="text-xl font-semibold capitalize">
-              {previewRole ?? resolvedProfile?.role ?? "colaborador"}
+              {previewRole ?? resolvedProfile?.role ?? "..."}
             </h1>
           </div>
           <div className="flex items-center gap-4">

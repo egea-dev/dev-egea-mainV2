@@ -359,12 +359,12 @@ export const useUpdateOrderStatus = () => {
 
             // Insert log entry
             const { error: logError } = await supabase
-                .from('comercial_order_status_log')
+                .from('status_log')
                 .insert({
                     order_id: orderId,
                     old_status: (currentOrder as any)?.status || null,
                     new_status: nextStatus,
-                    comment,
+                    notes: comment,
                     changed_by: userId
                 } as any);
 
