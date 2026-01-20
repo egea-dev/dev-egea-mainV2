@@ -144,8 +144,9 @@ export const useUpdateOrderStatus = () => {
             const quantity = Number((currentOrder as any)?.quantity_total) || 0;
             const resolvedOrderNumber = (() => {
                 const rawOrderNumber = (currentOrder as any)?.order_number || "";
-                if (rawOrderNumber.toUpperCase().startsWith("INT-")) return rawOrderNumber;
-                return (currentOrder as any)?.admin_code || rawOrderNumber || "SIN-REF";
+                const adminCode = (currentOrder as any)?.admin_code;
+                // Priorizar admin_code si existe, luego order_number
+                return adminCode || rawOrderNumber || "SIN-REF";
             })();
             const createProductionWorkOrder = async ({
                 status,
@@ -415,7 +416,7 @@ export const useUpdateOrder = () => {
                 // Sincronizar con Orden de Producción si existe
                 const resolvedOrderNumber = (() => {
                     const rawOrderNumber = data.order_number || "";
-                    if (rawOrderNumber.toUpperCase().startsWith("INT-")) return rawOrderNumber;
+                    // Priorizar admin_code si existe, luego order_number
                     return data.admin_code || rawOrderNumber || "SIN-REF";
                 })();
 

@@ -51,9 +51,8 @@ export default function CommercialPage() {
 
         const resolvedRefs = eligible
           .map((order) => {
-            const rawOrderNumber = String(order.order_number || "");
-            if (rawOrderNumber.toUpperCase().startsWith("INT-")) return rawOrderNumber;
-            return order.admin_code || rawOrderNumber || null;
+            // Priorizar admin_code si existe, luego order_number
+            return order.admin_code || order.order_number || null;
           })
           .filter(Boolean);
         const orderNumbers = eligible
@@ -98,9 +97,8 @@ export default function CommercialPage() {
 
         for (const order of eligible) {
           const rawOrderNumber = String(order.order_number || "");
-          const orderRef = rawOrderNumber.toUpperCase().startsWith("INT-")
-            ? rawOrderNumber
-            : (order.admin_code || rawOrderNumber || null);
+          // Priorizar admin_code si existe, luego order_number
+          const orderRef = order.admin_code || rawOrderNumber || null;
           const adminRef = order.admin_code;
           if ((orderRef && existingSet.has(orderRef)) || (adminRef && existingSet.has(adminRef))) continue;
           const lines = order.lines || [];
