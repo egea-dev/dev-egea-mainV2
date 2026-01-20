@@ -13,6 +13,10 @@ import { printHtmlToIframe } from '@/utils/print';
 import { parseQRCode, validateQRWithLines, extractOrderNumber } from '@/lib/qr-utils';
 import { summarizeMaterials } from '@/lib/materials';
 import { cn } from "@/lib/utils";
+import { ScannerButton } from '@/components/scanner/ScannerButton';
+import { ScannerModal } from '@/components/scanner/ScannerModal';
+import { useOrientation, useDeviceType } from '@/hooks/useOrientation';
+import { sortWorkOrdersByPriority, daysToDueDate, getUrgencyBadge } from '@/services/priority-service';
 
 function escapeZpl(str: string): string {
   if (!str) return "";
@@ -119,6 +123,7 @@ export function ProductionPage() {
   const [scannedOrder, setScannedOrder] = useState<Order | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [scannerModalOpen, setScannerModalOpen] = useState(false);
   const [packagesInput, setPackagesInput] = useState<number>(1);
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [isPersisting, setIsPersisting] = useState(false);
@@ -132,6 +137,11 @@ export function ProductionPage() {
   const instanceIdRef = useRef(`prod-${Math.random().toString(36).slice(2)}`);
   const activeQueueRef = useRef<Order[]>([]);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+
+  // Hooks responsive
+  const orientation = useOrientation();
+  const deviceType = useDeviceType();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [printerStatus, setPrinterStatus] = useState<any>('checking');
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -977,55 +987,55 @@ export function ProductionPage() {
       }
     >
       <div className="flex flex-col gap-6 relative">
-        {/* ESCÁNER - PANTALLA COMPLETA */}
+        {/* ESCÁNER RESPONSIVE CON BOTÓN CTA */}
         <RoleBasedRender hideForRoles={['admin', 'manager']}>
           <div className="w-full">
-            {/* Escáner */}
-            <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-lg p-2">
-              <div className="flex items-center gap-2 mb-2">
+            {/* Scanner Button */}
+            <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
                 <QrCode className="w-5 h-5 text-[#FF6B35]" />
-                <h3 className="text-white font-bold">Escáner de producción</h3>
+                <h3 className="text-white font-bold">Escaneo de Producción</h3>
               </div>
-              {!cameraActive ? (
-                <button
-                  onClick={() => setCameraActive(true)}
-                  className="w-full aspect-[3/4] min-h-[600px] bg-[#0D0F11] rounded-lg border-2 border-dashed border-[#2A2D31] flex flex-col items-center justify-center gap-3 text-[#B5B8BA] hover:text-white hover:border-[#FF6B35]/40 transition"
-                >
-                  <Camera className="w-16 h-16" />
-                  <span className="text-lg font-semibold">Activar cámara</span>
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  <QRScanner onScan={handleScan} onClose={() => setCameraActive(false)} />
-                  <button
-                    onClick={() => setCameraActive(false)}
-                    className="w-full py-3 bg-[#2A2D31] text-white rounded-lg hover:bg-[#3A3D41] transition font-medium"
-                  >
-                    Cerrar cámara
-                  </button>
-                </div>
-              )}
-            </div>
 
-            {/* Input Manual Debajo */}
-            <div className="flex gap-2 mt-2">
-              <input
-                type="text"
-                placeholder="Código del pedido o escanea QR..."
-                className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-[#FF6B35] outline-none"
-                value={qrInput}
-                onChange={(e) => setQrInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
+              <ScannerButton
+                onActivate={() => setScannerModalOpen(true)}
+                isActive={scannerModalOpen}
+                size={deviceType === 'mobile' ? 'mobile' : deviceType === 'tablet' ? 'tablet' : 'desktop'}
+                fullWidth
+                className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
               />
-              <button
-                onClick={() => handleScan(qrInput)}
-                className="px-5 py-3 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition font-semibold flex items-center justify-center min-w-[60px]"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
+
+              {/* Input Manual Debajo */}
+              <div className="flex gap-2 mt-3">
+                <input
+                  type="text"
+                  placeholder="O introduce código manualmente..."
+                  className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-[#FF6B35] outline-none"
+                  value={qrInput}
+                  onChange={(e) => setQrInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
+                />
+                <button
+                  onClick={() => handleScan(qrInput)}
+                  className="px-5 py-3 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition font-semibold flex items-center justify-center min-w-[60px]"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
         </RoleBasedRender>
+
+        {/* Scanner Modal */}
+        <ScannerModal
+          isOpen={scannerModalOpen}
+          onClose={() => setScannerModalOpen(false)}
+          onScan={(code) => {
+            handleScan(code);
+            setScannerModalOpen(false);
+          }}
+          title="Escanear Pedido en Producción"
+        />
 
         {/* CONTENEDOR DE COLA Y DETALLE - LADO A LADO EN DESKTOP */}
         <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
@@ -1080,13 +1090,33 @@ export function ProductionPage() {
                             }}
                             className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden ${isSelected
                               ? 'bg-indigo-900/10 border-indigo-500/50 ring-1 ring-indigo-500/20'
-                              : 'bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41] hover:bg-[#121417]'
-                              }`}
+                              : order._is_grouped_material
+                                ? 'agrupado-material'
+                                : 'bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41] hover:bg-[#121417]'
+                              } ${order._is_canarias_urgent ? 'prioridad-canarias' : ''}`}
                           >
                             <div className="flex justify-between items-start mb-2">
-                              <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-indigo-400' : 'text-[#B5B8BA]'}`}>
-                                {order.order_number}
-                              </span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-indigo-400' : 'text-[#B5B8BA]'}`}>
+                                  {order.order_number}
+                                </span>
+                                {/* Badges de Prioridad */}
+                                {order._is_canarias_urgent && (
+                                  <span className="px-2 py-0.5 bg-red-600/20 border border-red-500/50 rounded text-[10px] font-bold text-red-300">
+                                    🔥 CANARIAS L-M
+                                  </span>
+                                )}
+                                {order._is_grouped_material && (
+                                  <span className="px-2 py-0.5 bg-green-600/20 border border-green-500/50 rounded text-[10px] font-bold text-green-300">
+                                    📦 AGRUPADO
+                                  </span>
+                                )}
+                                {daysToDueDate(order.due_date) !== null && (
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getUrgencyBadge(daysToDueDate(order.due_date)!).color}`}>
+                                    {getUrgencyBadge(daysToDueDate(order.due_date)!).label}
+                                  </span>
+                                )}
+                              </div>
                               <div className={dueInfo.badge}>{dueInfo.label}</div>
                             </div>
                             <div className="space-y-2">

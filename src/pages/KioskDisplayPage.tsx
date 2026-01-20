@@ -26,6 +26,9 @@ import { supabaseProductivity } from "@/integrations/supabase";
 import { parseQRCode, extractOrderNumber } from "@/lib/qr-utils";
 import { summarizeMaterials } from "@/lib/materials";
 import { isMondayToWednesday, daysToDueDate, getUrgencyBadge } from "@/services/priority-service";
+import { ScannerButton } from "@/components/scanner/ScannerButton";
+import { ScannerModal } from "@/components/scanner/ScannerModal";
+import { useOrientation, useDeviceType } from "@/hooks/useOrientation";
 
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -44,9 +47,12 @@ const KioskDisplayPage: React.FC = () => {
 
     const [scannedId, setScannedId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<"scanner" | "list">("scanner");
-    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-    const lastScannedRef = useRef<string | null>(null); // Referencia para evitar parpadeo/spam
+    const [scannerModalOpen, setScannerModalOpen] = useState(false);
     const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+    // Hooks responsive
+    const orientation = useOrientation();
+    const deviceType = useDeviceType();
 
     const { data: workOrders } = useWorkOrders();
     const updateStatus = useUpdateWorkOrderStatus();
@@ -161,38 +167,16 @@ const KioskDisplayPage: React.FC = () => {
         }
     });
 
-    useEffect(() => {
-        if (activeTab === "scanner" && !scannerRef.current) {
-            scannerRef.current = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-            scannerRef.current.render(onScanSuccess, onScanFailure);
-        }
-        return () => {
-            if (scannerRef.current) {
-                scannerRef.current.clear().catch((err) => console.error("Error clearing scanner", err));
-                scannerRef.current = null;
-            }
-        };
-    }, [activeTab]);
-
-    useEffect(() => {
-        if (kioskConfig && typeof kioskConfig === "object" && !Array.isArray(kioskConfig)) {
-            setTheme(kioskConfig.theme === "light" ? "light" : "dark");
-        } else {
-            setTheme("dark");
-        }
-    }, [kioskConfig]);
-
-    function onScanSuccess(decodedText: string) {
+    const onScanSuccess = (decodedText: string) => {
         const qrData = parseQRCode(decodedText);
         const orderNum = qrData.orderNumber || extractOrderNumber(decodedText);
 
-        // Evitar procesar el mismo código repetidamente (causa parpadeo de toasts y estado)
-        if (orderNum === lastScannedRef.current) return;
-        lastScannedRef.current = orderNum;
-
-        setScannedId(orderNum);
-        toast.success(`✓ Orden detectada: ${orderNum}`);
-    }
+        if (orderNum) {
+            setScannedId(orderNum);
+            setScannerModalOpen(false);
+            toast.success(`✓ Orden detectada: ${orderNum}`);
+        }
+    };
 
     function onScanFailure(_error: any) { }
 
@@ -282,10 +266,36 @@ const KioskDisplayPage: React.FC = () => {
                                 <QrCode className={cn("w-4 h-4 mr-2", colors.token)} /> Lector de Pedidos
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className={cn("flex-1 p-0 flex items-center justify-center relative", colors.panelMuted)}>
-                            <div id="reader" className="w-full h-full [&>div]:border-none [&>div>img]:hidden"></div>
+                        <CardContent className={cn("flex-1 p-6 flex flex-col items-center justify-center relative gap-6", colors.panelMuted)}>
+                            <div className="text-center space-y-2 mb-4">
+                                <p className={cn("text-sm font-medium", isLight ? "text-slate-600" : "text-slate-400")}>
+                                    Pulsa el botón para activar la cámara
+                                </p>
+                            </div>
+
+                            <ScannerButton
+                                onActivate={() => setScannerModalOpen(true)}
+                                isActive={scannerModalOpen}
+                                size={deviceType === 'mobile' ? 'mobile' : 'tablet'}
+                                fullWidth
+                                className="max-w-xs h-16 text-lg"
+                            />
+
+                            <div className="mt-8 p-4 bg-black/20 rounded-xl border border-white/5 max-w-sm text-center">
+                                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-2">Instrucciones</p>
+                                <p className="text-xs text-slate-400 leading-relaxed">
+                                    Enfoca el código QR de la orden de trabajo. Se cargará automáticamente el desglose y opciones de validación.
+                                </p>
+                            </div>
                         </CardContent>
                     </Card>
+
+                    <ScannerModal
+                        isOpen={scannerModalOpen}
+                        onClose={() => setScannerModalOpen(false)}
+                        onScan={onScanSuccess}
+                        title="Lector Modo Kiosco"
+                    />
 
                     <div className="space-y-6 overflow-y-auto">
                         {selectedOrder ? (
