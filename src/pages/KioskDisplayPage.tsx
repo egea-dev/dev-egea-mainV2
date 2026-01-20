@@ -25,6 +25,8 @@ import { useSearchParams } from "react-router-dom";
 import { supabaseProductivity } from "@/integrations/supabase";
 import { parseQRCode, extractOrderNumber } from "@/lib/qr-utils";
 import { summarizeMaterials } from "@/lib/materials";
+import { isMondayToWednesday, daysToDueDate, getUrgencyBadge } from "@/services/priority-service";
+
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
     PENDIENTE: { label: "Pendiente", color: "bg-slate-500/10 text-slate-400 border-slate-500/30", icon: Timer },
@@ -404,27 +406,79 @@ const KioskDisplayPage: React.FC = () => {
                             const archivedStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
                             return !archivedStatuses.includes(order.status?.toUpperCase?.() || order.status);
                         })
-                        .map((order) => (
-                            <Card key={order.id} className={cn("rounded-2xl overflow-hidden cursor-pointer", colors.card)} onClick={() => {
-                                setScannedId(order.id);
-                                lastScannedRef.current = order.id; // Sincronizar para evitar re-escaneo inmediato
-                                setActiveTab("scanner");
-                            }}>
-                                <CardContent className="p-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className={cn("p-3 rounded-xl", colors.panel)}><Package className={cn("w-6 h-6", colors.mutedText)} /></div>
-                                        <div>
-                                            <h4 className={cn("text-xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</h4>
-                                            <p className={cn("text-[10px] font-bold uppercase", colors.mutedText)}>{order.status} - {order.fabric}</p>
+                        .map((order) => {
+                            // Calcular metadata de prioridad
+                            const isCanariasUrgent =
+                                order.region?.toUpperCase() === 'CANARIAS' &&
+                                    order.created_at ?
+                                    isMondayToWednesday(order.created_at) :
+                                    false;
+
+                            const daysRemaining = daysToDueDate(order.due_date);
+                            const urgencyBadge = getUrgencyBadge(daysRemaining);
+
+                            // Detectar agrupación de material (comparar con otros pedidos)
+                            const materialGroup = (workOrders || []).filter(
+                                o => o.fabric === order.fabric && o.fabric && o.id !== order.id
+                            );
+                            const isGrouped = materialGroup.length >= 1;
+
+                            return (
+                                <Card
+                                    key={order.id}
+                                    className={cn(
+                                        "rounded-2xl overflow-hidden cursor-pointer transition-all",
+                                        colors.card,
+                                        isGrouped && "agrupado-material",
+                                        isCanariasUrgent && "prioridad-canarias"
+                                    )}
+                                    onClick={() => {
+                                        setScannedId(order.id);
+                                        lastScannedRef.current = order.id;
+                                        setActiveTab("scanner");
+                                    }}
+                                >
+                                    <CardContent className="p-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className={cn("p-3 rounded-xl", colors.panel)}>
+                                                <Package className={cn("w-6 h-6", colors.mutedText)} />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className={cn("text-xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>
+                                                        {order.order_number}
+                                                    </h4>
+                                                    {isCanariasUrgent && (
+                                                        <Badge className="bg-red-500/20 text-red-400 border-red-500/50 text-[8px] px-2 py-0.5">
+                                                            🔥 CANARIAS L-M
+                                                        </Badge>
+                                                    )}
+                                                    {isGrouped && (
+                                                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/50 text-[8px] px-2 py-0.5">
+                                                            📦 AGRUPADO
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <p className={cn("text-[10px] font-bold uppercase", colors.mutedText)}>
+                                                    {order.status} - {order.fabric || 'N/D'}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border", STATUS_CONFIG[order.status]?.color)}>{STATUS_CONFIG[order.status]?.label || order.status}</Badge>
-                                        <ArrowRight className={cn("w-4 h-4", colors.mutedText)} />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
+                                        <div className="flex items-center gap-3">
+                                            {urgencyBadge && (
+                                                <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border", urgencyBadge.color)}>
+                                                    {urgencyBadge.label}
+                                                </Badge>
+                                            )}
+                                            <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border", STATUS_CONFIG[order.status]?.color)}>
+                                                {STATUS_CONFIG[order.status]?.label || order.status}
+                                            </Badge>
+                                            <ArrowRight className={cn("w-4 h-4", colors.mutedText)} />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
                 </div>
             )}
         </div>

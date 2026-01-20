@@ -382,3 +382,69 @@
 .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: hsl(215 15% 50%);
 }
+
+/* ===== Sistema de Priorización de Kioscos ===== */
+
+/* Animación de parpadeo verde para materiales agrupados */
+@keyframes alert-blink {
+  0% { 
+    background-color: rgba(46, 204, 113, 0.15);
+    box-shadow: 0 0 15px rgba(46, 204, 113, 0.2);
+  }
+  50% { 
+    background-color: rgba(162, 242, 194, 0.25);
+    box-shadow: 0 0 25px rgba(46, 204, 113, 0.35);
+  }
+  100% { 
+    background-color: rgba(46, 204, 113, 0.15);
+    box-shadow: 0 0 15px rgba(46, 204, 113, 0.2);
+  }
+}
+
+/* Clase para pedidos agrupados por material */
+.agrupado-material {
+  animation: alert-blink 1.5s ease-in-out infinite;
+  border: 2px solid #27ae60 !important;
+  position: relative;
+}
+
+.agrupado-material::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(46, 204, 113, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* Clase para pedidos urgentes de Canarias (Lunes-Miércoles) */
+.prioridad-canarias {
+  border-left: 6px solid #e74c3c !important;
+  box-shadow: 0 0 25px rgba(231, 76, 60, 0.4);
+  position: relative;
+}
+
+.prioridad-canarias::after {
+  content: '🔥';
+  position: absolute;
+  top: 8px;
+  left: -16px;
+  font-size: 16px;
+  animation: pulse-fire 1s ease-in-out infinite;
+}
+
+@keyframes pulse-fire {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+/* Combinación de ambos estados (Canarias + Agrupado) */
+.prioridad-canarias.agrupado-material {
+  border: 3px solid #e67e22 !important;
+  box-shadow: 
+    0 0 20px rgba(231, 76, 60, 0.3),
+    0 0 30px rgba(46, 204, 113, 0.2);
+}
