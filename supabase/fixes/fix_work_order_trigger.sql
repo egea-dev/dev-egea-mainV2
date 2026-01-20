@@ -50,7 +50,7 @@ BEGIN
             product_type,
             fabric,
             color,
-            quantity,
+            quantity_total,
             status,
             notes
         ) VALUES (
