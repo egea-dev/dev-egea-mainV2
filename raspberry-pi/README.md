@@ -40,19 +40,6 @@ const PRINTER_IP = '192.168.1.236'; // Tu IP
 const PRINTER_PORT = 500;           // Tu puerto
 ```
 
-### 3.1 (Opcional) Proteger con API key
-
-```bash
-# En la Raspberry Pi
-export PRINTER_API_KEY=tu-clave-secreta
-```
-
-En el frontend, configura:
-
-```env
-VITE_PRINTER_API_KEY=tu-clave-secreta
-```
-
 ### 4. Probar servidor
 
 ```bash

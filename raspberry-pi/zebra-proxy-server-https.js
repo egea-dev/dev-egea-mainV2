@@ -12,13 +12,9 @@ const PORT = 3001;
 // Configuración de la impresora
 const PRINTER_IP = '192.168.1.236';
 const PRINTER_PORT = 500;
-const API_KEY = process.env.PRINTER_API_KEY || '';
 
 // Middleware
-app.use(cors({
-    allowedHeaders: ['Content-Type', 'X-API-Key'],
-    methods: ['GET', 'POST', 'OPTIONS']
-}));
+app.use(cors());
 app.use(express.text({ type: '*/*', limit: '10mb' }));
 
 // Health check
@@ -28,10 +24,6 @@ app.get('/health', (req, res) => {
 
 // Endpoint para imprimir ZPL
 app.post('/print', async (req, res) => {
-    if (API_KEY && req.header('X-API-Key') !== API_KEY) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     const zpl = req.body;
 
     if (!zpl || typeof zpl !== 'string') {
