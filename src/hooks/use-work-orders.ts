@@ -300,15 +300,24 @@ export const useUpdateWorkOrderStatus = () => {
                 if (commStatus) {
                     console.log(`🔄 Sincronizando estado ${commStatus} con comercial para orden ${data.order_number}`);
 
+                    // Preparar payload con flag de notificación si es ENVIADO
+                    const updatePayload: any = { status: commStatus };
+                    if (commStatus === 'ENVIADO') {
+                        updatePayload.shipping_notification_pending = true;
+                    }
+
                     const { error: syncError } = await (supabase as any)
                         .from('comercial_orders')
-                        .update({ status: commStatus })
+                        .update(updatePayload)
                         .eq('order_number', data.order_number);
 
                     if (syncError) {
                         console.warn("Error sincronizando estado con comercial:", syncError);
                     } else {
                         console.log(`✓ Sincronizado estado ${commStatus} en comercial`);
+                        if (commStatus === 'ENVIADO') {
+                            console.log(`📧 Notificación de envío pendiente para ${data.order_number}`);
+                        }
                     }
                 }
             }

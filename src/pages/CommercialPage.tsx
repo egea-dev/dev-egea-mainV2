@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OrderStatusBadge } from "@/components/badges";
-import { Package, Eye, Plus, LayoutList, History } from "lucide-react";
+import { Package, Eye, Plus, LayoutList, History, Mail, Bell } from "lucide-react";
 import { useOrders, useCreateOrder, useUpdateOrderStatus, useDeleteOrder } from "@/hooks/use-orders";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseProductivity } from "@/integrations/supabase";
@@ -188,6 +188,7 @@ export default function CommercialPage() {
 
   const activeOrders = orders.filter((o) => !["ENVIADO", "ENTREGADO", "CANCELADO"].includes(String(o.status).trim().toUpperCase()));
   const archivedOrders = orders.filter((o) => ["ENVIADO", "ENTREGADO", "CANCELADO"].includes(String(o.status).trim().toUpperCase()));
+  const pendingNotificationOrders = orders.filter((o: any) => o.shipping_notification_pending === true);
   const displayedOrders = viewMode === "ACTIVE" ? activeOrders : archivedOrders;
 
   const validateOrderReadyForProduction = (order: any): { valid: boolean; error?: string } => {
@@ -461,6 +462,44 @@ export default function CommercialPage() {
     >
       <div className="space-y-6">
         <CalendarModule selectedDate={selectedDate} onDateSelect={setSelectedDate} mode="commercial" />
+
+        {/* Alerta de Notificaciones de Envío Pendientes */}
+        {pendingNotificationOrders.length > 0 && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Bell className="w-5 h-5 text-amber-400 animate-pulse" />
+              <h3 className="text-amber-300 font-semibold">
+                Notificaciones de Envío Pendientes ({pendingNotificationOrders.length})
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {pendingNotificationOrders.map((order: any) => (
+                <div key={order.id} className="flex items-center justify-between bg-background/50 rounded-md p-3">
+                  <div className="flex items-center gap-3">
+                    <Package className="w-4 h-4 text-muted-foreground" />
+                    <div>
+                      <span className="font-medium text-foreground">
+                        {order.admin_code || order.order_number}
+                      </span>
+                      <span className="text-muted-foreground text-sm ml-2">
+                        {order.customer_company || order.customer_name || 'Sin cliente'}
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-500/50 text-amber-300 hover:bg-amber-500/20"
+                    onClick={() => setSelectedOrder(order)}
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Notificar Envío
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-6 border-b border-border">
           <button

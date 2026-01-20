@@ -478,3 +478,36 @@ export const useDeleteOrder = () => {
     });
 };
 
+// Hook para marcar notificación de envío como enviada
+export const useMarkShippingNotificationSent = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ orderId, userId }: { orderId: string; userId: string }) => {
+            const { data, error } = await (supabase as any)
+                .from('comercial_orders')
+                .update({
+                    shipping_notification_pending: false,
+                    shipping_notification_sent_at: new Date().toISOString(),
+                    shipping_notification_sent_by: userId
+                })
+                .eq('id', orderId)
+                .select()
+                .single();
+
+            if (error) {
+                console.error("Error marking shipping notification as sent:", error);
+                throw error;
+            }
+
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            toast.success("✅ Notificación de envío marcada como enviada");
+        },
+        onError: (error: any) => {
+            toast.error(`Error: ${error.message}`);
+        }
+    });
+};
