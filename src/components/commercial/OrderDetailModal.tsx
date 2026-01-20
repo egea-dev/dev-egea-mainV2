@@ -62,6 +62,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
     const { data: materials } = useMaterials();
     const [savingDoc, setSavingDoc] = useState<DocType | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [paidConfirmOpen, setPaidConfirmOpen] = useState(false);
     const isAdminOrManager = userRole === 'admin' || userRole === 'manager';
     const fileInputsRef = useRef<Record<DocType, HTMLInputElement | null>>({
         PRESUPUESTO: null,
@@ -310,20 +311,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                         {/* Botón Marcar como Pagado */}
                         {formData.status === 'PENDIENTE_PAGO' && (
                             <Button
-                                onClick={async () => {
-                                    try {
-                                        await updateOrderStatus.mutateAsync({
-                                            orderId: formData.id,
-                                            status: 'PAGADO',
-                                            comment: 'Validación desde detalle de pedido'
-                                        });
-                                        setFormData(prev => ({ ...prev, status: 'PAGADO' }));
-                                        toast.success('Pedido marcado como PAGADO y enviado a producción');
-                                        if (onSave) onSave({ ...formData, status: 'PAGADO' });
-                                    } catch (error: any) {
-                                        toast.error(`Error: ${error.message}`);
-                                    }
-                                }}
+                                onClick={() => setPaidConfirmOpen(true)}
                                 className="bg-green-600 hover:bg-green-700 text-white"
                             >
                                 <FileCheck className="w-4 h-4 mr-2" /> Marcar como Pagado
@@ -1066,6 +1054,54 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                 </div>
 
             </div>
+            {/* Diálogo de Confirmación de Pago */}
+            {paidConfirmOpen && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-card/95 p-6 rounded-2xl border border-border/60 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-4 text-green-500">
+                            <FileCheck className="w-6 h-6" />
+                            <h3 className="text-xl font-bold text-white">Confirmación de Pago</h3>
+                        </div>
+
+                        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-6">
+                            <p className="text-sm text-green-200 leading-relaxed font-medium text-center">
+                                "Recuerda tener el presupuesto y la aceptación, verifica los datos del cliente y que estén asociados al código de producción, gracias."
+                            </p>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setPaidConfirmOpen(false)}
+                                className="text-muted-foreground hover:text-white"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20"
+                                onClick={async () => {
+                                    try {
+                                        setPaidConfirmOpen(false);
+                                        await updateOrderStatus.mutateAsync({
+                                            orderId: formData.id,
+                                            status: 'PAGADO',
+                                            comment: 'Validación con revisión de datos por comercial'
+                                        });
+                                        setFormData(prev => ({ ...prev, status: 'PAGADO' }));
+                                        toast.success('Pedido marcado como PAGADO y enviado a producción');
+                                        if (onSave) onSave({ ...formData, status: 'PAGADO' });
+                                    } catch (error: any) {
+                                        toast.error(`Error: ${error.message}`);
+                                    }
+                                }}
+                            >
+                                Confirmar Pago
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <DoubleConfirmDialog
                 open={deleteDialogOpen}
                 onOpenChange={setDeleteDialogOpen}
