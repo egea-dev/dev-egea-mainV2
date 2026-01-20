@@ -409,7 +409,8 @@ export function ProductionPage() {
           const processStartAt = order.process_start_at || order.started_at || null;
           return {
             ...order,
-            order_number: order.order_number || order.work_order_number || order.id,
+            order_number: order.admin_code || order.order_number || order.work_order_number || order.id,
+            admin_code: order.admin_code || null,
             status: normalizedStatus,
             fabric,
             color,
@@ -463,7 +464,7 @@ export function ProductionPage() {
       if (!pollPausedRef.current) {
         pollTimeoutRef.current = setTimeout(() => {
           void loadOrders();
-        }, 10000);
+        }, 30000); // Aumentado a 30 segundos para reducir parpadeo
       }
       if (isFirstLoad) {
         setIsLoading(false);
