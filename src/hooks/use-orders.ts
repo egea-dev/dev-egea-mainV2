@@ -159,6 +159,7 @@ export const useUpdateOrderStatus = () => {
                 slaDays?: number | null;
             }) => {
                 const payload: any = {
+                    work_order_number: resolvedOrderNumber,
                     order_number: resolvedOrderNumber,
                     customer_name: customerDisplay,
                     status,
@@ -275,6 +276,7 @@ export const useUpdateOrderStatus = () => {
             };
             const workOrderMatch = [
                 (currentOrder as any)?.order_number ? `order_number.eq.${escapeOrValue((currentOrder as any).order_number)}` : null,
+                (currentOrder as any)?.order_number ? `work_order_number.eq.${escapeOrValue((currentOrder as any).order_number)}` : null,
                 (currentOrder as any)?.admin_code ? `admin_code.eq.${escapeOrValue((currentOrder as any).admin_code)}` : null
             ].filter(Boolean).join(',');
 
@@ -424,6 +426,7 @@ export const useUpdateOrder = () => {
 
                 const workOrderMatch = [
                     data.order_number ? `order_number.eq.${escapeOrValue(data.order_number)}` : null,
+                    data.order_number ? `work_order_number.eq.${escapeOrValue(data.order_number)}` : null,
                     data.admin_code ? `admin_code.eq.${escapeOrValue(data.admin_code)}` : null
                 ].filter(Boolean).join(',');
 

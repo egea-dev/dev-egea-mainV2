@@ -76,19 +76,21 @@ export default function CommercialPage() {
             .join(",");
           const { data } = await supabaseProductivity
             .from("produccion_work_orders")
-            .select("id, order_number, admin_code")
+            .select("id, order_number, admin_code, work_order_number")
             .or(
               [
                 escapedOrders ? `order_number.in.(${escapedOrders})` : null,
+                escapedOrders ? `work_order_number.in.(${escapedOrders})` : null,
                 escapedAdmins ? `admin_code.in.(${escapedAdmins})` : null,
-                escapedResolved ? `order_number.in.(${escapedResolved})` : null
+                escapedResolved ? `order_number.in.(${escapedResolved})` : null,
+                escapedResolved ? `work_order_number.in.(${escapedResolved})` : null
               ].filter(Boolean).join(",")
             );
           existing = data as any[] || [];
         }
 
         const existingSet = new Set(
-          (existing || []).flatMap((row: any) => [row.order_number, row.admin_code])
+          (existing || []).flatMap((row: any) => [row.order_number, row.admin_code, row.work_order_number])
         );
 
         let createdCount = 0;
@@ -108,6 +110,7 @@ export default function CommercialPage() {
           const quantity = Number(order.quantity_total) || 0;
 
           const payload: any = {
+            work_order_number: orderRef || adminRef,
             order_number: orderRef || adminRef,
             admin_code: adminRef || null,
             customer_name: order.customer_company || order.customer_name || "Cliente",
