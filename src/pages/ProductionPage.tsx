@@ -142,6 +142,9 @@ export function ProductionPage() {
   const orientation = useOrientation();
   const deviceType = useDeviceType();
 
+  // v3.1.0 - Estado de expansión vertical para móvil
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [printerStatus, setPrinterStatus] = useState<any>('checking');
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -484,20 +487,17 @@ export function ProductionPage() {
   };
 
   const activeQueue = useMemo(() => {
-    const nextQueue = orders
-      .filter(order => {
-        const activeStatuses = ['PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'PAGADO', 'EN_PROCESO'];
-        return activeStatuses.includes(order.status);
-      })
-      .sort((a, b) => {
-        const aDate = a.created_at ? new Date(a.created_at).getTime() : Infinity;
-        const bDate = b.created_at ? new Date(b.created_at).getTime() : Infinity;
-        return aDate - bDate;
-      });
+    const filtered = orders.filter(order => {
+      const activeStatuses = ['PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'PAGADO', 'EN_PROCESO'];
+      return activeStatuses.includes(order.status);
+    });
+
+    // v3.1.0 - Aplicar ordenación senior
+    const sorted = sortWorkOrdersByPriority(filtered as any);
 
     if (!isPersisting) {
-      activeQueueRef.current = nextQueue;
-      return nextQueue;
+      activeQueueRef.current = sorted as any;
+      return sorted as any;
     }
 
     return activeQueueRef.current;
@@ -1077,73 +1077,119 @@ export function ProductionPage() {
                   )}
                   {!isLoading && activeQueue.length > 0 && (
                     <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-2">
-                      {activeQueue.map((order) => {
+                      {activeQueue.map((order: any) => {
                         const isSelected = scannedOrder?.id === order.id;
+                        const isExpanded = expandedOrderId === order.id;
                         const dueInfo = getDueBadge(order);
+
+                        // Determinar clase de borde según requerimiento v3.1.0
+                        let borderClass = "";
+                        const level = order._priority_level;
+                        const isKiosk = deviceType === 'tablet'; // Asumimos Kiosko como tablet para parpadeo
+
+                        if (level === 'critical') borderClass = isKiosk ? "blink-priority-urgent" : "border-priority-urgent";
+                        else if (level === 'warning') borderClass = isKiosk ? "blink-priority-canarias" : "border-priority-canarias";
+                        else if (level === 'material') borderClass = isKiosk ? "blink-priority-material" : "border-priority-material";
+
                         return (
-                          <button
-                            key={order.id}
-                            onClick={() => {
-                              setScannedOrder(order);
-                              setSelectedOrderId(order.id);
-                              setPackagesInput(order.packages_count || 1);
-                            }}
-                            className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden ${isSelected
-                              ? 'bg-indigo-900/10 border-indigo-500/50 ring-1 ring-indigo-500/20'
-                              : order._is_grouped_material
-                                ? 'agrupado-material'
-                                : 'bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41] hover:bg-[#121417]'
-                              } ${order._is_canarias_urgent ? 'prioridad-canarias' : ''}`}
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-indigo-400' : 'text-[#B5B8BA]'}`}>
-                                  {order.order_number}
-                                </span>
-                                {/* Badges de Prioridad */}
-                                {order._is_canarias_urgent && (
-                                  <span className="px-2 py-0.5 bg-red-600/20 border border-red-500/50 rounded text-[10px] font-bold text-red-300">
-                                    🔥 CANARIAS L-M
+                          <div key={order.id} className="order-expandable-container">
+                            <button
+                              onClick={() => {
+                                if (deviceType === 'mobile') {
+                                  setExpandedOrderId(isExpanded ? null : order.id);
+                                }
+                                setScannedOrder(order);
+                                setSelectedOrderId(order.id);
+                                setPackagesInput(order.packages_count || 1);
+                              }}
+                              className={cn(
+                                "w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden",
+                                isSelected ? "bg-indigo-900/20 border-indigo-500/50" : "bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41]",
+                                borderClass
+                              )}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-indigo-400' : 'text-[#B5B8BA]'}`}>
+                                    {order.order_number}
                                   </span>
-                                )}
-                                {order._is_grouped_material && (
-                                  <span className="px-2 py-0.5 bg-green-600/20 border border-green-500/50 rounded text-[10px] font-bold text-green-300">
-                                    📦 AGRUPADO
-                                  </span>
-                                )}
-                                {daysToDueDate(order.due_date) !== null && (
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getUrgencyBadge(daysToDueDate(order.due_date)!).color}`}>
-                                    {getUrgencyBadge(daysToDueDate(order.due_date)!).label}
-                                  </span>
-                                )}
-                              </div>
-                              <div className={dueInfo.badge}>{dueInfo.label}</div>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="font-bold text-white text-base leading-tight">
-                                {order.customer_name}
-                              </p>
-                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#B5B8BA]">
-                                <span className="flex items-center gap-1">
-                                  <Package className="w-3 h-3" /> {order.quantity_total} uds
-                                </span>
-                                <span className="opacity-50">•</span>
-                                <span>{order.fabric}</span>
-                              </div>
-                              <div className="mt-2">
-                                <div className="flex justify-between text-[10px] text-[#B5B8BA] transition-all mb-1">
-                                  <span className="uppercase font-bold tracking-wider">{order.status}</span>
-                                  <span>{Math.round((['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'].indexOf(order.status) + 1) / 5 * 100)}%</span>
+                                  {/* Badges de Prioridad (Sin Emojis) */}
+                                  {order._is_canarias_urgent && (
+                                    <span className="px-2 py-0.5 bg-orange-600/20 border border-orange-500/50 rounded text-[10px] font-bold text-orange-300">
+                                      CANARIAS L-M
+                                    </span>
+                                  )}
+                                  {order._is_grouped_material && (
+                                    <span className="px-2 py-0.5 bg-green-600/20 border border-green-500/50 rounded text-[10px] font-bold text-green-300">
+                                      AGRUPADO
+                                    </span>
+                                  )}
+                                  {daysToDueDate(order.due_date) !== null && (
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getUrgencyBadge(daysToDueDate(order.due_date)!).color}`}>
+                                      {getUrgencyBadge(daysToDueDate(order.due_date)!).label}
+                                    </span>
+                                  )}
                                 </div>
-                                <div className="w-full bg-[#0D0F11] border border-[#2A2D31] rounded-full h-1.5 overflow-hidden">
-                                  <div
-                                    className="h-1.5 rounded-full bg-indigo-500 transition-all duration-500"
-                                    style={{ width: `${(['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'LISTO_ENVIO'].indexOf(order.status) + 1) / 5 * 100}%` }}
-                                  ></div>
+                                <div className={dueInfo.badge}>{dueInfo.label}</div>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="font-bold text-white text-base leading-tight">
+                                  {order.customer_name}
+                                </p>
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#B5B8BA]">
+                                  <span className="flex items-center gap-1">
+                                    <Package className="w-3 h-3" /> {order.quantity_total} uds
+                                  </span>
+                                  <span className="opacity-50">•</span>
+                                  <span>{order.fabric}</span>
                                 </div>
                               </div>
-                            </div>
-                          </button>
+                            </button>
+
+                            {/* Expansión Vertical (Solo Móvil) */}
+                            {deviceType === 'mobile' && (
+                              <div className={cn("order-details-expanded", isExpanded && "show")}>
+                                <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-xl p-4 mt-2 space-y-4">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-[#B5B8BA] uppercase font-bold tracking-wider">{order.status}</span>
+                                    <div className="flex gap-2">
+                                      {['PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD'].includes(order.status) && (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); initiateFinish(); }}
+                                          className="p-2 bg-emerald-600 text-white rounded-lg"
+                                        >
+                                          <CheckCircle className="w-5 h-5" />
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); printZebraLabel(); }}
+                                        className="p-2 bg-[#FF6B35] text-white rounded-lg"
+                                      >
+                                        <Printer className="w-5 h-5" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Info Detallada */}
+                                  <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div className="bg-[#0D0F11] p-2 rounded border border-[#2A2D31]">
+                                      <p className="text-[10px] text-[#B5B8BA]">Material</p>
+                                      <p className="font-bold text-white truncate">{order.fabric}</p>
+                                    </div>
+                                    <div className="bg-[#0D0F11] p-2 rounded border border-[#2A2D31]">
+                                      <p className="text-[10px] text-[#B5B8BA]">Total Uds</p>
+                                      <p className="font-bold text-white">{order.quantity_total}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Desglose resumido */}
+                                  <div className="text-[11px] text-[#B5B8BA] bg-[#0D0F11]/50 p-2 rounded italic">
+                                    {renderLinePreview(order)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>

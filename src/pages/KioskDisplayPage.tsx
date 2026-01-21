@@ -320,7 +320,7 @@ const KioskDisplayPage: React.FC = () => {
                                     <div className="flex justify-between items-start mb-6">
                                         <div>
                                             <Badge className="bg-emerald-900/40 text-emerald-400 border-emerald-500/30 mb-2 px-3 py-1 text-[10px] tracking-widest font-bold uppercase">
-                                                Información del Pedido
+                                                Resumen del Pedido
                                             </Badge>
                                             <h2 className={cn("text-4xl font-black tracking-tight uppercase", isLight ? "text-slate-900" : "text-white")}>
                                                 {selectedOrder.order_number}
@@ -433,14 +433,22 @@ const KioskDisplayPage: React.FC = () => {
                             );
                             const isGrouped = materialGroup.length >= 1;
 
+                            // v3.1.0 - Determinar nivel de prioridad para borde
+                            let level = 'normal';
+                            if (isCanariasUrgent) level = 'warning';
+                            else if (isGrouped) level = 'material';
+                            // Si la fecha es crítica, sobreescribe
+                            if (daysRemaining !== null && daysRemaining <= 2) level = 'critical';
+
                             return (
                                 <Card
                                     key={order.id}
                                     className={cn(
-                                        "rounded-2xl overflow-hidden cursor-pointer transition-all",
+                                        "rounded-2xl overflow-hidden cursor-pointer transition-all border-4",
                                         colors.card,
-                                        isGrouped && "agrupado-material",
-                                        isCanariasUrgent && "prioridad-canarias"
+                                        level === 'critical' ? "blink-priority-urgent" :
+                                            level === 'warning' ? "blink-priority-canarias" :
+                                                level === 'material' ? "blink-priority-material" : ""
                                     )}
                                     onClick={() => {
                                         setScannedId(order.id);
@@ -459,13 +467,13 @@ const KioskDisplayPage: React.FC = () => {
                                                         {order.order_number}
                                                     </h4>
                                                     {isCanariasUrgent && (
-                                                        <Badge className="bg-red-500/20 text-red-400 border-red-500/50 text-[8px] px-2 py-0.5">
-                                                            🔥 CANARIAS L-M
+                                                        <Badge className="bg-orange-600/20 text-orange-400 border-orange-500/50 text-[8px] px-2 py-0.5">
+                                                            CANARIAS L-M
                                                         </Badge>
                                                     )}
                                                     {isGrouped && (
-                                                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/50 text-[8px] px-2 py-0.5">
-                                                            📦 AGRUPADO
+                                                        <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-500/50 text-[8px] px-2 py-0.5">
+                                                            AGRUPADO
                                                         </Badge>
                                                     )}
                                                 </div>

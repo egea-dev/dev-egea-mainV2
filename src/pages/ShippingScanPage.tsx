@@ -35,6 +35,7 @@ import { ScannerButton } from '@/components/scanner/ScannerButton';
 import { ScannerModal } from '@/components/scanner/ScannerModal';
 import { useOrientation, useDeviceType } from '@/hooks/useOrientation';
 import { sortWorkOrdersByPriority, daysToDueDate, getUrgencyBadge } from '@/services/priority-service';
+import { cn } from "@/lib/utils";
 
 // Tipos
 interface Order {
@@ -104,6 +105,7 @@ export default function ShippingScanPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasTrackingNow, setHasTrackingNow] = useState(true);
   const [isIncidentModalOpen, setIsIncidentModalOpen] = useState(false);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   // Hooks responsive
   const orientation = useOrientation();
@@ -795,61 +797,108 @@ export default function ShippingScanPage() {
                       {activeShipments.map((order: any) => {
                         const isIncomplete = (order.scanned_packages || 0) > 0 && (order.scanned_packages || 0) < (order.packages_count || 1);
                         const isSelected = scannedOrder?.id === order.id;
+                        const isExpanded = expandedOrderId === order.id;
 
-                        // Detectar prioridades
-                        const isPriorityCanarias = order._is_canarias_urgent || false;
-                        const isGrouped = order._is_grouped_material || false;
-                        const daysRemaining = order.due_date ? daysToDueDate(order.due_date) : null;
-                        const urgencyBadge = daysRemaining !== null ? getUrgencyBadge(daysRemaining) : null;
+                        // v3.1.0 - Lógica de bordes
+                        let borderClass = "";
+                        const level = order._priority_level;
+                        const isKiosk = deviceType === 'tablet';
+
+                        if (level === 'critical') borderClass = isKiosk ? "blink-priority-urgent" : "border-priority-urgent";
+                        else if (level === 'warning') borderClass = isKiosk ? "blink-priority-canarias" : "border-priority-canarias";
+                        else if (level === 'material') borderClass = isKiosk ? "blink-priority-material" : "border-priority-material";
 
                         return (
-                          <button
-                            key={order.id}
-                            onClick={() => {
-                              setScannedOrder(order);
-                              setTrackingNumber(order.tracking_number || '');
-                              setScannedPackagesCount(order.scanned_packages || 0);
-                            }}
-                            className={`w-full text-left p-3 rounded-lg border transition-all group relative overflow-hidden ${isSelected
-                                ? 'bg-indigo-900/20 border-indigo-500/50'
-                                : isIncomplete
-                                  ? 'bg-amber-900/10 border-amber-500/50'
-                                  : isGrouped
-                                    ? 'agrupado-material'
-                                    : 'bg-[#1A1D1F] border-[#45474A] hover:border-[#6E6F71]'
-                              } ${isPriorityCanarias ? 'prioridad-canarias' : ''}`}
-                          >
-                            <div className="flex justify-between items-start mb-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`font-mono font-bold text-sm ${isSelected ? 'text-indigo-300' : 'text-[#B5B8BA]'}`}>
-                                  {order.order_number}
-                                </span>
-                                {/* Badges de Prioridad */}
-                                {isPriorityCanarias && (
-                                  <span className="px-2 py-0.5 bg-red-600/20 border border-red-500/50 rounded text-[10px] font-bold text-red-300">
-                                    🔥 CANARIAS L-M
+                          <div key={order.id} className="order-expandable-container">
+                            <button
+                              onClick={() => {
+                                if (deviceType === 'mobile') {
+                                  setExpandedOrderId(isExpanded ? null : order.id);
+                                }
+                                setScannedOrder(order);
+                                setTrackingNumber(order.tracking_number || '');
+                                setScannedPackagesCount(order.scanned_packages || 0);
+                              }}
+                              className={cn(
+                                "w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden",
+                                isSelected ? "bg-indigo-900/20 border-indigo-500/50" : "bg-[#1A1D1F] border-[#323438] hover:border-[#45474A]",
+                                borderClass
+                              )}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`font-mono font-bold text-sm ${isSelected ? 'text-indigo-400' : 'text-[#8B8D90]'}`}>
+                                    {order.order_number}
                                   </span>
-                                )}
-                                {isGrouped && (
-                                  <span className="px-2 py-0.5 bg-green-600/20 border border-green-500/50 rounded text-[10px] font-bold text-green-300">
-                                    📦 AGRUPADO
+                                  {/* Badges de Prioridad (Sin Emojis) */}
+                                  {order._is_canarias_urgent && (
+                                    <span className="px-2 py-0.5 bg-orange-600/20 border border-orange-500/50 rounded text-[10px] font-bold text-orange-300">
+                                      CANARIAS L-M
+                                    </span>
+                                  )}
+                                  {order._is_grouped_material && (
+                                    <span className="px-2 py-0.5 bg-green-600/20 border border-green-500/50 rounded text-[10px] font-bold text-green-300">
+                                      AGRUPADO
+                                    </span>
+                                  )}
+                                  {daysToDueDate(order.due_date) !== null && (
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getUrgencyBadge(daysToDueDate(order.due_date)!).color}`}>
+                                      {getUrgencyBadge(daysToDueDate(order.due_date)!).label}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isIncomplete ? 'bg-amber-600/20 text-amber-500 border border-amber-500/30' : 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'}`}>
+                                    {order.scanned_packages || 0}/{order.packages_count || 1} BULTOS
                                   </span>
-                                )}
-                                {urgencyBadge && (
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${urgencyBadge.color}`}>
-                                    {urgencyBadge.label}
-                                  </span>
-                                )}
+                                </div>
                               </div>
-                              {order.needs_shipping_validation && <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />}
-                              {isIncomplete && !isSelected && <PauseCircle className="w-4 h-4 text-amber-500" />}
-                            </div>
-                            <div className="flex flex-col gap-1 text-xs text-[#8B8D90]">
-                              <span className="group-hover:text-[#B5B8BA] font-semibold">{order.customer_name}</span>
-                              <span className="text-[#B5B8BA]">{order.fabric || 'Sin material'} · {summarizeLines(order)}</span>
-                              <span>{isIncomplete ? <span className="text-amber-500 font-bold">{order.scanned_packages}/{order.packages_count}</span> : <span>{order.packages_count || 1} bultos</span>}</span>
-                            </div>
-                          </button>
+                              <div className="space-y-1">
+                                <p className="font-bold text-white text-sm">{order.customer_name}</p>
+                                <p className="text-[11px] text-[#8B8D90] truncate">{order.fabric}</p>
+                              </div>
+                            </button>
+
+                            {/* Expansión Vertical (Solo Móvil) */}
+                            {deviceType === 'mobile' && (
+                              <div className={cn("order-details-expanded", isExpanded && "show")}>
+                                <div className="bg-[#323438] border border-[#45474A] rounded-xl p-4 mt-2 space-y-4">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs text-[#B5B8BA] uppercase font-bold tracking-wider">{order.status}</span>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); validateShipment(); }}
+                                        className="p-2 bg-indigo-600 text-white rounded-lg"
+                                      >
+                                        <Truck className="w-5 h-5" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); printManifest(); }}
+                                        className="p-2 bg-[#2A2D31] text-white rounded-lg border border-[#45474A]"
+                                      >
+                                        <FileOutput className="w-5 h-5" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div className="bg-[#1A1D1F] p-2 rounded border border-[#45474A]">
+                                      <p className="text-[10px] text-[#B5B8BA]">Material</p>
+                                      <p className="font-bold text-white truncate">{order.fabric}</p>
+                                    </div>
+                                    <div className="bg-[#1A1D1F] p-2 rounded border border-[#45474A]">
+                                      <p className="text-[10px] text-[#B5B8BA]">Bultos</p>
+                                      <p className="font-bold text-white">{order.scanned_packages || 0}/{order.packages_count || 1}</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-[11px] text-[#B5B8BA] bg-[#1A1D1F]/50 p-2 rounded italic">
+                                    {summarizeLines(order)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>

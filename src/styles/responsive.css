@@ -8,7 +8,7 @@
  * - Orientation-specific styles
  */
 
-/* ===== Variables CSS ===== */
+/* ===== Variables CSS v3.1.0 ===== */
 :root {
     --mobile-max: 768px;
     --tablet-max: 1024px;
@@ -20,7 +20,84 @@
     --scanner-sidebar-width: 450px;
     --scanner-sidebar-tablet: 360px;
     --scanner-sidebar-landscape: 320px;
+
+    /* Bordes de Prioridad */
+    --border-width-priority: 4px;
+    --color-priority-material: #10b981;
+    /* Verde Emerald */
+    --color-priority-canarias: #f59e0b;
+    /* Ámbar/Naranja */
+    --color-priority-urgent: #ef4444;
+    /* Rojo */
 }
+
+/* ===== Animaciones de Prioridad (Kiosko) ===== */
+@keyframes blink-border {
+    0% {
+        border-color: transparent;
+    }
+
+    50% {
+        border-color: var(--blink-color);
+    }
+
+    100% {
+        border-color: transparent;
+    }
+}
+
+.blink-priority-material {
+    --blink-color: var(--color-priority-material);
+    animation: blink-border 1.5s infinite;
+    border-width: var(--border-width-priority) !important;
+}
+
+.blink-priority-canarias {
+    --blink-color: var(--color-priority-canarias);
+    animation: blink-border 1s infinite;
+    border-width: var(--border-width-priority) !important;
+}
+
+.blink-priority-urgent {
+    --blink-color: var(--color-priority-urgent);
+    animation: blink-border 0.8s infinite;
+    border-width: var(--border-width-priority) !important;
+}
+
+/* Bordes Estáticos (Móvil/Acceso) */
+.border-priority-material {
+    border: var(--border-width-priority) solid var(--color-priority-material) !important;
+}
+
+.border-priority-canarias {
+    border: var(--border-width-priority) solid var(--color-priority-canarias) !important;
+}
+
+.border-priority-urgent {
+    border: var(--border-width-priority) solid var(--color-priority-urgent) !important;
+}
+
+/* ===== Expansión Vertical UX ===== */
+.order-expandable-container {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.order-details-expanded {
+    max-height: 0;
+    opacity: 0;
+    transition: all 0.4s ease-in-out;
+}
+
+.order-details-expanded.show {
+    max-height: 1000px;
+    opacity: 1;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+/* Resto de estilos responsive previos... */
+/* ... (Se mantienen las media queries de layout) ... */
 
 /* ===== Utilities de Orientación ===== */
 

@@ -1,10 +1,10 @@
 /**
- * Servicio de Priorización Dinámica para Kioscos de Producción
+ * Servicio de Priorización Dinámica para Kioscos de Producción v3.1.0
  * 
- * Implementa un sistema de scoring que prioriza pedidos según:
+ * Implementa un sistema de scoring con jerarquía estricta:
  * 1. Ventana de envío a Canarias (Lunes-Miércoles)
- * 2. Urgencia por fecha de caducidad
- * 3. Agrupación por material
+ * 2. Agrupación por Material + Fecha de Entrega
+ * 3. Urgencia por fecha de caducidad (Inversa)
  */
 
 import { WorkOrder } from '@/types/production';
@@ -14,13 +14,7 @@ export interface WorkOrderWithPriority extends WorkOrder {
     _is_grouped_material?: boolean;
     _group_material_name?: string;
     _is_canarias_urgent?: boolean;
-}
-
-/**
- * Obtiene el día de la semana de una fecha (0=Domingo, 1=Lunes, ..., 6=Sábado)
- */
-function getDayOfWeek(date: Date): number {
-    return date.getDay();
+    _priority_level?: 'critical' | 'warning' | 'material' | 'normal';
 }
 
 /**
@@ -29,7 +23,7 @@ function getDayOfWeek(date: Date): number {
 export function isMondayToWednesday(dateString: string): boolean {
     try {
         const date = new Date(dateString);
-        const dayOfWeek = getDayOfWeek(date);
+        const dayOfWeek = date.getDay();
         // 1=Lunes, 2=Martes, 3=Miércoles
         return dayOfWeek >= 1 && dayOfWeek <= 3;
     } catch {
@@ -39,117 +33,106 @@ export function isMondayToWednesday(dateString: string): boolean {
 
 /**
  * Calcula los días restantes hasta la fecha de caducidad
- * Retorna valores negativos si ya caducó
  */
 export function daysToDueDate(dueDateString: string | null | undefined): number {
-    if (!dueDateString) return 999; // Sin fecha = prioridad muy baja
-
+    if (!dueDateString) return 999;
     try {
         const now = new Date();
+        now.setHours(0, 0, 0, 0);
         const dueDate = new Date(dueDateString);
+        dueDate.setHours(0, 0, 0, 0);
         const diffMs = dueDate.getTime() - now.getTime();
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        return diffDays;
+        return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
     } catch {
         return 999;
     }
 }
 
 /**
- * Calcula el score de prioridad para un pedido
- * Mayor score = Mayor prioridad (aparece primero)
+ * Determina el nivel de prioridad para estilos visuales
  */
-export function calculatePriorityScore(workOrder: WorkOrder): number {
+export function getPriorityLevel(order: WorkOrderWithPriority): 'critical' | 'warning' | 'material' | 'normal' {
+    if (order._is_canarias_urgent) return 'warning'; // Ámbar/Naranja según requerimiento
+
+    const days = daysToDueDate(order.due_date);
+    if (days <= 2) return 'critical'; // Rojo
+
+    if (order._is_grouped_material) return 'material'; // Verde
+
+    return 'normal';
+}
+
+/**
+ * Calcula el score de prioridad para un pedido (Jerarquía Estricta)
+ * 1. Canarias (L-M): +10000
+ * 2. Material Grupos: +5000 (solo si hay coincidencia de material)
+ * 3. Días restantes: 1000 / (días + 1)
+ */
+export function calculatePriorityScore(workOrder: WorkOrder, isGrouped: boolean = false): number {
     let score = 0;
 
-    // FACTOR 1: Prioridad Canarias (L-M) - Máxima prioridad
+    // NIVEL 1: Canarias L-M
     const region = workOrder.region?.toUpperCase();
     const createdAt = workOrder.created_at;
-
     if (region === 'CANARIAS' && createdAt && isMondayToWednesday(createdAt)) {
-        score += 1000; // Máxima prioridad por ventana de envío
+        score += 10000;
     }
 
-    // FACTOR 2: Urgencia por fecha de caducidad
-    const daysRemaining = daysToDueDate(workOrder.due_date);
+    // NIVEL 2: Agrupación por Material
+    if (isGrouped) {
+        score += 5000;
+    }
 
+    // NIVEL 3: Fecha de Vencimiento
+    const daysRemaining = daysToDueDate(workOrder.due_date);
     if (daysRemaining <= 0) {
-        // Ya caducado o caducando HOY - urgencia extrema
-        score += 500;
-    } else if (daysRemaining <= 3) {
-        // Menos de 3 días - muy urgente
-        score += 300;
-    } else if (daysRemaining <= 7) {
-        // Menos de una semana - urgente
-        score += 150;
+        score += 2000; // Vencido
+    } else if (daysRemaining <= 2) {
+        score += 1000; // Crítico
     } else {
-        // Inversamente proporcional a días restantes
-        score += (1 / daysRemaining) * 100;
+        // Puntos adicionales inversamente proporcionales a los días
+        score += Math.max(0, (20 - daysRemaining) * 10);
     }
 
     return score;
 }
 
 /**
- * Detecta agrupaciones de pedidos por material
- */
-function detectMaterialGroups(orders: WorkOrderWithPriority[]): Map<string, WorkOrderWithPriority[]> {
-    const groups = new Map<string, WorkOrderWithPriority[]>();
-
-    orders.forEach(order => {
-        const material = order.fabric || 'N/D';
-        if (!groups.has(material)) {
-            groups.set(material, []);
-        }
-        groups.get(material)!.push(order);
-    });
-
-    return groups;
-}
-
-/**
- * Ordena pedidos por prioridad dinámica y añade metadata de agrupación
+ * Ordena pedidos por prioridad dinámica y añade metadata
  */
 export function sortWorkOrdersByPriority(orders: WorkOrder[]): WorkOrderWithPriority[] {
-    // 1. Calcular score para cada pedido
-    const ordersWithScore: WorkOrderWithPriority[] = orders.map(order => ({
-        ...order,
-        _priority_score: calculatePriorityScore(order),
-        _is_canarias_urgent:
-            order.region?.toUpperCase() === 'CANARIAS' &&
-                order.created_at ?
-                isMondayToWednesday(order.created_at) :
-                false
-    }));
-
-    // 2. Ordenar por score descendente (mayor primero)
-    ordersWithScore.sort((a, b) => {
-        const scoreA = a._priority_score || 0;
-        const scoreB = b._priority_score || 0;
-        return scoreB - scoreA; // Descendente
+    // 1. Detección preliminar de grupos (Material + Fecha coincidente)
+    const materialDateMap = new Map<string, number>();
+    orders.forEach(o => {
+        const key = `${o.fabric || 'N/D'}_${o.due_date || 'N/D'}`;
+        materialDateMap.set(key, (materialDateMap.get(key) || 0) + 1);
     });
 
-    // 3. Detectar agrupaciones por material
-    const materialGroups = detectMaterialGroups(ordersWithScore);
+    // 2. Mapeo con scores y flags
+    const ordersWithMeta: WorkOrderWithPriority[] = orders.map(order => {
+        const key = `${order.fabric || 'N/D'}_${order.due_date || 'N/D'}`;
+        const isGrouped = (materialDateMap.get(key) || 0) >= 2;
 
-    // 4. Marcar pedidos que pertenecen a grupos (2 o más del mismo material)
-    ordersWithScore.forEach(order => {
-        const material = order.fabric || 'N/D';
-        const group = materialGroups.get(material);
+        const enhanced: WorkOrderWithPriority = {
+            ...order,
+            _is_canarias_urgent: order.region?.toUpperCase() === 'CANARIAS' &&
+                order.created_at ? isMondayToWednesday(order.created_at) : false,
+            _is_grouped_material: isGrouped,
+            _group_material_name: isGrouped ? order.fabric : undefined
+        };
 
-        if (group && group.length >= 2) {
-            order._is_grouped_material = true;
-            order._group_material_name = material;
-        } else {
-            order._is_grouped_material = false;
-        }
+        enhanced._priority_score = calculatePriorityScore(enhanced, isGrouped);
+        enhanced._priority_level = getPriorityLevel(enhanced);
+
+        return enhanced;
     });
 
-    return ordersWithScore;
+    // 3. Ordenación descendente
+    return ordersWithMeta.sort((a, b) => (b._priority_score || 0) - (a._priority_score || 0));
 }
 
 /**
- * Obtiene el badge de urgencia para un pedido
+ * Obtiene el badge de urgencia (Sin Emojis)
  */
 export function getUrgencyBadge(daysRemaining: number): { label: string; color: string } | null {
     if (daysRemaining < 0) {
@@ -158,16 +141,16 @@ export function getUrgencyBadge(daysRemaining: number): { label: string; color: 
             color: 'bg-red-900/40 text-red-400 border-red-500/30'
         };
     }
-    if (daysRemaining <= 3) {
+    if (daysRemaining <= 2) {
         return {
             label: 'URGENTE',
-            color: 'bg-amber-900/40 text-amber-400 border-amber-500/30'
+            color: 'bg-red-900/20 text-red-300 border-red-500/20'
         };
     }
-    if (daysRemaining <= 7) {
+    if (daysRemaining <= 5) {
         return {
             label: 'PRÓXIMO',
-            color: 'bg-orange-900/40 text-orange-400 border-orange-500/30'
+            color: 'bg-amber-900/40 text-amber-400 border-amber-500/30'
         };
     }
     return {
