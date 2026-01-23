@@ -17,7 +17,8 @@ import {
   PauseCircle,
   AlertOctagon,
   History,
-  ListFilter
+  ListFilter,
+  Calendar
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import PageShell from '@/components/layout/PageShell';
@@ -36,6 +37,7 @@ import { ScannerModal } from '@/components/scanner/ScannerModal';
 import { useOrientation, useDeviceType } from '@/hooks/useOrientation';
 import { sortWorkOrdersByPriority, daysToDueDate, getUrgencyBadge } from '@/services/priority-service';
 import { cn } from "@/lib/utils";
+import ShippingCalendar from '@/components/shipping/ShippingCalendar';
 
 // Tipos
 interface Order {
@@ -763,37 +765,41 @@ export default function ShippingScanPage() {
           {/* COLA DE ALMACÉN */}
           <div className="w-full lg:w-[450px] shrink-0 flex flex-col gap-4">
             <Tabs defaultValue="active" className="w-full">
-              <div className="bg-[#323438] border border-[#45474A] rounded-xl p-1 mb-4">
+              <div className="p-1 mb-4">
                 <TabsList className="grid w-full grid-cols-2 bg-transparent">
                   <TabsTrigger
                     value="active"
-                    className="data-[state=active]:bg-[#45474A] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center gap-2"
+                    className="data-[state=active]:bg-[#2A2D31] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center justify-center gap-2 h-11"
                   >
                     <ListFilter className="w-4 h-4" />
                     Expediciones ({activeShipments.length})
                   </TabsTrigger>
                   <TabsTrigger
                     value="history"
-                    className="data-[state=active]:bg-[#45474A] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center gap-2"
+                    className="data-[state=active]:bg-[#2A2D31] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center justify-center gap-2 h-11"
                   >
                     <History className="w-4 h-4" />
-                    Historial ({historyShipments.length})
+                    Historial
                   </TabsTrigger>
                 </TabsList>
               </div>
 
               <TabsContent value="active" className="m-0 focus-visible:ring-0">
-                <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2 min-h-[500px]">
-                  <h3 className="font-bold text-[#8B8D90] mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
-                    <span>Cola de Almacén Activa</span>
-                    <span className="bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full text-xs">{activeShipments.length}</span>
+                <div className="flex flex-col min-h-[500px]">
+                  <h3 className="text-[#B5B8BA] font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
+                    <Truck className="w-4 h-4 mr-2 text-indigo-400" />
+                    Cola de envíos activa
                   </h3>
                   {isLoading && <div className="text-sm text-[#B5B8BA] py-4">Cargando órdenes...</div>}
                   {!isLoading && activeShipments.length === 0 && (
-                    <div className="text-sm text-[#B5B8BA] py-12 text-center opacity-40">No hay envíos pendientes.</div>
+                    <div className="flex-1 flex flex-col items-center justify-center text-[#B5B8BA] text-center opacity-40 py-12">
+                      <CheckCircle className="w-12 h-12 mb-3" />
+                      <p className="text-sm font-medium">Todo al día</p>
+                      <p className="text-xs uppercase tracking-tighter">No hay envíos pendientes</p>
+                    </div>
                   )}
                   {!isLoading && activeShipments.length > 0 && (
-                    <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1">
+                    <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-2">
                       {activeShipments.map((order: any) => {
                         const isIncomplete = (order.scanned_packages || 0) > 0 && (order.scanned_packages || 0) < (order.packages_count || 1);
                         const isSelected = scannedOrder?.id === order.id;
@@ -916,7 +922,7 @@ export default function ShippingScanPage() {
                     <div className="text-sm text-[#B5B8BA] py-12 text-center opacity-40">Historial vacío.</div>
                   )}
                   {!isLoading && historyShipments.length > 0 && (
-                    <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto custom-scrollbar pr-1">
+                    <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-2">
                       {historyShipments.slice(0, 20).map((order) => {
                         const isSelected = scannedOrder?.id === order.id;
                         return (
@@ -1177,7 +1183,7 @@ export default function ShippingScanPage() {
                         }`}
                     >
                       <Truck className="w-6 h-6 mr-2" />
-                      CONFIRMAR ENVÍO
+                      PROCESADO
                     </button>
                   )}
 

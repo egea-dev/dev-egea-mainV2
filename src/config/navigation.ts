@@ -20,6 +20,7 @@ import {
   ScrollText,
   Activity,
   AlertTriangle,
+  Truck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -50,6 +51,7 @@ const procesosItems: AppNavItem[] = [
   { type: "item", path: "/admin/templates", label: "Plantillas", icon: FileText },
   { type: "item", path: "/admin/produccion", label: "Produccion", icon: Factory },
   { type: "item", path: "/admin/envios", label: "Envíos", icon: Package },
+  { type: "item", path: "/admin/expediciones", label: "Expediciones", icon: Truck },
   { type: "item", path: "/admin/almacen", label: "Almacen", icon: Package },
   { type: "item", path: "/admin/incidencias", label: "Incidencias", icon: AlertTriangle },
 ];
@@ -183,9 +185,10 @@ export const getNavItemsForRole = (role: string | null | undefined): AppNavEntry
       ];
 
     case 'envios':
-      // Envíos solo accede a su módulo
+      // Envíos accede a su módulo y Expediciones
       return [
         { type: "item", path: "/admin/envios", label: "Envíos", icon: Package },
+        { type: "item", path: "/admin/expediciones", label: "Expediciones", icon: Truck },
       ];
 
     case 'almacen':

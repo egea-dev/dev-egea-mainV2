@@ -439,18 +439,18 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                     <SelectValue placeholder="Selecciona" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="PENINSULA">PENÍNSULA (+10d)</SelectItem>
-                                                    <SelectItem value="BALEARES">BALEARES (+7d)</SelectItem>
-                                                    <SelectItem value="CANARIAS">CANARIAS (+15d)</SelectItem>
+                                                    <SelectItem value="PENINSULA">PENÍNSULA (+10d lab.)</SelectItem>
+                                                    <SelectItem value="BALEARES">BALEARES (+7d lab.)</SelectItem>
+                                                    <SelectItem value="CANARIAS">CANARIAS (+20d lab.)</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                             {isEditing && (
                                                 <div className="mt-1 text-[10px] text-[#14CC7F] font-bold">
                                                     SLA: {
                                                         {
-                                                            'PENINSULA': '10 días naturales',
-                                                            'BALEARES': '7 días naturales',
-                                                            'CANARIAS': '15 días naturales'
+                                                            'PENINSULA': '10 días laborables',
+                                                            'BALEARES': '7 días laborables',
+                                                            'CANARIAS': '20 días laborables'
                                                         }[formData.delivery_region || formData.region || 'PENINSULA']
                                                     }
                                                 </div>

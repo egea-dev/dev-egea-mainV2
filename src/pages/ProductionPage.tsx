@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { supabaseProductivity } from '@/integrations/supabase';
-import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon, FileText, History, ListFilter } from 'lucide-react';
+import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon, FileText, History, ListFilter, Calendar } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import PageShell from '@/components/layout/PageShell';
 import QRScanner from '@/components/common/QRScanner';
@@ -17,6 +17,7 @@ import { ScannerButton } from '@/components/scanner/ScannerButton';
 import { ScannerModal } from '@/components/scanner/ScannerModal';
 import { useOrientation, useDeviceType } from '@/hooks/useOrientation';
 import { sortWorkOrdersByPriority, daysToDueDate, getUrgencyBadge } from '@/services/priority-service';
+import ProductionCalendar from '@/components/production/ProductionCalendar';
 
 function escapeZpl(str: string): string {
   if (!str) return "";
@@ -73,25 +74,25 @@ interface Order {
 }
 
 const slaConfig: Record<string, number> = {
-  // Baleares - 7 días
+  // Baleares - 7 días laborables
   'MALLORCA': 7,
-  'MENORCA': 7,        // CORREGIDO: era 10
-  'IBIZA': 7,          // CORREGIDO: era 10
-  'FORMENTERA': 7,     // CORREGIDO: era 12
+  'MENORCA': 7,
+  'IBIZA': 7,
+  'FORMENTERA': 7,
   'BALEARES': 7,
 
-  // Península - 10 días
-  'PENINSULA': 10,     // CORREGIDO: era 14
+  // Península - 10 días laborables
+  'PENINSULA': 10,
 
-  // Canarias - 15 días
-  'CANARIAS': 15,
-  'TENERIFE': 15,
-  'GRAN_CANARIA': 15,
-  'LANZAROTE': 15,
-  'FUERTEVENTURA': 15,
-  'LA_PALMA': 15,
-  'LA_GOMERA': 15,
-  'EL_HIERRO': 15,
+  // Canarias - 20 días laborables
+  'CANARIAS': 20,
+  'TENERIFE': 20,
+  'GRAN_CANARIA': 20,
+  'LANZAROTE': 20,
+  'FUERTEVENTURA': 20,
+  'LA_PALMA': 20,
+  'LA_GOMERA': 20,
+  'EL_HIERRO': 20,
 
   'DEFAULT': 10,
 };
@@ -1041,7 +1042,12 @@ export function ProductionPage() {
         <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
           {/* COLA DE PRODUCCIÓN */}
           <div className="w-full lg:w-[450px] shrink-0 flex flex-col gap-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <Tabs value={activeTab} onValueChange={(value) => {
+              setActiveTab(value);
+              // Limpiar selección al cambiar de pestaña para evitar "ghost selection"
+              setScannedOrder(null);
+              setSelectedOrderId(null);
+            }} className="w-full">
               <div className="p-1 mb-4">
                 <TabsList className="grid w-full grid-cols-2 bg-transparent">
                   <TabsTrigger

@@ -8,8 +8,9 @@ import { Clock, CheckCircle2, Package } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { summarizeMaterials } from "@/lib/materials";
+import { sortWorkOrdersByPriority, isMondayToWednesday, daysToDueDate } from "@/services/priority-service";
 
-interface WorkOrder {
+interface WorkOrderExtended {
     id: string;
     order_number: string;
     work_order_number?: string;
@@ -21,19 +22,25 @@ interface WorkOrder {
     quantity_total?: number;
     quantity?: number;
     notes: string;
-}
-
-interface WorkOrderExtended extends WorkOrder {
     region?: string;
     fabric?: string;
     color?: string;
     stage_progress?: number;
     packages_count?: number;
+    scanned_packages?: number;
+    packageProgress?: number;
     due_date?: string | null;
+    estimated_completion?: string | null;
     lines?: any[];
     dueBadge: { label: string; color: string; boxValue: string; boxLabel: string };
     customer_company?: string;
     admin_code?: string;
+    // Flags de prioridad (P1/P2/P3)
+    _is_canarias_urgent?: boolean;
+    _is_grouped_material?: boolean;
+    _group_material_name?: string;
+    _priority_score?: number;
+    _priority_level?: 'critical' | 'warning' | 'material' | 'normal';
 }
 
 export default function PlantBoardPage() {
@@ -197,7 +204,9 @@ export default function PlantBoardPage() {
             };
         }).filter(Boolean);
 
-        setOrders(transformed as WorkOrderExtended[]);
+        // Aplicar ordenamiento jerárquico P1/P2/P3
+        const sortedOrders = sortWorkOrdersByPriority(transformed as any);
+        setOrders(sortedOrders as unknown as WorkOrderExtended[]);
     };
 
     const isLight = theme === "light";
@@ -258,18 +267,19 @@ export default function PlantBoardPage() {
                     </div>
                 ) : (
                     orders.map((order) => {
-                        const getMarkerStyle = () => {
-                            if (order.dueBadge.label === "VENCIDO") return { color: 'bg-red-400', pulse: true };
-                            if (order.dueBadge.label === "URGENTE") return { color: 'bg-amber-500', pulse: false };
-                            return { color: 'bg-[#D4AF37]', pulse: false };
-                        };
+                        // Determinar borde de prioridad (Kiosko = parpadeo/blink)
+                        // v3.1.0 usa clases de responsive.css
+                        let borderClass = "";
+                        if (order._is_canarias_urgent) {
+                            borderClass = "blink-priority-canarias";
+                        } else if (order._is_grouped_material) {
+                            borderClass = "blink-priority-material";
+                        } else if (daysToDueDate(order.due_date) <= 2) {
+                            borderClass = "blink-priority-urgent";
+                        }
 
                         return (
-                            <div key={order.id} className={cn("relative grid grid-cols-12 gap-4 items-center p-4 rounded-lg shadow-lg pl-7", colors.row, getMarkerStyle().pulse && "bg-red-500/10 animate-pulse")}>
-                                {(() => {
-                                    const marker = getMarkerStyle();
-                                    return <span className={cn("absolute left-0 top-0 h-full w-3 rounded-l-lg", marker.color, marker.pulse && "shadow-[0_0_12px_2px_rgba(248,113,113,0.6)]")} />;
-                                })()}
+                            <div key={order.id} className={cn("relative grid grid-cols-12 gap-4 items-center p-4 rounded-lg shadow-lg", colors.row, borderClass)}>
                                 <div className="col-span-2">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</div>
                                     <div className="text-xs text-gray-500 font-mono mt-1">{order.admin_code || order.id.slice(0, 8)}</div>
@@ -281,37 +291,48 @@ export default function PlantBoardPage() {
                                 <div className="col-span-3">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-gray-300")}>{order.fabric}</div>
                                     <div className={cn("text-2xl font-black mb-2", isLight ? "text-slate-900" : "text-gray-400")}>{order.color}</div>
-                                    {/* Desglose de líneas eliminado por solicitud - solo mostrar Material Principal y Color */}
                                 </div>
                                 <div className="col-span-1">
                                     <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>{order.quantity_total} uds</div>
                                 </div>
                                 <div className="col-span-2 pr-10">
                                     <div className="flex items-center gap-3">
-                                        <Package className={`w-8 h-8 ${order.packageProgress === 100 ? 'text-emerald-500' : order.packageProgress >= 50 ? 'text-blue-400' : 'text-amber-500'}`} />
+                                        <Package className={`w-8 h-8 ${(order.packageProgress || 0) === 100 ? 'text-emerald-500' : (order.packageProgress || 0) >= 50 ? 'text-blue-400' : 'text-amber-500'}`} />
                                         <div className="flex-1">
                                             <div className={cn("text-2xl font-black mb-1", isLight ? "text-slate-900" : "text-white")}>
                                                 {order.scanned_packages || 0}/{order.packages_count || 1}
                                             </div>
                                             <Progress
-                                                value={order.packageProgress}
+                                                value={order.packageProgress || 0}
                                                 className={cn("h-3", colors.progress)}
-                                                indicatorClassName={order.packageProgress === 100 ? "bg-emerald-500" : order.packageProgress >= 50 ? "bg-blue-500" : "bg-amber-500"}
+                                                indicatorClassName={(order.packageProgress || 0) === 100 ? "bg-emerald-500" : (order.packageProgress || 0) >= 50 ? "bg-blue-500" : "bg-amber-500"}
                                             />
                                         </div>
                                     </div>
                                     <div className="text-[10px] text-gray-600 mt-2 uppercase tracking-wide text-right font-bold">Fase: {order.status}</div>
                                 </div>
-                                <div className="col-span-2 flex items-center justify-end gap-3">
-                                    <div className={`px-2 py-1 rounded-lg border text-[10px] font-black uppercase ${order.dueBadge.color}`}>{order.dueBadge.label}</div>
-                                    <div className={cn("text-center border rounded-lg px-3 py-1.5 min-w-[80px]", colors.stat)}>
-                                        <span className={cn("text-2xl font-black tracking-tighter", isLight ? "text-slate-900" : "text-white")}>{order.dueBadge.boxValue}</span>
-                                        <span className="text-[10px] text-gray-500 uppercase font-black ml-1">{order.dueBadge.boxLabel}</span>
+                                {/* STACK VERTICAL DE ETIQUETAS */}
+                                <div className="col-span-2 flex flex-col items-end gap-1">
+                                    {/* Etiqueta DÍAS: Fondo gris, texto negro */}
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-center bg-gray-200 border border-gray-300 rounded-lg px-3 py-1.5 min-w-[80px]">
+                                            <span className="text-2xl font-black tracking-tighter text-gray-900">{order.dueBadge.boxValue}</span>
+                                            <span className="text-[10px] text-gray-700 uppercase font-black ml-1">{order.dueBadge.boxLabel}</span>
+                                        </div>
                                     </div>
+                                    {/* Etiqueta AGRUPADO: Verde si aplica, Gris si no */}
+                                    <span className={cn("text-[10px] font-bold uppercase", order._is_grouped_material ? "text-emerald-500" : "text-gray-400 opacity-30")}>
+                                        AGRUPADO
+                                    </span>
+                                    {/* Etiqueta CANARIAS: Naranja si aplica, Gris si no */}
+                                    <span className={cn("text-[10px] font-bold uppercase", order._is_canarias_urgent ? "text-orange-500" : "text-gray-400 opacity-30")}>
+                                        CANARIAS
+                                    </span>
                                 </div>
                             </div>
                         );
                     })
+
                 )}
             </div>
 

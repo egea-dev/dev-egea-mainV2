@@ -34,6 +34,7 @@ import ManagementPage from "./pages/ManagementPage";
 import SlaConfigPage from "./pages/SlaConfigPage";
 import SystemLogPage from "./pages/SystemLogPage";
 import ShippingScanPage from "./pages/ShippingScanPage";
+import ExpedicionesPage from "./pages/ExpedicionesPage";
 import KioskDisplayPage from "./pages/KioskDisplayPage";
 import PlantBoardPage from "./pages/PlantBoardPage";
 import ShippingBoardPage from "./pages/ShippingBoardPage";
@@ -148,6 +149,11 @@ const App = () => (
               <Route path="envios" element={
                 <PermissionGuardEnhanced resource="envios" action="view">
                   <ShippingScanPage />
+                </PermissionGuardEnhanced>
+              } />
+              <Route path="expediciones" element={
+                <PermissionGuardEnhanced resource="envios" action="view">
+                  <ExpedicionesPage />
                 </PermissionGuardEnhanced>
               } />
               <Route path="incidencias" element={

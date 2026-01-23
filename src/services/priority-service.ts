@@ -18,11 +18,12 @@ export interface WorkOrderWithPriority extends WorkOrder {
 }
 
 /**
- * Verifica si una fecha cae en Lunes, Martes o Miércoles
+ * Verifica si HOY es Lunes, Martes o Miércoles
+ * @param dateString - Opcional: si se proporciona, verifica esa fecha. Si no, usa la fecha actual.
  */
-export function isMondayToWednesday(dateString: string): boolean {
+export function isMondayToWednesday(dateString?: string): boolean {
     try {
-        const date = new Date(dateString);
+        const date = dateString ? new Date(dateString) : new Date();
         const dayOfWeek = date.getDay();
         // 1=Lunes, 2=Martes, 3=Miércoles
         return dayOfWeek >= 1 && dayOfWeek <= 3;
@@ -63,35 +64,63 @@ export function getPriorityLevel(order: WorkOrderWithPriority): 'critical' | 'wa
 }
 
 /**
+ * Determina si una región pertenece a Canarias
+ */
+export function isCanarias(region?: string): boolean {
+    if (!region) return false;
+    const r = region.toUpperCase();
+    return r.includes('CANARIAS') ||
+        r.includes('TENERIFE') ||
+        r.includes('GRAN CANARIA') ||
+        r.includes('PALMA') ||
+        r.includes('GOMERA') ||
+        r.includes('HIERRO') ||
+        r.includes('LANZAROTE') ||
+        r.includes('FUERTEVENTURA');
+}
+
+/**
+ * Normaliza una fecha para agrupamiento (solo YYYY-MM-DD)
+ */
+function normalizeDate(dateStr?: string | null): string {
+    if (!dateStr) return 'N/D';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return 'N/D';
+        return d.toISOString().split('T')[0];
+    } catch {
+        return 'N/D';
+    }
+}
+
+/**
  * Calcula el score de prioridad para un pedido (Jerarquía Estricta)
- * 1. Canarias (L-M): +10000
- * 2. Material Grupos: +5000 (solo si hay coincidencia de material)
- * 3. Días restantes: 1000 / (días + 1)
+ * P1. Canarias + HOY es L-M: +10000
+ * P2. Material Grupos (mismo material + misma fecha): +5000
+ * P3. Días restantes: inversamente proporcional
  */
 export function calculatePriorityScore(workOrder: WorkOrder, isGrouped: boolean = false): number {
     let score = 0;
 
-    // NIVEL 1: Canarias L-M
-    const region = workOrder.region?.toUpperCase();
-    const createdAt = workOrder.created_at;
-    if (region === 'CANARIAS' && createdAt && isMondayToWednesday(createdAt)) {
+    // P1: Canarias + HOY es Lunes/Martes/Miércoles
+    if (isCanarias(workOrder.region) && isMondayToWednesday()) {
         score += 10000;
     }
 
-    // NIVEL 2: Agrupación por Material
+    // P2: Agrupación por Material
     if (isGrouped) {
         score += 5000;
     }
 
-    // NIVEL 3: Fecha de Vencimiento
+    // P3: Fecha de Vencimiento (Ascendente - menor días = mayor prioridad)
     const daysRemaining = daysToDueDate(workOrder.due_date);
     if (daysRemaining <= 0) {
         score += 2000; // Vencido
     } else if (daysRemaining <= 2) {
         score += 1000; // Crítico
     } else {
-        // Puntos adicionales inversamente proporcionales a los días
-        score += Math.max(0, (20 - daysRemaining) * 10);
+        // Puntos inversamente proporcionales a los días (hasta 30 días)
+        score += Math.max(0, (30 - daysRemaining) * 10);
     }
 
     return score;
@@ -101,22 +130,23 @@ export function calculatePriorityScore(workOrder: WorkOrder, isGrouped: boolean 
  * Ordena pedidos por prioridad dinámica y añade metadata
  */
 export function sortWorkOrdersByPriority(orders: WorkOrder[]): WorkOrderWithPriority[] {
-    // 1. Detección preliminar de grupos (Material + Fecha coincidente)
+    // 1. Detección preliminar de grupos (Material + Fecha [YYYY-MM-DD] coincidente)
     const materialDateMap = new Map<string, number>();
     orders.forEach(o => {
-        const key = `${o.fabric || 'N/D'}_${o.due_date || 'N/D'}`;
+        const normDate = normalizeDate(o.due_date);
+        const key = `${o.fabric || 'N/D'}_${normDate}`;
         materialDateMap.set(key, (materialDateMap.get(key) || 0) + 1);
     });
 
     // 2. Mapeo con scores y flags
     const ordersWithMeta: WorkOrderWithPriority[] = orders.map(order => {
-        const key = `${order.fabric || 'N/D'}_${order.due_date || 'N/D'}`;
+        const normDate = normalizeDate(order.due_date);
+        const key = `${order.fabric || 'N/D'}_${normDate}`;
         const isGrouped = (materialDateMap.get(key) || 0) >= 2;
 
         const enhanced: WorkOrderWithPriority = {
             ...order,
-            _is_canarias_urgent: order.region?.toUpperCase() === 'CANARIAS' &&
-                order.created_at ? isMondayToWednesday(order.created_at) : false,
+            _is_canarias_urgent: isCanarias(order.region) && isMondayToWednesday(),
             _is_grouped_material: isGrouped,
             _group_material_name: isGrouped ? order.fabric : undefined
         };
@@ -127,7 +157,7 @@ export function sortWorkOrdersByPriority(orders: WorkOrder[]): WorkOrderWithPrio
         return enhanced;
     });
 
-    // 3. Ordenación descendente
+    // 3. Ordenación descendente por score
     return ordersWithMeta.sort((a, b) => (b._priority_score || 0) - (a._priority_score || 0));
 }
 

@@ -103,35 +103,38 @@ export const useStartProduction = () => {
 
     return useMutation({
         mutationFn: async ({ id, region }: { id: string; region: string }) => {
-            // SLA por región (días)
+            // Importar dinámicamente para evitar problemas de dependencias circulares
+            const { addWorkdays } = await import('@/utils/workday-utils');
+
+            // SLA por región (días LABORABLES)
             const slaConfig: Record<string, number> = {
-                // Baleares - 7 días
+                // Baleares - 7 días laborables
                 'MALLORCA': 7,
-                'MENORCA': 7,        // CORREGIDO: era 10
-                'IBIZA': 7,          // CORREGIDO: era 10
-                'FORMENTERA': 7,     // CORREGIDO: era 12
+                'MENORCA': 7,
+                'IBIZA': 7,
+                'FORMENTERA': 7,
                 'BALEARES': 7,
 
-                // Península - 10 días
-                'PENINSULA': 10,     // CORREGIDO: era 14
+                // Península - 10 días laborables
+                'PENINSULA': 10,
 
-                // Canarias - 15 días
-                'CANARIAS': 15,
-                'TENERIFE': 15,
-                'GRAN_CANARIA': 15,
-                'LANZAROTE': 15,
-                'FUERTEVENTURA': 15,
-                'LA_PALMA': 15,
-                'LA_GOMERA': 15,
-                'EL_HIERRO': 15,
+                // Canarias - 20 días laborables
+                'CANARIAS': 20,
+                'TENERIFE': 20,
+                'GRAN_CANARIA': 20,
+                'LANZAROTE': 20,
+                'FUERTEVENTURA': 20,
+                'LA_PALMA': 20,
+                'LA_GOMERA': 20,
+                'EL_HIERRO': 20,
 
                 'DEFAULT': 10,
             };
 
             const sla = slaConfig[region] || slaConfig['DEFAULT'];
             const now = new Date();
-            const due = new Date();
-            due.setDate(now.getDate() + sla);
+            // Usar días LABORABLES para calcular fecha de vencimiento
+            const due = addWorkdays(now, sla);
 
             const updates = {
                 status: 'CORTE' as WorkOrderStatus,

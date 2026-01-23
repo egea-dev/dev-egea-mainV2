@@ -18,6 +18,8 @@ import { useProfile } from "@/hooks/use-supabase";
 import { getNavItemsForRole } from "@/config/navigation";
 import type { AppNavGroup, AppNavItem } from "@/config/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import NotificationBadge from "@/components/common/NotificationBadge";
+import NotificationPanel from "@/components/common/NotificationPanel";
 
 export const SidebarContentComponent = () => {
   const location = useLocation();
@@ -28,6 +30,7 @@ export const SidebarContentComponent = () => {
   const navItems = getNavItemsForRole(profile?.role ?? "admin");
   const autoCollapseGroups = useMemo(() => new Set(["Actividad", "Sistema"]), []);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
 
   useEffect(() => {
     if (isError) {
@@ -109,20 +112,35 @@ export const SidebarContentComponent = () => {
   return (
     <>
       <SidebarHeader>
-        <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt={userName} className="h-full w-full object-cover" />
-            ) : (
-              <AvatarFallback>{getInitials(userName)}</AvatarFallback>
-            )}
-          </Avatar>
-          <div className={cn("flex flex-col", isCollapsed && "hidden")}>
-            <span className="text-[11px] font-semibold text-foreground">{profile?.full_name || "Usuario"}</span>
-            <span className="text-xs text-muted-foreground capitalize">{profile?.role ?? "usuario"}</span>
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt={userName} className="h-full w-full object-cover" />
+              ) : (
+                <AvatarFallback>{getInitials(userName)}</AvatarFallback>
+              )}
+            </Avatar>
+            <div className={cn("flex flex-col", isCollapsed && "hidden")}>
+              <span className="text-[11px] font-semibold text-foreground">{profile?.full_name || "Usuario"}</span>
+              <span className="text-xs text-muted-foreground capitalize">{profile?.role ?? "usuario"}</span>
+            </div>
           </div>
+          {/* Notification Badge */}
+          <NotificationBadge
+            targetRole={profile?.role as any}
+            onClick={() => setNotificationPanelOpen(true)}
+            className={cn(isCollapsed && "hidden")}
+          />
         </div>
       </SidebarHeader>
+
+      {/* Notification Panel */}
+      <NotificationPanel
+        isOpen={notificationPanelOpen}
+        onClose={() => setNotificationPanelOpen(false)}
+        targetRole={profile?.role as any}
+      />
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((entry) => {

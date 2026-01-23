@@ -179,7 +179,7 @@ export function generateProduccionInicioEmail(data: OrderEmailData): string {
   const deliveryDays = {
     BALEARES: '7 dias laborables',
     PENINSULA: '10 dias laborables',
-    CANARIAS: '15 dias laborables'
+    CANARIAS: '20 dias laborables'
   };
 
   const normalizedLogoUrl = data.logoUrl?.replace(
