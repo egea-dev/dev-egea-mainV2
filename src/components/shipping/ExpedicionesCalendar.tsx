@@ -1,8 +1,8 @@
-/**
- * ExpedicionesCalendar - Calendario específico para Expediciones
+﻿/**
+ * ExpedicionesCalendar - Calendario especÃ­fico para Expediciones
  * 
  * - Vista mensual por defecto
- * - Estados específicos: LISTO_ENVIO, ENVIADO, PROCESADO
+ * - Estados especificos: PTE_ENVIO, ENVIADO, ENTREGADO
  * - Sin tabs Comercial/Instalaciones
  * - Muestra pedidos pendientes Y procesados
  */
@@ -58,27 +58,31 @@ interface ExpedicionesCalendarProps {
     onOrderClick?: (order: any) => void;
 }
 
-// Estados específicos de Expediciones
+// Estados especÃ­ficos de Expediciones
 const EXPEDICIONES_STATUS_LEGEND = [
-    { value: 'LISTO_ENVIO', label: 'Listo Envío', color: 'bg-amber-500' },
-    { value: 'ENVIADO', label: 'Enviado', color: 'bg-blue-500' },
-    { value: 'PROCESADO', label: 'Procesado', color: 'bg-emerald-500' },
+    { value: 'PTE_ENVIO', label: 'Pendiente EnvÃ­o', color: 'bg-amber-500' },
+    { value: 'ENVIADO', label: 'Procesado', color: 'bg-emerald-500' },
+    { value: 'ENTREGADO', label: 'Entregado', color: 'bg-blue-500' },
 ] as const;
 
-const getExpedicionesStatusColor = (status: string, processed_at?: string | null) => {
-    // Si tiene processed_at o está ENTREGADO, es procesado
-    if (processed_at || status === 'ENTREGADO') {
-        return { bg: 'bg-card/90', text: 'text-emerald-300', border: 'border-emerald-500/50', badge: 'bg-emerald-500' };
-    }
-
+const getExpedicionesStatusColor = (status: string) => {
     switch (status) {
+        case 'PTE_ENVIO':
         case 'LISTO_ENVIO':
             return { bg: 'bg-card/90', text: 'text-amber-300', border: 'border-amber-500/50', badge: 'bg-amber-500' };
         case 'ENVIADO':
+            return { bg: 'bg-card/90', text: 'text-emerald-300', border: 'border-emerald-500/50', badge: 'bg-emerald-500' };
+        case 'ENTREGADO':
             return { bg: 'bg-card/90', text: 'text-blue-300', border: 'border-blue-500/50', badge: 'bg-blue-500' };
         default:
             return { bg: 'bg-card/90', text: 'text-muted-foreground', border: 'border-border/60', badge: 'bg-muted-foreground' };
     }
+};
+
+const getExpedicionesStatusLabel = (status: string) => {
+    if (status === 'ENVIADO') return 'PROCESADO';
+    if (status === 'LISTO_ENVIO') return 'PTE_ENVIO';
+    return status;
 };
 
 const getDisplayOrderNumber = (order: any) => order.admin_code || order.order_number || '';
@@ -92,7 +96,6 @@ interface ExpedicionOrder {
     status: string;
     delivery_date?: string | null;
     due_date?: string | null;
-    processed_at?: string | null;
     region?: string;
     quantity_total?: number;
     fabric?: string;
@@ -119,7 +122,7 @@ export const ExpedicionesCalendar = ({
             const { data, error } = await supabaseProductivity
                 .from('comercial_orders')
                 .select('*')
-                .in('status', ['LISTO_ENVIO', 'ENVIADO', 'ENTREGADO'])
+                .in('status', ['PTE_ENVIO', 'LISTO_ENVIO', 'ENVIADO', 'ENTREGADO'])
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -139,7 +142,7 @@ export const ExpedicionesCalendar = ({
         return eachDayOfInterval({ start, end });
     }, [currentDate, viewMode]);
 
-    const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const weekDays = ['Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b'];
     const workingDays = useMemo(() => calendarDays.filter(day => day.getDay() !== 0), [calendarDays]);
 
     const handlePrev = () => {
@@ -174,7 +177,7 @@ export const ExpedicionesCalendar = ({
         return format(currentDate, 'MMMM yyyy', { locale: es });
     }, [currentDate, viewMode]);
 
-    // Obtener pedidos para un día (por delivery_date o due_date)
+    // Obtener pedidos para un dÃ­a (por delivery_date o due_date)
     const getDayOrders = (day: Date) => {
         return orders.filter(order => {
             const dateField = order.delivery_date || order.due_date;
@@ -237,12 +240,12 @@ export const ExpedicionesCalendar = ({
         setDragOverDay(null);
     };
 
-    // Contadores para estadísticas
+    // Contadores para estadÃ­sticas
     const stats = useMemo(() => {
-        const listoEnvio = orders.filter(o => o.status === 'LISTO_ENVIO' && !o.processed_at).length;
-        const enviado = orders.filter(o => o.status === 'ENVIADO' && !o.processed_at).length;
-        const procesado = orders.filter(o => !!o.processed_at || o.status === 'ENTREGADO').length;
-        return { listoEnvio, enviado, procesado, total: orders.length };
+        const pendientes = orders.filter(o => o.status === 'PTE_ENVIO' || o.status === 'LISTO_ENVIO').length;
+        const procesados = orders.filter(o => o.status === 'ENVIADO').length;
+        const entregados = orders.filter(o => o.status === 'ENTREGADO').length;
+        return { pendientes, procesados, entregados, total: orders.length };
     }, [orders]);
 
     return (
@@ -257,24 +260,24 @@ export const ExpedicionesCalendar = ({
                         <div className="flex-1">
                             <h2 className="text-xl font-bold text-white tracking-tight">Calendario de Expediciones</h2>
                             <p className="text-xs text-slate-400 font-medium">
-                                Previsión de entregas y envíos • {stats.total} pedidos
+                                PrevisiÃ³n de entregas y envÃ­os â€¢ {stats.total} pedidos
                             </p>
                         </div>
                     </div>
 
-                    {/* Estadísticas rápidas */}
+                    {/* EstadÃ­sticas rÃ¡pidas */}
                     <div className="flex gap-2">
                         <Badge variant="outline" className="border-amber-500/50 text-amber-400 py-1 px-3">
                             <Package className="w-3 h-3 mr-1.5" />
-                            {stats.listoEnvio} Listo
-                        </Badge>
-                        <Badge variant="outline" className="border-blue-500/50 text-blue-400 py-1 px-3">
-                            <Truck className="w-3 h-3 mr-1.5" />
-                            {stats.enviado} Enviado
+                            {stats.pendientes} Pendiente
                         </Badge>
                         <Badge variant="outline" className="border-emerald-500/50 text-emerald-400 py-1 px-3">
+                            <Truck className="w-3 h-3 mr-1.5" />
+                            {stats.procesados} Procesado
+                        </Badge>
+                        <Badge variant="outline" className="border-blue-500/50 text-blue-400 py-1 px-3">
                             <CheckCircle className="w-3 h-3 mr-1.5" />
-                            {stats.procesado} Procesado
+                            {stats.entregados} Entregado
                         </Badge>
                     </div>
                 </div>
@@ -439,7 +442,7 @@ export const ExpedicionesCalendar = ({
 
                                     <div className="flex flex-col gap-1">
                                         {visibleItems.map((order: any) => {
-                                            const statusStyle = getExpedicionesStatusColor(order.status, order.processed_at);
+                                            const statusStyle = getExpedicionesStatusColor(order.status);
                                             return (
                                                 <div
                                                     key={order.id}
@@ -483,7 +486,7 @@ export const ExpedicionesCalendar = ({
                             </div>
                         ) : (
                             orders.map((order: any) => {
-                                const statusStyle = getExpedicionesStatusColor(order.status, order.processed_at);
+                                const statusStyle = getExpedicionesStatusColor(order.status);
                                 return (
                                     <div
                                         key={order.id}
@@ -502,7 +505,7 @@ export const ExpedicionesCalendar = ({
                                                 </div>
                                             </div>
                                             <Badge variant="outline" className={cn("text-xs", statusStyle.text, statusStyle.border)}>
-                                                {order.processed_at ? 'PROCESADO' : order.status}
+                                                {getExpedicionesStatusLabel(order.status)}
                                             </Badge>
                                         </div>
                                     </div>
@@ -519,7 +522,7 @@ export const ExpedicionesCalendar = ({
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold flex items-center gap-2">
                             <CalendarIcon className="w-5 h-5 text-primary" />
-                            {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : 'Detalle del día'}
+                            {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : 'Detalle del dÃ­a'}
                         </DialogTitle>
                         <DialogDescription>
                             Expediciones programadas para esta fecha.
@@ -530,7 +533,7 @@ export const ExpedicionesCalendar = ({
                         <div className="grid grid-cols-1 gap-3">
                             {selectedDate && getDayOrders(selectedDate).length > 0 ? (
                                 getDayOrders(selectedDate).map((order: any) => {
-                                    const statusStyle = getExpedicionesStatusColor(order.status, order.processed_at);
+                                    const statusStyle = getExpedicionesStatusColor(order.status);
                                     return (
                                         <div
                                             key={order.id}
@@ -555,14 +558,14 @@ export const ExpedicionesCalendar = ({
                                                 </div>
                                             </div>
                                             <Badge variant="outline" className={cn("text-xs", statusStyle.text)}>
-                                                {order.processed_at ? 'PROCESADO' : order.status}
+                                                {getExpedicionesStatusLabel(order.status)}
                                             </Badge>
                                         </div>
                                     );
                                 })
                             ) : (
                                 <div className="text-center py-10 text-muted-foreground border border-dashed border-border/60 rounded-xl">
-                                    No hay expediciones para este día.
+                                    No hay expediciones para este dÃ­a.
                                 </div>
                             )}
                         </div>
@@ -577,3 +580,6 @@ export const ExpedicionesCalendar = ({
 };
 
 export default ExpedicionesCalendar;
+
+
+

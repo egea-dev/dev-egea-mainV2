@@ -25,10 +25,11 @@ import { useSearchParams } from "react-router-dom";
 import { supabaseProductivity } from "@/integrations/supabase";
 import { parseQRCode, extractOrderNumber } from "@/lib/qr-utils";
 import { summarizeMaterials } from "@/lib/materials";
-import { isMondayToWednesday, daysToDueDate, getUrgencyBadge } from "@/services/priority-service";
+import { sortWorkOrdersByPriority, isMondayToWednesday, isCanarias, daysToDueDate, getUrgencyBadge } from "@/services/priority-service";
 import { ScannerButton } from "@/components/scanner/ScannerButton";
 import { ScannerModal } from "@/components/scanner/ScannerModal";
 import { useOrientation, useDeviceType } from "@/hooks/useOrientation";
+import { getWorkdaysRemaining } from "@/utils/workday-utils";
 
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -54,6 +55,7 @@ const KioskDisplayPage: React.FC = () => {
     const orientation = useOrientation();
     const deviceType = useDeviceType();
 
+    const lastScannedRef = useRef<string | null>(null);
     const { data: workOrders } = useWorkOrders();
     const updateStatus = useUpdateWorkOrderStatus();
 
@@ -81,11 +83,10 @@ const KioskDisplayPage: React.FC = () => {
     } = useQuery({
         queryKey: ["scanned-order-lookup", scannedId],
         enabled: !!scannedId,
-        staleTime: 60000, // Los datos escaneados son estables; solo se invalidan por acción
+        staleTime: 60000,
         queryFn: async () => {
             if (!scannedId) return null;
 
-            // 1. Validar UUID para evitar error PostgREST
             const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scannedId);
 
             let prodQuery = supabaseProductivity
@@ -100,41 +101,54 @@ const KioskDisplayPage: React.FC = () => {
 
             const { data: prodData } = await prodQuery.maybeSingle();
             let linesData: any[] | null = null;
-            if (prodData?.id) {
+            if ((prodData as any)?.id) {
                 const { data: lines } = await supabaseProductivity
                     .from("produccion_work_order_lines")
                     .select("*")
-                    .eq("work_order_id", prodData.id);
+                    .eq("work_order_id", (prodData as any).id);
                 linesData = lines as any[] | null;
             }
 
-            // 2. Buscar en comercial_orders (siempre necesario para la "Verdad Absoluta")
-            const orderNumToSearch = prodData?.order_number || scannedId;
-            const { data: commData } = await supabaseProductivity
-                .from("comercial_orders")
-                .select("*")
-                .eq("order_number", orderNumToSearch)
-                .maybeSingle();
+            const orderNumToSearch = (prodData as any)?.order_number;
+            const orFilters = [];
+            if (orderNumToSearch) {
+                orFilters.push(`order_number.eq.${orderNumToSearch}`);
+            }
+            orFilters.push(`order_number.eq.${scannedId}`);
+            orFilters.push(`admin_code.eq.${scannedId}`);
 
-            if (!prodData && !commData) return null;
+            const { data: commResp, error: commError } = await supabaseProductivity
+                .from('comercial_orders')
+                .select('id, order_number, admin_code, lines, fabric, delivery_region, region, customer_company, customer_name, delivery_date')
+                .or(orFilters.join(','));
 
-            // 3. Merge Logic Consolidada
-            const base = prodData || {
-                id: (commData as any)?.id,
-                order_number: (commData as any)?.order_number,
-                customer_name: (commData as any)?.customer_company || (commData as any)?.customer_name,
+            if (commError) {
+                console.error("Error fetching commercial order:", commError);
+            }
+
+            const commDataList = (commResp as any[]) || [];
+
+            let finalCommData = null;
+            if (prodData && commDataList.length > 0) {
+                finalCommData = commDataList.find(c => c.order_number === prodData.order_number) || commDataList[0];
+            } else if (commDataList.length > 0) {
+                finalCommData = commDataList[0];
+            }
+
+            if (!prodData && !finalCommData) return null;
+
+            const base = (prodData as any) || {
+                id: finalCommData?.id,
+                order_number: finalCommData?.order_number,
+                customer_name: finalCommData?.customer_company || finalCommData?.customer_name,
                 status: 'PENDIENTE',
+                fabric: finalCommData?.fabric || 'N/D',
+                quantity_total: 1,
                 is_only_commercial: true
             };
 
-            const order = base as any;
-            const specs = order.technical_specs || {};
-            const commLines = Array.isArray((commData as any)?.lines) ? (commData as any).lines : [];
-            const orderLines = Array.isArray(order.lines) ? order.lines : [];
-            const relLines = linesData || [];
-            const rawLines = [...commLines, ...orderLines, ...relLines].filter(Boolean);
+            const region = finalCommData?.delivery_region || finalCommData?.region || base.region || 'PENINSULA';
 
-            // Deduplicar y agrupar líneas por material+dimensiones
             const deduplicateLines = (lines: any[]) => {
                 const grouped = lines.reduce((acc, line) => {
                     const material = line.material || line.fabric || 'Pieza';
@@ -148,24 +162,36 @@ const KioskDisplayPage: React.FC = () => {
                 return Object.values(grouped);
             };
 
+            const rawLines = Array.isArray(base.lines) && base.lines.length > 0 ? base.lines : (linesData || []);
             const lines = deduplicateLines(rawLines);
-            const materialList = summarizeMaterials(rawLines, "N/D");
+            const materialList = summarizeMaterials(rawLines, finalCommData?.fabric || "N/D");
 
-            // Verificar si el pedido ya está en estado final (archivado)
             const finalStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
-            const isArchived = finalStatuses.includes(order.status?.toUpperCase?.() || order.status);
+            const isArchived = finalStatuses.includes(base.status?.toUpperCase?.() || base.status);
 
             return {
-                ...order,
-                status: normalizeStatus(order.status),
+                ...base,
+                region,
+                status: normalizeStatus(base.status),
                 fabric: materialList,
-                color: lines.map((l: any) => l.color).filter(Boolean).join(", ") || (specs.color || order.color || "N/D"),
+                color: lines.map((l: any) => l.color).filter(Boolean).join(", ") || (base.technical_specs?.color || base.color || "N/D"),
                 lines: lines,
-                due_date: (commData as any)?.delivery_date || order.due_date,
-                is_archived: isArchived  // Flag para mostrar mensaje en UI
+                due_date: finalCommData?.delivery_date || base.due_date,
+                is_archived: isArchived,
+                _is_canarias_urgent: isCanarias(region) && isMondayToWednesday(),
+                _is_grouped_material: lines.length > 0
             };
         }
     });
+
+    const activeWorkOrders = React.useMemo(() => {
+        if (!workOrders) return [];
+        const filtered = workOrders.filter(order => {
+            const archivedStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
+            return !archivedStatuses.includes(order.status?.toUpperCase?.() || order.status);
+        });
+        return sortWorkOrdersByPriority(filtered as any);
+    }, [workOrders]);
 
     const onScanSuccess = (decodedText: string) => {
         const qrData = parseQRCode(decodedText);
@@ -174,7 +200,7 @@ const KioskDisplayPage: React.FC = () => {
         if (orderNum) {
             setScannedId(orderNum);
             setScannerModalOpen(false);
-            toast.success(`✓ Orden detectada: ${orderNum}`);
+            toast.success(`Orden detectada: ${orderNum}`);
         }
     };
 
@@ -183,7 +209,6 @@ const KioskDisplayPage: React.FC = () => {
     const handleStatusChange = async (newStatus: WorkOrderStatus) => {
         if (!selectedOrder) return;
 
-        // Si el pedido solo existe en comercial, avisar que no se puede actualizar en producción directamente
         if ((selectedOrder as any).is_only_commercial) {
             toast.error("Este pedido no ha sido aceptado en producción todavía. Acéptalo primero en la zona comercial.");
             return;
@@ -196,7 +221,6 @@ const KioskDisplayPage: React.FC = () => {
                 notes: "Actualización desde Kiosco de Operario",
             });
 
-            // Invalidad la búsqueda específica inmediatamente
             queryClient.invalidateQueries({ queryKey: ["scanned-order-lookup", scannedId] });
 
             if (newStatus === "LISTO_ENVIO") {
@@ -225,16 +249,19 @@ const KioskDisplayPage: React.FC = () => {
         ghostBtn: isLight ? "text-slate-500 hover:text-slate-900 hover:bg-slate-100" : "text-gray-400 hover:text-white hover:bg-white/5",
     };
 
-    // Days logic for the scanned detail
     const getDueBadge = () => {
         if (!selectedOrder?.due_date) return null;
-        const now = new Date();
-        const due = new Date(selectedOrder.due_date);
-        const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const workdaysRemaining = getWorkdaysRemaining(selectedOrder.due_date);
+        const region = selectedOrder.region || 'PENINSULA';
+        const badge = getUrgencyBadge(workdaysRemaining, region);
 
-        if (diffDays < 0) return { label: "VENCIDO", color: "bg-red-900/40 text-red-400 border-red-500/30", box: Math.abs(diffDays) };
-        if (diffDays <= 3) return { label: "URGENTE", color: "bg-amber-900/40 text-amber-400 border-amber-500/30", box: diffDays };
-        return { label: "A TIEMPO", color: "bg-emerald-900/40 text-emerald-400 border-emerald-500/30", box: diffDays };
+        if (!badge) return null;
+
+        return {
+            label: badge.label,
+            color: badge.color,
+            box: workdaysRemaining === 999 ? '-' : Math.abs(workdaysRemaining)
+        };
     };
 
     const dueBadge = getDueBadge();
@@ -306,11 +333,10 @@ const KioskDisplayPage: React.FC = () => {
                                     </div>
                                 )}
                                 <CardContent className="p-6">
-                                    {/* Alerta si el pedido ya está archivado */}
                                     {(selectedOrder as any).is_archived && (
                                         <div className="mb-4 p-4 rounded-xl bg-amber-900/30 border border-amber-500/50 text-amber-400">
                                             <div className="flex items-center gap-2 font-bold text-sm mb-1">
-                                                ⚠️ PEDIDO ARCHIVADO
+                                                PEDIDO ARCHIVADO
                                             </div>
                                             <p className="text-xs opacity-80">
                                                 Este pedido ya fue enviado y está en el historial. No requiere más acciones de producción.
@@ -318,13 +344,25 @@ const KioskDisplayPage: React.FC = () => {
                                         </div>
                                     )}
                                     <div className="flex justify-between items-start mb-6">
-                                        <div>
-                                            <Badge className="bg-emerald-900/40 text-emerald-400 border-emerald-500/30 mb-2 px-3 py-1 text-[10px] tracking-widest font-bold uppercase">
+                                        <div className="flex flex-col gap-3">
+                                            <Badge className="bg-emerald-900/40 text-emerald-400 border-emerald-500/30 w-fit px-3 py-1 text-[10px] tracking-widest font-bold uppercase">
                                                 Resumen del Pedido
                                             </Badge>
                                             <h2 className={cn("text-4xl font-black tracking-tight uppercase", isLight ? "text-slate-900" : "text-white")}>
                                                 {selectedOrder.order_number}
                                             </h2>
+                                            <div className="flex gap-2">
+                                                {(selectedOrder as any)._is_canarias_urgent && (
+                                                    <span className="px-3 py-1.5 bg-orange-600/20 border border-orange-500/50 rounded-lg text-xs font-black text-orange-300 flex items-center gap-2">
+                                                        CANARIAS
+                                                    </span>
+                                                )}
+                                                {(selectedOrder as any)._is_grouped_material && (
+                                                    <span className="px-3 py-1.5 bg-emerald-600/20 border border-emerald-500/50 rounded-lg text-xs font-black text-emerald-300 flex items-center gap-2">
+                                                        AGRUPADO
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         {dueBadge && (
                                             <div className="flex flex-col items-end gap-2">
@@ -410,93 +448,82 @@ const KioskDisplayPage: React.FC = () => {
 
             {activeTab === "list" && (
                 <div className="grid grid-cols-1 gap-3 pb-10">
-                    {/* Filtrar solo pedidos en estados activos de producción */}
-                    {(workOrders || [])
-                        .filter(order => {
-                            const archivedStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
-                            return !archivedStatuses.includes(order.status?.toUpperCase?.() || order.status);
-                        })
-                        .map((order) => {
-                            // Calcular metadata de prioridad
-                            const isCanariasUrgent =
-                                order.region?.toUpperCase() === 'CANARIAS' &&
-                                    order.created_at ?
-                                    isMondayToWednesday(order.created_at) :
-                                    false;
+                    {activeWorkOrders.map((order) => {
+                        const daysRemaining = daysToDueDate(order.due_date);
+                        const urgencyBadge = getUrgencyBadge(daysRemaining, order.region);
+                        const level = order._priority_level;
 
-                            const daysRemaining = daysToDueDate(order.due_date);
-                            const urgencyBadge = getUrgencyBadge(daysRemaining);
-
-                            // Detectar agrupación de material (comparar con otros pedidos)
-                            const materialGroup = (workOrders || []).filter(
-                                o => o.fabric === order.fabric && o.fabric && o.id !== order.id
-                            );
-                            const isGrouped = materialGroup.length >= 1;
-
-                            // v3.1.0 - Determinar nivel de prioridad para borde
-                            let level = 'normal';
-                            if (isCanariasUrgent) level = 'warning';
-                            else if (isGrouped) level = 'material';
-                            // Si la fecha es crítica, sobreescribe
-                            if (daysRemaining !== null && daysRemaining <= 2) level = 'critical';
-
-                            return (
-                                <Card
-                                    key={order.id}
-                                    className={cn(
-                                        "rounded-2xl overflow-hidden cursor-pointer transition-all border-4",
-                                        colors.card,
-                                        level === 'critical' ? "blink-priority-urgent" :
-                                            level === 'warning' ? "blink-priority-canarias" :
-                                                level === 'material' ? "blink-priority-material" : ""
-                                    )}
-                                    onClick={() => {
-                                        setScannedId(order.id);
-                                        lastScannedRef.current = order.id;
-                                        setActiveTab("scanner");
-                                    }}
-                                >
-                                    <CardContent className="p-4 flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className={cn("p-3 rounded-xl", colors.panel)}>
-                                                <Package className={cn("w-6 h-6", colors.mutedText)} />
+                        return (
+                            <Card
+                                key={order.id}
+                                className={cn(
+                                    "rounded-2xl overflow-hidden cursor-pointer transition-all border-4",
+                                    colors.card,
+                                    level === 'critical' ? "blink-priority-urgent" :
+                                        level === 'warning' ? "blink-priority-canarias" :
+                                            level === 'material' ? "blink-priority-material" : ""
+                                )}
+                                onClick={() => {
+                                    setScannedId(order.id);
+                                    lastScannedRef.current = order.id;
+                                    setActiveTab("scanner");
+                                }}
+                            >
+                                <CardContent className="p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className={cn("p-3 rounded-xl", colors.panel)}>
+                                            <Package className={cn("w-6 h-6", colors.mutedText)} />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h4 className={cn("text-xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>
+                                                    {order.order_number}
+                                                </h4>
+                                                {order._is_canarias_urgent && (
+                                                    <Badge className="bg-orange-600/20 text-orange-400 border-orange-500/50 text-[10px] font-black px-2 py-0.5">
+                                                        CANARIAS
+                                                    </Badge>
+                                                )}
+                                                {order._is_grouped_material && (
+                                                    <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-500/50 text-[10px] font-black px-2 py-0.5">
+                                                        AGRUPADO
+                                                    </Badge>
+                                                )}
                                             </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <h4 className={cn("text-xl font-black uppercase", isLight ? "text-slate-900" : "text-white")}>
-                                                        {order.order_number}
-                                                    </h4>
-                                                    {isCanariasUrgent && (
-                                                        <Badge className="bg-orange-600/20 text-orange-400 border-orange-500/50 text-[8px] px-2 py-0.5">
-                                                            CANARIAS L-M
-                                                        </Badge>
-                                                    )}
-                                                    {isGrouped && (
-                                                        <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-500/50 text-[8px] px-2 py-0.5">
-                                                            AGRUPADO
-                                                        </Badge>
-                                                    )}
-                                                </div>
+                                            <div className="flex flex-col gap-1">
                                                 <p className={cn("text-[10px] font-bold uppercase", colors.mutedText)}>
                                                     {order.status} - {order.fabric || 'N/D'}
                                                 </p>
+                                                <p className={cn("text-[10px] font-bold uppercase opacity-60", colors.mutedText)}>
+                                                    {order.customer_name}
+                                                </p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex flex-col items-end gap-1">
                                             {urgencyBadge && (
                                                 <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border", urgencyBadge.color)}>
                                                     {urgencyBadge.label}
                                                 </Badge>
                                             )}
-                                            <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border", STATUS_CONFIG[order.status]?.color)}>
+                                            <Badge className={cn("px-2 py-1 text-[10px] font-black uppercase border w-fit", STATUS_CONFIG[order.status]?.color)}>
                                                 {STATUS_CONFIG[order.status]?.label || order.status}
                                             </Badge>
-                                            <ArrowRight className={cn("w-4 h-4", colors.mutedText)} />
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
+
+                                        {order.due_date && (
+                                            <div className={cn("text-center border rounded-xl px-3 py-1.5 min-w-[70px]", colors.panel)}>
+                                                <span className="text-xl font-black block leading-none">{daysRemaining === 999 ? '-' : daysRemaining}</span>
+                                                <span className="text-[8px] opacity-60 uppercase font-black">Días</span>
+                                            </div>
+                                        )}
+                                        <ArrowRight className={cn("w-4 h-4", colors.mutedText)} />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
             )}
         </div>

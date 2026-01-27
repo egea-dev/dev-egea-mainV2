@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { supabaseProductivity } from '@/integrations/supabase';
 import {
   AlertTriangle,
@@ -77,13 +77,17 @@ interface Order {
     type: string;
   }>;
   tracking_pending?: boolean;
+  _is_canarias_urgent?: boolean;
+  _is_grouped_material?: boolean;
+  _priority_level?: 'critical' | 'warning' | 'material' | 'normal';
+  _priority_score?: number;
 }
 
-// Eliminada lógica de TWELVE_HOURS_MS para que los envíos pasen al historial inmediatamente
+// Eliminada lÃ³gica de TWELVE_HOURS_MS para que los envÃ­os pasen al historial inmediatamente
 
 const summarizeLines = (order: Order) => {
   if (!order.lines || !order.lines.length) return 'Sin desglose cargado';
-  const preview = order.lines.slice(0, 2).map(line => `${line.quantity} x ${line.width}x${line.height}cm`).join('  ·  ');
+  const preview = order.lines.slice(0, 2).map(line => `${line.quantity} x ${line.width}x${line.height}cm`).join('  Â·  ');
   const remaining = order.lines.length > 2 ? ` +${order.lines.length - 2}` : '';
   return `${preview}${remaining}`;
 };
@@ -113,7 +117,7 @@ export default function ShippingScanPage() {
   const orientation = useOrientation();
   const deviceType = useDeviceType();
 
-  // Estado para alertas móviles
+  // Estado para alertas mÃ³viles
   const [alertState, setAlertState] = useState<{
     isOpen: boolean;
     type: AlertType;
@@ -153,15 +157,14 @@ export default function ShippingScanPage() {
   const loadOrders = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Cargando órdenes de envío...');
+      console.log('ðŸ” Cargando Ã³rdenes de envÃ­o...');
 
-      const { data: ordersData, error: ordersError } = await supabaseProductivity
-        .from('produccion_work_orders')
+      const { data: ordersData, error: ordersError } = await (supabaseProductivity.from('produccion_work_orders') as any)
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('📦 Órdenes recibidas:', ordersData?.length || 0, 'registros');
-      if (ordersError) console.error('❌ Error cargando órdenes:', ordersError);
+      console.log('ðŸ“¦ Ã“rdenes recibidas:', ordersData?.length || 0, 'registros');
+      if (ordersError) console.error('âŒ Error cargando Ã³rdenes:', ordersError);
 
       if (ordersError) throw ordersError;
 
@@ -175,37 +178,50 @@ export default function ShippingScanPage() {
         console.warn('Error fetching work order lines:', linesError);
       }
 
+      // Fetch commercial data for region and specific fabric
+      const { data: commResp } = await supabaseProductivity
+        .from('comercial_orders')
+        .select('id, order_number, admin_code, delivery_region, region, lines, fabric')
+        .in('order_number', ordersData?.map((o: any) => o.order_number) || []);
+
+      const commercialData = (commResp as any[]) || [];
+
       const data = ordersData?.map((o: any) => {
-        // Priorizar líneas de la columna JSON, si no, usar la tabla relacional
+        const commOrder = commercialData.find((c: any) => c.order_number === o.order_number || (o.admin_code && c.admin_code === o.admin_code));
+
+        // Priorizar lÃ­neas de la columna JSON, si no, usar la tabla relacional
         const lines = (Array.isArray(o.lines) && o.lines.length > 0)
           ? o.lines
           : (linesData?.filter((l: any) => l.work_order_id === o.id) || []);
 
         const specs = o.technical_specs || {};
-        const materialList = summarizeMaterials(lines, specs.fabric || o.fabric || "N/D");
+        const materialList = summarizeMaterials(lines, commOrder?.fabric || specs.fabric || o.fabric || "N/D");
 
         const colorList = lines.length > 0
           ? lines.map((l: any) => l.color).filter(Boolean).join(", ")
           : (specs.color || o.color || "N/D");
+
+        const region = commOrder?.delivery_region || commOrder?.region || o.region || specs.region || 'PENINSULA';
 
         return {
           ...o,
           lines,
           fabric: materialList || "N/D",
           color: colorList || "N/D",
+          region,
           quantity_total: o.quantity_total || specs.quantity || 1
         };
       });
       setOrders(data || []);
     } catch (error: any) {
-      console.error('💥 Error loading orders:', error);
-      toast.error('Error al cargar órdenes: ' + error.message);
+      console.error('ðŸ’¥ Error loading orders:', error);
+      toast.error('Error al cargar Ã³rdenes: ' + error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Cargar órdenes al montar
+  // Cargar Ã³rdenes al montar
   useEffect(() => {
     loadOrders();
   }, []);
@@ -214,25 +230,25 @@ export default function ShippingScanPage() {
     // Estados que ya NO deben aparecer en expediciones activas
     const archivedStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
 
-    // Log para depuración
-    console.log('📋 Estados de pedidos cargados:', orders.map(o => ({ order_number: o.order_number, status: o.status })));
+    // Log para depuraciÃ³n
+    console.log('ðŸ“‹ Estados de pedidos cargados:', orders.map(o => ({ order_number: o.order_number, status: o.status })));
 
     const filtered = orders.filter(o => {
       // Excluir pedidos ya archivados
       if (archivedStatuses.includes(o.status)) return false;
 
-      // Solo mostrar pedidos LISTO_ENVIO (producción terminada, listos para escanear)
+      // Solo mostrar pedidos LISTO_ENVIO (producciÃ³n terminada, listos para escanear)
       return o.status === 'LISTO_ENVIO';
     });
 
-    // APLICAR PRIORIZACIÓN DINÁMICA
+    // APLICAR PRIORIZACIÃ“N DINÃMICA
     return sortWorkOrdersByPriority(filtered as any);
   }, [orders]);
 
   const historyShipments = useMemo(() => {
     return orders.filter(o => {
       // Solo pedidos ya enviados o entregados van al historial
-      // LISTO_ENVIO NO está aquí porque ahora está en activeShipments
+      // LISTO_ENVIO NO estÃ¡ aquÃ­ porque ahora estÃ¡ en activeShipments
       return o.status === 'ENVIADO' || o.status === 'ENTREGADO';
     });
   }, [orders]);
@@ -247,7 +263,7 @@ export default function ShippingScanPage() {
       // Solo enviar campos que existen en produccion_work_orders
       const validFields: Record<string, any> = {};
 
-      // Campos válidos según el esquema de produccion_work_orders
+      // Campos vÃ¡lidos segÃºn el esquema de produccion_work_orders
       const allowedFields = ['status', 'priority', 'notes', 'quality_check_status', 'updated_at'];
 
       for (const key of allowedFields) {
@@ -259,7 +275,7 @@ export default function ShippingScanPage() {
       // Siempre actualizar updated_at
       validFields.updated_at = new Date().toISOString();
 
-      if (Object.keys(validFields).length > 1) { // Más que solo updated_at
+      if (Object.keys(validFields).length > 1) { // MÃ¡s que solo updated_at
         const { error } = await supabaseProductivity
           .from('produccion_work_orders')
           .update(validFields as any)
@@ -271,11 +287,11 @@ export default function ShippingScanPage() {
         }
       }
 
-      // Sincronización con comercial_orders si el estado cambia
+      // SincronizaciÃ³n con comercial_orders si el estado cambia
       if (patch.status) {
         const order = orders.find(o => o.id === orderId);
         if (order && order.order_number) {
-          console.log(`🔄 Sincronizando estado ${patch.status} con comercial para orden ${order.order_number}`);
+          console.log(`ðŸ”„ Sincronizando estado ${patch.status} con comercial para orden ${order.order_number}`);
 
           const { error: syncError } = await supabaseProductivity
             .from('comercial_orders')
@@ -285,7 +301,7 @@ export default function ShippingScanPage() {
           if (syncError) {
             console.warn("Error sincronizando estado con comercial:", syncError);
           } else {
-            console.log(`✓ Sincronizado estado ${patch.status} en comercial_orders para ${order.order_number}`);
+            console.log(`âœ“ Sincronizado estado ${patch.status} en comercial_orders para ${order.order_number}`);
           }
         }
       }
@@ -297,7 +313,7 @@ export default function ShippingScanPage() {
   };
 
   const handleScan = async (code: string) => {
-    // Parsear el código QR usando la utilidad centralizada
+    // Parsear el cÃ³digo QR usando la utilidad centralizada
     const qrData = parseQRCode(code);
     const orderNum = qrData.orderNumber || extractOrderNumber(code);
 
@@ -314,13 +330,13 @@ export default function ShippingScanPage() {
     }
 
     if (scannedOrder && scannedOrder.order_number !== orderNum && scannedPackagesCount > 0 && scannedPackagesCount < (scannedOrder.packages_count || 1)) {
-      showAlert('error', '¡ALTO!', 'Estás escaneando un pedido diferente mientras el actual está incompleto. No mezcles pedidos.', () => { });
+      showAlert('error', 'Â¡ALTO!', 'EstÃ¡s escaneando un pedido diferente mientras el actual estÃ¡ incompleto. No mezcles pedidos.', () => { });
       return;
     }
 
     const order = orders.find(o => o.order_number === orderNum);
     if (order) {
-      // Validar los datos del QR contra la orden de la BD INCLUYENDO el desglose de líneas
+      // Validar los datos del QR contra la orden de la BD INCLUYENDO el desglose de lÃ­neas
       const validation = validateQRWithLines(qrData, {
         order_number: order.order_number,
         customer_name: order.customer_name,
@@ -328,41 +344,41 @@ export default function ShippingScanPage() {
         color: order.color,
         quantity_total: order.quantity_total,
         status: order.status,
-        lines: order.lines,  // ← NUEVO: Validar desglose de líneas
+        lines: order.lines,  // â† NUEVO: Validar desglose de lÃ­neas
       });
 
-      // Mostrar alertas según el resultado de la validación
+      // Mostrar alertas segÃºn el resultado de la validaciÃ³n
       if (!validation.isValid) {
-        showAlert('error', 'QR Inválido', 'El número de orden del QR no coincide con ningún pedido en el sistema.');
+        showAlert('error', 'QR InvÃ¡lido', 'El nÃºmero de orden del QR no coincide con ningÃºn pedido en el sistema.');
         return;
       }
 
-      // Verificar discrepancias en el desglose de líneas
+      // Verificar discrepancias en el desglose de lÃ­neas
       if (validation.linesDiscrepancies && validation.linesDiscrepancies.length > 0) {
         const linesMessage = validation.linesDiscrepancies.join('\n');
         showAlert(
           'warning',
-          '⚠️ Advertencia: Problemas en el desglose',
-          `Se detectaron problemas en el desglose de artículos:\n\n${linesMessage}\n\nRevisa el pedido antes de continuar.`
+          'âš ï¸ Advertencia: Problemas en el desglose',
+          `Se detectaron problemas en el desglose de artÃ­culos:\n\n${linesMessage}\n\nRevisa el pedido antes de continuar.`
         );
       } else if (validation.hasDiscrepancies) {
         const discrepancyMessage = validation.discrepancies.join('\n');
         showAlert(
           'warning',
           'Advertencia: Discrepancias detectadas',
-          `Se encontraron diferencias entre el QR y la base de datos:\n\n${discrepancyMessage}\n\nSe usarán los datos de la base de datos.`
+          `Se encontraron diferencias entre el QR y la base de datos:\n\n${discrepancyMessage}\n\nSe usarÃ¡n los datos de la base de datos.`
         );
       } else if (qrData.isLegacyFormat) {
-        toast.info(`QR en formato antiguo - Datos técnicos cargados desde BD`);
+        toast.info(`QR en formato antiguo - Datos tÃ©cnicos cargados desde BD`);
       }
 
-      // Validar que la orden esté lista para envío
+      // Validar que la orden estÃ© lista para envÃ­o
       const validStatuses = ['PTE_ENVIO', 'LISTO_ENVIO', 'ENVIADO'];
       const isValidForShipping = validStatuses.includes(order.status) ||
         (order.status === 'EN_PROCESO' && order.needs_shipping_validation);
 
       if (!isValidForShipping) {
-        toast.error(`Este pedido no está listo para envío (Estado: ${order.status})`);
+        toast.error(`Este pedido no estÃ¡ listo para envÃ­o (Estado: ${order.status})`);
         return;
       }
       const isReEntry = (order.scanned_packages || 0) > 0 && (order.scanned_packages || 0) < (order.packages_count || 1);
@@ -376,7 +392,7 @@ export default function ShippingScanPage() {
       setScannedPackagesCount(order.scanned_packages || 0);
 
       const linesCount = order.lines?.length || 0;
-      toast.success(`✓ Orden ${orderNum} validada (${linesCount} líneas)`);
+      toast.success(`âœ“ Orden ${orderNum} validada (${linesCount} lÃ­neas)`);
     } else {
       toast.error(`Pedido no encontrado: ${orderNum}`);
     }
@@ -390,6 +406,7 @@ export default function ShippingScanPage() {
   const validateShipment = async () => {
     if (!scannedOrder) return;
     const totalPackages = scannedOrder.packages_count || 1;
+    const resolvedTracking = hasTrackingNow ? trackingNumber.trim() : '';
 
     if (scannedPackagesCount < totalPackages) {
       showAlert('warning', 'Pedido Incompleto', `Debes verificar todos los bultos (${scannedPackagesCount}/${totalPackages}) escaneando el QR antes de validar.`);
@@ -397,71 +414,76 @@ export default function ShippingScanPage() {
     }
 
     try {
-      console.log('🚀 Iniciando validación de envío para:', scannedOrder.id);
+      console.log('ðŸš€ Iniciando validaciÃ³n de envÃ­o para:', scannedOrder.id);
 
       // Cambiar estado a ENVIADO para que aparezca en historial
       // (ENVIADO indica que ya fue validado y despachado)
-      const { data: prodData, error: prodError } = await supabaseProductivity
+      const { data: prodData, error: prodError } = await (supabaseProductivity as any)
         .from('produccion_work_orders')
         .update({
-          status: 'ENVIADO',  // Estado final después de validar envío
+          status: 'ENVIADO',  // Estado final despuÃ©s de validar envÃ­o
+          tracking_number: resolvedTracking || null,
           updated_at: new Date().toISOString()
         } as any)
         .eq('id', scannedOrder.id)
         .select();
 
-      console.log('📤 Resultado update produccion_work_orders:', { prodData, prodError });
+      console.log('ðŸ“¤ Resultado update produccion_work_orders:', { prodData, prodError });
 
       if (prodError) {
-        console.error('❌ Error actualizando produccion_work_orders:', prodError);
+        console.error('âŒ Error actualizando produccion_work_orders:', prodError);
         toast.error('Error al actualizar el estado del pedido: ' + prodError.message);
         return;
       }
 
-      // Sincronizar con comercial_orders - aquí sí usamos ENVIADO
+      // Sincronizar con comercial_orders - aquÃ­ sÃ­ usamos ENVIADO
       if (scannedOrder.order_number) {
-        console.log(`🔄 Sincronizando estado ENVIADO con comercial para orden ${scannedOrder.order_number}`);
-        const { data: commData, error: commError } = await supabaseProductivity
+        console.log(`ðŸ”„ Sincronizando estado ENVIADO con comercial para orden ${scannedOrder.order_number}`);
+        const { data: commData, error: commError } = await (supabaseProductivity as any)
           .from('comercial_orders')
-          .update({ status: 'ENVIADO' } as any)
+          .update({
+            status: 'ENVIADO',
+            shipping_notification_pending: true,
+            tracking_number: resolvedTracking || null
+          } as any)
           .eq('order_number', scannedOrder.order_number)
           .select();
 
-        console.log('📤 Resultado update comercial_orders:', { commData, commError });
+        console.log('ðŸ“¤ Resultado update comercial_orders:', { commData, commError });
 
         if (commError) {
-          console.warn('⚠️ Error sincronizando con comercial_orders:', commError);
+          console.warn('âš ï¸ Error sincronizando con comercial_orders:', commError);
         } else if (!commData || commData.length === 0) {
-          console.log(`ℹ️ No existe pedido comercial con order_number ${scannedOrder.order_number} - sincronización no aplicable (pedido solo de producción)`);
+          console.log(`â„¹ï¸ No existe pedido comercial con order_number ${scannedOrder.order_number} - sincronizaciÃ³n no aplicable (pedido solo de producciÃ³n)`);
         } else {
-          console.log(`✓ Sincronizado estado ENVIADO en comercial_orders para ${scannedOrder.order_number}`);
+          console.log(`âœ“ Sincronizado estado ENVIADO en comercial_orders para ${scannedOrder.order_number}`);
         }
 
-        // Archivar el pedido llamando a la función de base de datos
-        console.log(`📦 Archivando pedido ${scannedOrder.order_number}...`);
-        const { data: archiveData, error: archiveError } = await supabaseProductivity
+        // Archivar el pedido llamando a la funciÃ³n de base de datos
+        console.log(`ðŸ“¦ Archivando pedido ${scannedOrder.order_number}...`);
+        const { data: archiveData, error: archiveError } = await (supabaseProductivity as any)
           .rpc('archive_completed_order', {
             p_order_number: scannedOrder.order_number,
             p_shipped_at: new Date().toISOString(),
-            p_tracking_number: trackingNumber || null
+            p_tracking_number: resolvedTracking || null
           });
 
         if (archiveError) {
-          console.warn('⚠️ No se pudo archivar (función RPC puede no existir aún):', archiveError.message);
-          // No bloquear el flujo si el archivado falla - puede que la migración no se haya aplicado
+          console.warn('âš ï¸ No se pudo archivar (funciÃ³n RPC puede no existir aÃºn):', archiveError.message);
+          // No bloquear el flujo si el archivado falla - puede que la migraciÃ³n no se haya aplicado
         } else {
-          console.log(`✓ Pedido archivado con ID: ${archiveData}`);
+          console.log(`âœ“ Pedido archivado con ID: ${archiveData}`);
         }
       }
 
-      // Alerta de éxito
-      toast.success('✓ Envío validado correctamente');
+      // Alerta de Ã©xito
+      toast.success('âœ“ EnvÃ­o validado correctamente');
 
       await loadOrders();
       setScannedOrder(null);
     } catch (error: any) {
-      console.error('❌ Error general en validateShipment:', error);
-      toast.error('Error al validar envío: ' + error.message);
+      console.error('âŒ Error general en validateShipment:', error);
+      toast.error('Error al validar envÃ­o: ' + error.message);
     }
   };
 
@@ -696,8 +718,8 @@ export default function ShippingScanPage() {
 
   return (
     <PageShell
-      title="Expedición y Logística"
-      description="Control de salidas y gestión de envíos"
+      title="ExpediciÃ³n y LogÃ­stica"
+      description="Control de salidas y gestiÃ³n de envÃ­os"
       className="space-y-0"
       actions={
         <div className="flex gap-2">
@@ -711,10 +733,10 @@ export default function ShippingScanPage() {
       }
     >
       <div className="flex flex-col gap-2">
-        {/* ESCÁNER RESPONSIVE CON BOTÓN CTA */}
+        {/* ESCÃNER RESPONSIVE CON BOTÃ“N CTA */}
         <RoleBasedRender hideForRoles={['admin', 'manager']}>
           <div className="w-full">
-            {/* Scanner Button - Reemplaza área de escáner estático */}
+            {/* Scanner Button - Reemplaza Ã¡rea de escÃ¡ner estÃ¡tico */}
             <div className="bg-[#323438] border border-[#45474A] rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <QrCode className="w-5 h-5 text-indigo-400" />
@@ -732,7 +754,7 @@ export default function ShippingScanPage() {
               <div className="flex gap-2 mt-3">
                 <input
                   type="text"
-                  placeholder="O introduce código manualmente..."
+                  placeholder="O introduce cÃ³digo manualmente..."
                   className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
                   value={qrInput}
                   onChange={(e) => setQrInput(e.target.value)}
@@ -757,12 +779,12 @@ export default function ShippingScanPage() {
             handleScan(code);
             setScannerModalOpen(false);
           }}
-          title="Escanear Pedido de Envío"
+          title="Escanear Pedido de EnvÃ­o"
         />
 
         {/* CONTENEDOR DE COLA Y DETALLE - LADO A LADO EN DESKTOP */}
         <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
-          {/* COLA DE ALMACÉN */}
+          {/* COLA DE ALMACÃ‰N */}
           <div className="w-full lg:w-[450px] shrink-0 flex flex-col gap-4">
             <Tabs defaultValue="active" className="w-full">
               <div className="p-1 mb-4">
@@ -788,14 +810,14 @@ export default function ShippingScanPage() {
                 <div className="flex flex-col min-h-[500px]">
                   <h3 className="text-[#B5B8BA] font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
                     <Truck className="w-4 h-4 mr-2 text-indigo-400" />
-                    Cola de envíos activa
+                    Cola de envÃ­os activa
                   </h3>
-                  {isLoading && <div className="text-sm text-[#B5B8BA] py-4">Cargando órdenes...</div>}
+                  {isLoading && <div className="text-sm text-[#B5B8BA] py-4">Cargando Ã³rdenes...</div>}
                   {!isLoading && activeShipments.length === 0 && (
                     <div className="flex-1 flex flex-col items-center justify-center text-[#B5B8BA] text-center opacity-40 py-12">
                       <CheckCircle className="w-12 h-12 mb-3" />
-                      <p className="text-sm font-medium">Todo al día</p>
-                      <p className="text-xs uppercase tracking-tighter">No hay envíos pendientes</p>
+                      <p className="text-sm font-medium">Todo al dÃ­a</p>
+                      <p className="text-xs uppercase tracking-tighter">No hay envÃ­os pendientes</p>
                     </div>
                   )}
                   {!isLoading && activeShipments.length > 0 && (
@@ -805,10 +827,10 @@ export default function ShippingScanPage() {
                         const isSelected = scannedOrder?.id === order.id;
                         const isExpanded = expandedOrderId === order.id;
 
-                        // v3.1.0 - Lógica de bordes
+                        // v3.1.0 - LÃ³gica de bordes
                         let borderClass = "";
                         const level = order._priority_level;
-                        const isKiosk = deviceType === 'tablet';
+                        const isKiosk = deviceType === 'tablet' || deviceType === 'desktop';
 
                         if (level === 'critical') borderClass = isKiosk ? "blink-priority-urgent" : "border-priority-urgent";
                         else if (level === 'warning') borderClass = isKiosk ? "blink-priority-canarias" : "border-priority-canarias";
@@ -832,31 +854,40 @@ export default function ShippingScanPage() {
                               )}
                             >
                               <div className="flex justify-between items-start mb-2">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`font-mono font-bold text-sm ${isSelected ? 'text-indigo-400' : 'text-[#8B8D90]'}`}>
-                                    {order.order_number}
-                                  </span>
-                                  {/* Badges de Prioridad (Sin Emojis) */}
-                                  {order._is_canarias_urgent && (
-                                    <span className="px-2 py-0.5 bg-orange-600/20 border border-orange-500/50 rounded text-[10px] font-bold text-orange-300">
-                                      CANARIAS L-M
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`font-mono font-bold text-sm ${isSelected ? 'text-indigo-400' : 'text-[#8B8D90]'}`}>
+                                      {order.order_number}
                                     </span>
-                                  )}
-                                  {order._is_grouped_material && (
-                                    <span className="px-2 py-0.5 bg-green-600/20 border border-green-500/50 rounded text-[10px] font-bold text-green-300">
-                                      AGRUPADO
+                                    {order._is_canarias_urgent && (
+                                      <span className="px-2 py-0.5 bg-orange-600/20 border border-orange-500/50 rounded text-[10px] font-bold text-orange-300 flex items-center gap-1">
+                                        CANARIAS
+                                      </span>
+                                    )}
+                                    {order._is_grouped_material && (
+                                      <span className="px-2 py-0.5 bg-emerald-600/20 border border-emerald-500/50 rounded text-[10px] font-bold text-emerald-300 flex items-center gap-1">
+                                        AGRUPADO
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {daysToDueDate(order.due_date) !== 999 && (
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getUrgencyBadge(daysToDueDate(order.due_date)!).color}`}>
+                                        {getUrgencyBadge(daysToDueDate(order.due_date)!).label}
+                                      </span>
+                                    )}
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isIncomplete ? 'bg-amber-600/20 text-amber-500 border border-amber-500/30' : 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'}`}>
+                                      {order.scanned_packages || 0}/{order.packages_count || 1} BULTOS
                                     </span>
-                                  )}
-                                  {daysToDueDate(order.due_date) !== null && (
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getUrgencyBadge(daysToDueDate(order.due_date)!).color}`}>
-                                      {getUrgencyBadge(daysToDueDate(order.due_date)!).label}
-                                    </span>
-                                  )}
+                                  </div>
                                 </div>
-                                <div className="flex flex-col items-end gap-1">
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isIncomplete ? 'bg-amber-600/20 text-amber-500 border border-amber-500/30' : 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'}`}>
-                                    {order.scanned_packages || 0}/{order.packages_count || 1} BULTOS
-                                  </span>
+                                <div className="flex flex-col items-end gap-2 text-right">
+                                  {order.due_date && (
+                                    <div className="text-[10px] font-black uppercase text-[#8B8D90] px-2 py-1 bg-[#1A1D1F] rounded border border-[#323438] min-w-[65px] text-center">
+                                      <span className="text-sm block leading-none">{daysToDueDate(order.due_date)}</span>
+                                      DÃAS
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               <div className="space-y-1">
@@ -865,7 +896,7 @@ export default function ShippingScanPage() {
                               </div>
                             </button>
 
-                            {/* Expansión Vertical (Solo Móvil) */}
+                            {/* ExpansiÃ³n Vertical (Solo MÃ³vil) */}
                             {deviceType === 'mobile' && (
                               <div className={cn("order-details-expanded", isExpanded && "show")}>
                                 <div className="bg-[#323438] border border-[#45474A] rounded-xl p-4 mt-2 space-y-4">
@@ -915,11 +946,11 @@ export default function ShippingScanPage() {
               <TabsContent value="history" className="m-0 focus-visible:ring-0">
                 <div className="bg-[#323438] border border-[#45474A] rounded-lg p-2 min-h-[500px]">
                   <h3 className="font-bold text-[#8B8D90] mb-3 text-sm uppercase tracking-wider flex items-center justify-between">
-                    <span>Historial de Envíos</span>
+                    <span>Historial de EnvÃ­os</span>
                     <span className="bg-[#45474A] text-[#B5B8BA] px-2 py-0.5 rounded-full text-xs">{historyShipments.length}</span>
                   </h3>
                   {!isLoading && historyShipments.length === 0 && (
-                    <div className="text-sm text-[#B5B8BA] py-12 text-center opacity-40">Historial vacío.</div>
+                    <div className="text-sm text-[#B5B8BA] py-12 text-center opacity-40">Historial vacÃ­o.</div>
                   )}
                   {!isLoading && historyShipments.length > 0 && (
                     <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-2">
@@ -975,17 +1006,17 @@ export default function ShippingScanPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 lg:p-6 space-y-4 lg:space-y-6 custom-scrollbar">
-                  {/* PROTOCOLO DE REVISIÓN */}
+                  {/* PROTOCOLO DE REVISIÃ“N */}
                   {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
                     <div className="bg-amber-900/10 border border-amber-500/30 p-5 rounded-xl flex items-start gap-4">
                       <AlertOctagon className="w-8 h-8 text-amber-500 shrink-0 mt-1" />
                       <div className="text-sm">
-                        <h4 className="font-bold text-amber-400 uppercase mb-2 tracking-wide text-lg">PROTOCOLO DE REVISIÓN</h4>
+                        <h4 className="font-bold text-amber-400 uppercase mb-2 tracking-wide text-lg">PROTOCOLO DE REVISIÃ“N</h4>
                         <ul className="space-y-2 text-[#B5B8BA]">
                           <li>Revisa color y medidas antes de continuar.</li>
                           <li>No mezclar pedidos; si cambias se reinicia el conteo.</li>
                           <li>Escanea cada bulto hasta completar el total.</li>
-                          <li>Tracking obligatorio antes de liberar envío.</li>
+                          <li>Tracking obligatorio antes de liberar envÃ­o.</li>
                         </ul>
                       </div>
                     </div>
@@ -1008,15 +1039,15 @@ export default function ShippingScanPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                       <div className="space-y-1">
-                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Cliente / Razón Social</p>
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Cliente / RazÃ³n Social</p>
                         <p className="text-[#B5B8BA] font-medium">{scannedOrder.customer_name}</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Región</p>
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">RegiÃ³n</p>
                         <p className="text-[#B5B8BA]">{scannedOrder.region}</p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Teléfono</p>
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">TelÃ©fono</p>
                         <p className="text-[#B5B8BA]">{scannedOrder.phone || '---'}</p>
                       </div>
                       <div className="space-y-1">
@@ -1024,11 +1055,11 @@ export default function ShippingScanPage() {
                         <p className="text-[#B5B8BA]">{scannedOrder.contact_name || '---'}</p>
                       </div>
                       <div className="col-span-1 md:col-span-2 space-y-1">
-                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Dirección de Entrega</p>
-                        <p className="text-[#B5B8BA]">{scannedOrder.delivery_address || 'Sin dirección especificada'}</p>
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">DirecciÃ³n de Entrega</p>
+                        <p className="text-[#B5B8BA]">{scannedOrder.delivery_address || 'Sin direcciÃ³n especificada'}</p>
                       </div>
                       <div className="col-span-1 md:col-span-2 space-y-1">
-                        <p className="text-[#8B8D90] text-xs uppercase font-bold">Ubicación (Maps)</p>
+                        <p className="text-[#8B8D90] text-xs uppercase font-bold">UbicaciÃ³n (Maps)</p>
                         {scannedOrder.google_maps_link ? (
                           <a href={scannedOrder.google_maps_link} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 flex items-center truncate">
                             <ExternalLink className="w-3 h-3 mr-1" /> {scannedOrder.google_maps_link}
@@ -1071,8 +1102,8 @@ export default function ShippingScanPage() {
                           scannedOrder.lines.map(line => (
                             <tr key={line.id}>
                               <td className="px-4 py-2 font-bold text-white">{line.quantity}</td>
-                              <td className="px-4 py-2 text-[#B5B8BA]">{line.material || scannedOrder.fabric} · {line.width}x{line.height}cm</td>
-                              <td className="px-4 py-2 text-[#8B8D90] italic">{line.notes || '—'}</td>
+                              <td className="px-4 py-2 text-[#B5B8BA]">{line.material || scannedOrder.fabric} Â· {line.width}x{line.height}cm</td>
+                              <td className="px-4 py-2 text-[#8B8D90] italic">{line.notes || 'â€”'}</td>
                             </tr>
                           ))
                         ) : (
@@ -1092,11 +1123,11 @@ export default function ShippingScanPage() {
                     </div>
                   )}
 
-                  {/* Verificación de bultos */}
+                  {/* VerificaciÃ³n de bultos */}
                   {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
                     <div className="bg-transparent md:bg-[#1A1D1F] p-4 rounded-xl border border-transparent md:border-[#45474A]">
                       <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-bold text-[#FFFFFF] text-sm uppercase">Verificación de Bultos</h4>
+                        <h4 className="font-bold text-[#FFFFFF] text-sm uppercase">VerificaciÃ³n de Bultos</h4>
                         <span className="font-mono text-[#B5B8BA]">{scannedPackagesCount} / {scannedOrder.packages_count || 1}</span>
                       </div>
                       <div className="w-full bg-[#323438] rounded-full h-4 mb-4">
@@ -1116,12 +1147,12 @@ export default function ShippingScanPage() {
                     </div>
                   )}
 
-                  {/* Validación de salida */}
+                  {/* ValidaciÃ³n de salida */}
                   {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
                     <div className="bg-emerald-900/10 border border-emerald-500/30 p-6 rounded-xl mt-4">
                       <h3 className="text-emerald-400 font-bold mb-4 flex items-center">
                         <Truck className="w-5 h-5 mr-2" />
-                        Validación de Salida
+                        ValidaciÃ³n de Salida
                       </h3>
                       <div className="flex flex-col gap-4">
                         {/* Componente Toggle + Input de Tracking */}
@@ -1134,7 +1165,7 @@ export default function ShippingScanPage() {
 
                           {hasTrackingNow && (
                             <div>
-                              <label className="text-xs text-[#8B8D90] font-bold uppercase mb-2 block">Número de Tracking</label>
+                              <label className="text-xs text-[#8B8D90] font-bold uppercase mb-2 block">NÃºmero de Tracking</label>
                               <input
                                 type="text"
                                 value={trackingNumber}
@@ -1159,19 +1190,19 @@ export default function ShippingScanPage() {
                         <div>
                           <h4 className="text-lg font-bold text-emerald-400">Enviado</h4>
                           <p className="text-[#8B8D90] text-sm">
-                            Tracking: <span className="font-mono text-white">{scannedOrder.tracking_number}</span>
+                            Tracking: <span className="font-mono text-white">{scannedOrder.tracking_number || 'Sin tracking'}</span>
                           </p>
                         </div>
                       </div>
                       <button onClick={printManifest} className="w-full md:w-auto px-4 py-2 bg-transparent md:bg-[#1A1D1F] border border-[#45474A] rounded-lg text-white hover:bg-[#45474A] flex items-center justify-center">
                         <FileOutput className="w-4 h-4 mr-2" />
-                        Albarán
+                        AlbarÃ¡n
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Botones de acción */}
+                {/* Botones de acciÃ³n */}
                 <div className="p-6 border-t border-[#45474A] bg-transparent md:bg-[#323438]">
                   {['PTE_ENVIO', 'LISTO_ENVIO', 'EN_PROCESO'].includes(scannedOrder.status) && (
                     <button
@@ -1196,7 +1227,7 @@ export default function ShippingScanPage() {
                       }}
                       className="w-full py-3 bg-[#45474A] text-white rounded-xl hover:bg-[#6E6F71] font-medium"
                     >
-                      Volver al Escáner
+                      Volver al EscÃ¡ner
                     </button>
                   )}
                 </div>
@@ -1204,7 +1235,7 @@ export default function ShippingScanPage() {
             ) : (
               <div className="h-full border-2 border-dashed border-[#45474A] rounded-2xl flex flex-col items-center justify-center text-[#8B8D90] bg-[#1A1D1F]/50">
                 <Truck className="w-16 h-16 mb-4 opacity-30" />
-                <h3 className="text-xl font-bold text-[#8B8D90] mb-2">Zona de Expedición</h3>
+                <h3 className="text-xl font-bold text-[#8B8D90] mb-2">Zona de ExpediciÃ³n</h3>
                 <p className="text-[#6E6F71] max-w-md text-center">
                   Selecciona un pedido de la lista o escanea el QR para verificar bultos y procesar la salida.
                 </p>
@@ -1233,3 +1264,5 @@ export default function ShippingScanPage() {
     </PageShell>
   );
 }
+
+

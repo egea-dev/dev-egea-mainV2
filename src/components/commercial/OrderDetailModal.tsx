@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    Users, UploadCloud, FileCheck, AlertTriangle, FileText, Plus, MinusCircle, Edit, Save, X, BoxSelect, MapPin, Share2, Loader2, History, Copy
+    Users, UploadCloud, FileCheck, AlertTriangle, FileText, Plus, MinusCircle, Edit, Save, X, BoxSelect, MapPin, Share2, Loader2, History, Copy, Mail
 } from 'lucide-react';
 import { Order, OrderLine, OrderDocument, OrderStatus } from '@/types/commercial';
 import { supabaseProductivity as supabase } from '@/integrations/supabase';
@@ -21,13 +21,15 @@ import {
     generatePresupuestoApprovalEmail,
     generatePresupuestoApprovalSubject,
     generateProduccionInicioEmail,
-    generateProduccionInicioSubject
+    generateProduccionInicioSubject,
+    generateShippingEmail,
+    generateShippingSubject
 } from '@/utils/email-templates';
 import { generateOrderPDF } from '@/utils/pdf-generator';
 import { generateQRPayload } from '@/lib/qr-utils';
 import { toast } from 'sonner';
 import { useSLADays } from '@/hooks/use-sla-days';
-import { useUpdateOrder, useCreateOrder, useUpdateOrderStatus } from '@/hooks/use-orders';
+import { useUpdateOrder, useCreateOrder, useUpdateOrderStatus, useMarkShippingNotificationSent } from '@/hooks/use-orders';
 
 // --- Types & Constants ---
 
@@ -59,6 +61,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
     const updateOrder = useUpdateOrder();
     const updateOrderStatus = useUpdateOrderStatus();
     const createOrder = useCreateOrder();
+    const markShippingSent = useMarkShippingNotificationSent();
+    const { data: { user } = { user: null } } = { data: { user: { id: 'commercial-user' } } }; // Fallback safe
     const { data: materials } = useMaterials();
     const [savingDoc, setSavingDoc] = useState<DocType | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -833,7 +837,15 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                                 })) || [],
                                                 status: formData.status,
                                             });
-                                            generateOrderPDF({ ...formData, qr_payload: qrPayload });
+                                            generateOrderPDF({
+                                                ...formData,
+                                                qr_payload: qrPayload,
+                                                lines: formData.lines.map(l => ({
+                                                    ...l,
+                                                    width: Number(l.width) || 0,
+                                                    height: Number(l.height) || 0
+                                                }))
+                                            } as any);
                                         }}
                                         className="w-full bg-muted/40 hover:bg-muted/60 text-foreground border border-border/60 disabled:opacity-50"
                                     >
@@ -1048,6 +1060,113 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, isOpe
                                     Copiar HTML
                                 </Button>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* SECCIÓN EMAIL NOTIFICACIÓN ENVÍO (Solo si el pedido está enviado) */}
+                    <div className={cn(
+                        "bg-[#2F3135] p-5 rounded-2xl border border-[#3B3D41] shadow-sm flex flex-col mt-6",
+                        formData.status !== 'ENVIADO' && "opacity-40 grayscale pointer-events-none"
+                    )}>
+                        <div className="flex justify-between items-start mb-4">
+                            <h4 className="font-bold text-white flex items-center">
+                                <Mail className="w-4 h-4 mr-2 text-[#14CC7F]" /> Notificación de Envío (Agencia)
+                            </h4>
+                            {formData.shipping_notification_pending && (
+                                <Badge className="bg-amber-500/20 text-amber-500 border-amber-500/50 animate-pulse">
+                                    Pendiente de enviar
+                                </Badge>
+                            )}
+                        </div>
+
+                        <div className="bg-[#1F2225] rounded-xl p-4 mb-4 border border-[#3B3D41] flex-grow max-h-[300px] overflow-y-auto custom-scrollbar">
+                            <div className="text-xs text-[#8B8D90]">
+                                <div className="mb-2 pb-2 border-b border-[#3B3D41]">
+                                    <p className="text-white font-semibold">Para: {formData.email || '{EMAIL_CLIENTE}'}</p>
+                                    <p className="text-[#8B8D90]">
+                                        Asunto: {generateShippingSubject(formData.admin_code || 'PENDIENTE')}
+                                    </p>
+                                </div>
+                                <div className="space-y-2 font-mono mt-3">
+                                    <p className="text-[#14CC7F]">✓ Pedido Validado en Almacén</p>
+                                    <p className="text-[#14CC7F]">✓ Despachado por Agencia</p>
+                                    <p className="text-[#14CC7F]">✓ Instrucciones de recepción</p>
+                                </div>
+                                <p className="mt-4 text-[10px] leading-relaxed italic">
+                                    * Este email se envía cuando el operario valida el bulto en la zona de logística.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-end gap-2 mt-auto">
+                            <Button
+                                onClick={() => {
+                                    const emailHTML = generateShippingEmail({
+                                        adminCode: formData.admin_code || 'PENDIENTE',
+                                        customerName: formData.customer_name || '',
+                                        customerCompany: formData.customer_company || '',
+                                        customerCIF: formData.customer_code || '',
+                                        contactName: formData.contact_name || '',
+                                        phone: formData.phone || '',
+                                        email: formData.email || '',
+                                        deliveryAddress: formData.delivery_address || '',
+                                        deliveryRegion: (formData.delivery_region || formData.region || 'PENINSULA') as any,
+                                        totalAmount: formData.quantity_total || 0
+                                    });
+                                    const win = window.open('', '_blank');
+                                    if (win) {
+                                        win.document.write(`<base href="${window.location.origin}/">` + emailHTML);
+                                        win.document.close();
+                                    }
+                                }}
+                                variant="outline"
+                                className="border-[#3B3D41] text-[#8B8D90] hover:bg-[#3B3D41] hover:text-white"
+                            >
+                                Vista Previa
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    const emailHTML = generateShippingEmail({
+                                        adminCode: formData.admin_code || 'PENDIENTE',
+                                        customerName: formData.customer_name || '',
+                                        customerCompany: formData.customer_company || '',
+                                        customerCIF: formData.customer_code || '',
+                                        contactName: formData.contact_name || '',
+                                        phone: formData.phone || '',
+                                        email: formData.email || '',
+                                        deliveryAddress: formData.delivery_address || '',
+                                        deliveryRegion: (formData.delivery_region || formData.region || 'PENINSULA') as any,
+                                        totalAmount: formData.quantity_total || 0
+                                    });
+                                    navigator.clipboard.writeText(emailHTML);
+                                    toast.success('HTML de envío copiado');
+                                }}
+                                className="bg-[#14CC7F] hover:bg-[#11A366] text-white"
+                            >
+                                <Copy className="w-4 h-4 mr-2" />
+                                Copiar HTML
+                            </Button>
+
+                            {formData.shipping_notification_pending && (
+                                <Button
+                                    onClick={async () => {
+                                        if (!formData.id) return;
+                                        try {
+                                            await markShippingSent.mutateAsync({
+                                                orderId: formData.id,
+                                                userId: (user as any)?.id || 'commercial-user'
+                                            });
+                                            setFormData(prev => ({ ...prev, shipping_notification_pending: false }));
+                                        } catch (err) {
+                                            console.error(err);
+                                        }
+                                    }}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                                >
+                                    <FileCheck className="w-4 h-4 mr-2" />
+                                    Marcar como Notificado
+                                </Button>
+                            )}
                         </div>
                     </div>
 

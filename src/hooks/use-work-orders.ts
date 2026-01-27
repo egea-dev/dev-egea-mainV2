@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+﻿import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabaseProductivity as supabase } from "@/integrations/supabase";
 import { WorkOrder, WorkOrderStatus, WorkOrderWithDetails } from "@/types/production";
 import { toast } from "sonner";
@@ -33,15 +33,23 @@ export const useWorkOrders = () => {
             }
 
             let linesData: any[] | null = null;
+            let commercialData: any[] | null = null;
             if (data && data.length > 0) {
                 const { data: linesResponse } = await supabase
                     .from('produccion_work_order_lines')
                     .select('*')
                     .in('work_order_id', data.map((o: any) => o.id));
                 linesData = linesResponse as any[] | null;
+
+                const { data: commResponse } = await supabase
+                    .from('comercial_orders')
+                    .select('order_number, admin_code, delivery_region, region')
+                    .in('order_number', data.map((o: any) => o.order_number).filter(Boolean));
+                commercialData = commResponse as any[] | null;
             }
 
             return (data || []).map((order: any) => {
+                const commOrder = commercialData?.find((c: any) => c.order_number === order.order_number || (order.admin_code && c.admin_code === order.admin_code));
                 const specs = order.technical_specs || {};
                 const lines = (Array.isArray(order.lines) && order.lines.length > 0)
                     ? order.lines
@@ -58,7 +66,8 @@ export const useWorkOrders = () => {
                     quantity_total: order.quantity_total || order.quantity || specs.quantity,
                     status: normalizeStatus(order.status),
                     fabric: materialList,
-                    color: colorList
+                    color: colorList,
+                    region: commOrder?.delivery_region || commOrder?.region || order.region || specs.region || "PENINSULA"
                 };
             }) as WorkOrderWithDetails[];
         },
@@ -132,7 +141,7 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
     });
 };
 
-// Hook para obtener una work order específica
+// Hook para obtener una work order especÃ­fica
 export const useWorkOrder = (id: string) => {
     return useQuery({
         queryKey: ['work-order', id],
@@ -278,15 +287,15 @@ export const useUpdateWorkOrderStatus = () => {
             return data as WorkOrder;
         },
         onSuccess: async (data, variables) => {
-            // Sincronización Producción -> Comercial
+            // SincronizaciÃ³n ProducciÃ³n -> Comercial
             if (data?.order_number) {
                 const mapProductionToCommercial = (status: string): string | null => {
                     switch (status.toUpperCase()) {
                         case 'LISTO_ENVIO':
                         case 'TERMINADO':
-                            // Cuando producción marca como LISTO_ENVIO, comercial pasa a ENVIADO
-                            // para que aparezca en el historial
-                            return 'ENVIADO';
+                            // Cuando produccion marca como LISTO_ENVIO, comercial pasa a PTE_ENVIO
+                            // para que expediciones complete datos antes de ENVIADO
+                            return 'PTE_ENVIO';
                         case 'ENVIADO':
                             return 'ENVIADO';
                         case 'ENTREGADO':
@@ -298,9 +307,9 @@ export const useUpdateWorkOrderStatus = () => {
 
                 const commStatus = mapProductionToCommercial(variables.status);
                 if (commStatus) {
-                    console.log(`🔄 Sincronizando estado ${commStatus} con comercial para orden ${data.order_number}`);
+                    console.log(`ðŸ”„ Sincronizando estado ${commStatus} con comercial para orden ${data.order_number}`);
 
-                    // Preparar payload con flag de notificación si es ENVIADO
+                    // Preparar payload con flag de notificaciÃ³n si es ENVIADO
                     const updatePayload: any = { status: commStatus };
                     if (commStatus === 'ENVIADO') {
                         updatePayload.shipping_notification_pending = true;
@@ -314,9 +323,9 @@ export const useUpdateWorkOrderStatus = () => {
                     if (syncError) {
                         console.warn("Error sincronizando estado con comercial:", syncError);
                     } else {
-                        console.log(`✓ Sincronizado estado ${commStatus} en comercial`);
+                        console.log(`âœ“ Sincronizado estado ${commStatus} en comercial`);
                         if (commStatus === 'ENVIADO') {
-                            console.log(`📧 Notificación de envío pendiente para ${data.order_number}`);
+                            console.log(`ðŸ“§ NotificaciÃ³n de envÃ­o pendiente para ${data.order_number}`);
                         }
                     }
                 }
@@ -457,3 +466,4 @@ export const useUpdateQualityCheck = () => {
         }
     });
 };
+

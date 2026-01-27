@@ -64,6 +64,11 @@ export interface Order {
     shipping_date?: string;
     quantity_shipped?: number;
 
+    // Email Notifications
+    shipping_notification_pending?: boolean;
+    shipping_notification_sent_at?: string;
+    shipping_notification_sent_by?: string;
+
     // QR
     qr_generated_at?: string;
 

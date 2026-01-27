@@ -179,15 +179,21 @@ export default function CommercialPage() {
   const [importOrderNumber, setImportOrderNumber] = useState("");
   const [comments, setComments] = useState<Record<string, string>>({});
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [viewMode, setViewMode] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
+  const [viewMode, setViewMode] = useState<"ACTIVE" | "SHIPPED" | "ARCHIVED">("ACTIVE");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const canDeleteOrders = profile?.role === "admin" || profile?.role === "manager";
 
   const activeOrders = orders.filter((o) => !["ENVIADO", "ENTREGADO", "CANCELADO"].includes(String(o.status).trim().toUpperCase()));
-  const archivedOrders = orders.filter((o) => ["ENVIADO", "ENTREGADO", "CANCELADO"].includes(String(o.status).trim().toUpperCase()));
+  const shippedOrders = orders.filter((o) => ["ENVIADO"].includes(String(o.status).trim().toUpperCase()));
+  const archivedOrders = orders.filter((o) => ["ENTREGADO", "CANCELADO"].includes(String(o.status).trim().toUpperCase()));
   const pendingNotificationOrders = orders.filter((o: any) => o.shipping_notification_pending === true);
-  const displayedOrders = viewMode === "ACTIVE" ? activeOrders : archivedOrders;
+  const displayedOrders =
+    viewMode === "ACTIVE"
+      ? activeOrders
+      : viewMode === "SHIPPED"
+        ? shippedOrders
+        : archivedOrders;
 
   const validateOrderReadyForProduction = (order: any): { valid: boolean; error?: string } => {
     // Validaciones básicas (siempre requeridas)
@@ -513,6 +519,21 @@ export default function CommercialPage() {
             Pedidos activos
             <Badge variant="secondary" className="ml-1 text-xs">
               {activeOrders.length}
+            </Badge>
+          </button>
+          <button
+            onClick={() => setViewMode("SHIPPED")}
+            className={cn(
+              "flex items-center gap-2 px-1 py-3 border-b-2 transition-colors text-sm font-medium",
+              viewMode === "SHIPPED"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Mail className="w-4 h-4" />
+            Enviados
+            <Badge variant="secondary" className="ml-1 text-xs">
+              {shippedOrders.length}
             </Badge>
           </button>
           <button

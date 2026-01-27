@@ -1,13 +1,13 @@
-/**
- * ShippedOrdersPanel - Componente para gestión del estado "ENVIADO"
+﻿/**
+ * ShippedOrdersPanel - Componente para gestion de expediciones (PROCESADO/ENVIADO)
  * 
  * Muestra pedidos en estado ENVIADO con:
  * - Datos generales del pedido (solo lectura)
  * - Trazabilidad del pedido
- * - Gestión de bultos (CRUD)
- * - Selector de empresa de envíos
+ * - GestiÃ³n de bultos (CRUD)
+ * - Selector de empresa de envÃ­os
  * - Campo de tracking
- * - Botón "CONFIRMAR ENVÍO" con validaciones
+ * - Boton "CONFIRMAR ENVIO" con validaciones
  */
 
 import React, { useState } from 'react';
@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { supabaseProductivity } from '@/integrations/supabase';
 import {
     useShipmentPackages,
     useCreatePackage,
@@ -66,10 +67,11 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
     const updatePackage = useUpdatePackage();
     const deletePackage = useDeletePackage();
 
-    // Cálculos
+    // CÃ¡lculos
     const totalUnits = calculateTotalUnits(packages);
     const totalWeight = calculateTotalWeight(packages);
     const expectedUnits = order.quantity_total || 0;
+    const isProcessed = order.status === 'ENVIADO' || order.status === 'ENTREGADO';
 
     // Handlers
     const handleAddPackage = async () => {
@@ -110,17 +112,22 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
     const handleProcess = async () => {
         // Validaciones
         const effectiveCarrier = carrierCompany === 'OTRO' ? customCarrier : carrierCompany;
+        if (carrierCompany === 'OTRO' && (!customCarrier || customCarrier.trim() === '')) {
+            toast.error('Debe indicar la empresa de envios (OTRO)');
+            return;
+        }
         const validation = validatePackagesForShipping(
             packages,
             expectedUnits,
             effectiveCarrier,
-            trackingNumber
+            trackingNumber,
+            { requireTracking: false }
         );
 
         if (!validation.isValid) {
             toast.error(
                 <div>
-                    <p className="font-bold mb-2">No se puede procesar el envío:</p>
+                    <p className="font-bold mb-2">No se puede procesar el envÃ­o:</p>
                     <ul className="list-disc list-inside">
                         {validation.errors.map((error, idx) => (
                             <li key={idx}>{error}</li>
@@ -133,13 +140,52 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
 
         setIsProcessing(true);
         try {
-            // TODO: Implementar actualización en BD
-            // 1. Actualizar estado del pedido a "HISTORIAL/ENTREGADO"
-            // 2. Guardar datos de envío en logistics
-            // 3. Enviar notificación a comercial
-            // 4. Registrar en status_log
+            const resolvedCarrier = effectiveCarrier && effectiveCarrier.trim() !== '' ? effectiveCarrier.trim() : null;
+            const resolvedTracking = trackingNumber.trim() || null;
+            const now = new Date().toISOString();
 
-            toast.success('Envío procesado correctamente. Notificación enviada a comercial.');
+            const basePayload: any = {
+                status: 'ENVIADO',
+                shipping_notification_pending: true,
+                tracking_number: resolvedTracking,
+                packages_count: packages.length,
+                updated_at: now
+            };
+            if (resolvedCarrier) {
+                basePayload.carrier_company = resolvedCarrier;
+            }
+
+            let { error: updateError } = await supabaseProductivity
+                .from('comercial_orders')
+                .update(basePayload)
+                .eq('id', order.id);
+
+            if (updateError && String(updateError.message || '').includes('carrier_company')) {
+                const fallbackPayload = { ...basePayload };
+                delete fallbackPayload.carrier_company;
+                const fallback = await supabaseProductivity
+                    .from('comercial_orders')
+                    .update(fallbackPayload)
+                    .eq('id', order.id);
+                updateError = fallback.error;
+            }
+
+            if (updateError) {
+                throw updateError;
+            }
+
+            if (order.order_number) {
+                await (supabaseProductivity as any)
+                    .from('produccion_work_orders')
+                    .update({
+                        status: 'ENVIADO',
+                        tracking_number: resolvedTracking,
+                        updated_at: now
+                    })
+                    .eq('order_number', order.order_number);
+            }
+
+            toast.success('Envio procesado correctamente. Notificacion enviada a comercial.');
             onProcessed?.();
         } catch (error: any) {
             toast.error(`Error al procesar: ${error.message}`);
@@ -161,8 +207,8 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                         <p className="text-sm text-gray-400">{order.customer_company || order.customer_name}</p>
                     </div>
                 </div>
-                <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
-                    ENVIADO
+                <Badge className={isProcessed ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" : "bg-amber-500/20 text-amber-300 border-amber-500/30"}>
+                    {isProcessed ? 'PROCESADO' : 'PENDIENTE'}
                 </Badge>
             </div>
 
@@ -183,7 +229,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                         <p className="text-white">{order.contact_name || '-'}</p>
                     </div>
                     <div>
-                        <span className="text-gray-400">Región:</span>
+                        <span className="text-gray-400">RegiÃ³n:</span>
                         <p className="text-white">{order.region || '-'}</p>
                     </div>
                     <div>
@@ -191,7 +237,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                         <p className="text-white font-bold text-lg">{expectedUnits} uds</p>
                     </div>
                     <div className="md:col-span-2">
-                        <span className="text-gray-400">Dirección:</span>
+                        <span className="text-gray-400">DirecciÃ³n:</span>
                         <p className="text-white">{order.delivery_address || '-'}</p>
                     </div>
                     <div>
@@ -201,13 +247,13 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                 </CardContent>
             </Card>
 
-            {/* Gestión de Bultos */}
+            {/* GestiÃ³n de Bultos */}
             <Card className="bg-card/50 border-border/60">
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-sm font-medium text-gray-400 uppercase tracking-wide flex items-center gap-2">
                             <Package className="w-4 h-4" />
-                            Gestión de Bultos
+                            GestiÃ³n de Bultos
                         </CardTitle>
                         <Button
                             size="sm"
@@ -216,7 +262,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                             className="bg-emerald-600 hover:bg-emerald-700"
                         >
                             <Plus className="w-4 h-4 mr-1" />
-                            Añadir Bulto
+                            AÃ±adir Bulto
                         </Button>
                     </div>
                 </CardHeader>
@@ -227,7 +273,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                         <div className="text-center py-8 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <AlertTriangle className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                             <p className="text-yellow-300">No hay bultos registrados</p>
-                            <p className="text-gray-400 text-sm">Añade al menos un bulto para continuar</p>
+                            <p className="text-gray-400 text-sm">AÃ±ade al menos un bulto para continuar</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -286,7 +332,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                                                             className="w-14 h-8 bg-muted/30 border-border/60"
                                                             placeholder="Alto"
                                                         />
-                                                        <span className="text-gray-400">×</span>
+                                                        <span className="text-gray-400">Ã—</span>
                                                         <Input
                                                             type="number"
                                                             min="0"
@@ -295,7 +341,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                                                             className="w-14 h-8 bg-muted/30 border-border/60"
                                                             placeholder="Ancho"
                                                         />
-                                                        <span className="text-gray-400">×</span>
+                                                        <span className="text-gray-400">Ã—</span>
                                                         <Input
                                                             type="number"
                                                             min="0"
@@ -353,17 +399,17 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                 </CardContent>
             </Card>
 
-            {/* Datos de Empresa de Envíos */}
+            {/* Datos de Empresa de EnvÃ­os */}
             <Card className="bg-card/50 border-border/60">
                 <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-400 uppercase tracking-wide flex items-center gap-2">
                         <Truck className="w-4 h-4" />
-                        Datos de Envío
+                        Datos de EnvÃ­o
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">Empresa de Envíos</label>
+                        <label className="text-sm text-gray-400">Empresa de EnvÃ­os</label>
                         <Select value={carrierCompany} onValueChange={setCarrierCompany}>
                             <SelectTrigger className="bg-muted/30 border-border/60">
                                 <SelectValue placeholder="Selecciona empresa..." />
@@ -386,18 +432,18 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                         )}
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">Número de Envío / Tracking</label>
+                        <label className="text-sm text-gray-400">Numero de envio / tracking (opcional)</label>
                         <Input
                             value={trackingNumber}
                             onChange={(e) => setTrackingNumber(e.target.value)}
-                            placeholder="Ej: MRW123456789"
+                            placeholder="Ej: MRW123456789 (si no hay, dejar vacio)"
                             className="bg-muted/30 border-border/60"
                         />
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Botón PROCESADO */}
+            {/* BotÃ³n PROCESADO */}
             <div className="flex justify-end">
                 <Button
                     size="lg"
@@ -410,18 +456,19 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                     ) : (
                         <>
                             <CheckCircle className="w-5 h-5 mr-2" />
-                            CONFIRMAR ENVÍO
+                            CONFIRMAR ENVÃO
                         </>
                     )}
                 </Button>
             </div>
 
-            {/* Info sobre acciones del botón CONFIRMAR ENVÍO */}
+            {/* Info sobre acciones del botÃ³n CONFIRMAR ENVÃO */}
             <div className="text-xs text-gray-400 text-center">
-                Al pulsar "CONFIRMAR ENVÍO", el pedido pasará a Historial y se notificará al departamento comercial
+                Al pulsar "CONFIRMAR ENVIO", el pedido pasara a ENVIADO y se notificara a comercial
             </div>
         </div>
     );
 };
 
 export default ShippedOrdersPanel;
+

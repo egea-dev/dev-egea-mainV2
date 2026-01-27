@@ -140,6 +140,18 @@ export function getDeliveryBreakdown(region?: string): DeliveryBreakdown {
     return DELIVERY_CONFIG[normalizedRegion] || DELIVERY_CONFIG.DEFAULT;
 }
 
+export function getProductionWorkdays(region?: string): number {
+    return getDeliveryBreakdown(region).productionDays;
+}
+
+export function getShippingWorkdays(region?: string): number {
+    return getDeliveryBreakdown(region).shippingDays;
+}
+
+export function getReceptionWorkdays(region?: string): number {
+    return getDeliveryBreakdown(region).receptionDays;
+}
+
 /**
  * Obtiene los días SLA totales para una región (días LABORABLES)
  * 
@@ -164,6 +176,28 @@ export function calculateDueDateWorkdays(deliveryDate: string | Date | null, reg
         const start = new Date(deliveryDate);
         const slaDays = getSLAWorkdays(region);
         return addWorkdays(start, slaDays);
+    } catch {
+        return null;
+    }
+}
+
+export function calculateProductionDueDate(startDate: string | Date | null, region?: string): Date | null {
+    if (!startDate) return null;
+    try {
+        const start = new Date(startDate);
+        const days = getProductionWorkdays(region);
+        return addWorkdays(start, days);
+    } catch {
+        return null;
+    }
+}
+
+export function calculateShippingDueDate(startDate: string | Date | null, region?: string): Date | null {
+    if (!startDate) return null;
+    try {
+        const start = new Date(startDate);
+        const days = getShippingWorkdays(region);
+        return addWorkdays(start, days);
     } catch {
         return null;
     }

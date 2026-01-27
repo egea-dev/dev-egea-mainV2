@@ -58,6 +58,10 @@ interface Order {
   process_start_at?: string | null;
   sla_days?: number;
   delivery_address?: string | null;
+  _is_canarias_urgent?: boolean;
+  _is_grouped_material?: boolean;
+  _priority_level?: 'critical' | 'warning' | 'material' | 'normal';
+  _priority_score?: number;
   contact_name?: string | null;
   phone?: string | null;
   notes_internal?: string | null;
@@ -369,7 +373,7 @@ export function ProductionPage() {
             ].filter(Boolean).join(',');
             const { data: commData, error: commError } = await supabaseProductivity
               .from('comercial_orders')
-              .select('id, order_number, admin_code, lines, fabric')
+              .select('id, order_number, admin_code, lines, fabric, delivery_region, region')
               .or(orFilters);
             if (commError) {
               console.warn('Commercial orders unavailable:', commError);
@@ -418,6 +422,7 @@ export function ProductionPage() {
           const fabric = materialList || "N/D";
           const color = colorList || "N/D";
 
+          const region = commOrder?.delivery_region || commOrder?.region || order.region || specs.region || 'PENINSULA';
           const normalizedStatus = normalizeStatus(order.status);
           const dueDate = order.due_date || order.estimated_completion || null;
           const processStartAt = order.process_start_at || order.started_at || null;
@@ -426,6 +431,7 @@ export function ProductionPage() {
             order_number: order.admin_code || order.order_number || order.work_order_number || order.id,
             admin_code: order.admin_code || null,
             status: normalizedStatus,
+            region,
             fabric,
             color,
             quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
@@ -1091,7 +1097,7 @@ export function ProductionPage() {
                         // Determinar clase de borde según requerimiento v3.1.0
                         let borderClass = "";
                         const level = order._priority_level;
-                        const isKiosk = deviceType === 'tablet'; // Asumimos Kiosko como tablet para parpadeo
+                        const isKiosk = deviceType === 'tablet' || deviceType === 'desktop'; // Permitir parpadeo en escritorio para mejor visibilidad
 
                         if (level === 'critical') borderClass = isKiosk ? "blink-priority-urgent" : "border-priority-urgent";
                         else if (level === 'warning') borderClass = isKiosk ? "blink-priority-canarias" : "border-priority-canarias";
@@ -1115,28 +1121,39 @@ export function ProductionPage() {
                               )}
                             >
                               <div className="flex justify-between items-start mb-2">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-indigo-400' : 'text-[#B5B8BA]'}`}>
-                                    {order.order_number}
-                                  </span>
-                                  {/* Badges de Prioridad (Sin Emojis) */}
-                                  {order._is_canarias_urgent && (
-                                    <span className="px-2 py-0.5 bg-orange-600/20 border border-orange-500/50 rounded text-[10px] font-bold text-orange-300">
-                                      CANARIAS L-M
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-indigo-400' : 'text-[#B5B8BA]'}`}>
+                                      {order.order_number}
                                     </span>
-                                  )}
-                                  {order._is_grouped_material && (
-                                    <span className="px-2 py-0.5 bg-green-600/20 border border-green-500/50 rounded text-[10px] font-bold text-green-300">
-                                      AGRUPADO
-                                    </span>
-                                  )}
-                                  {daysToDueDate(order.due_date) !== null && (
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getUrgencyBadge(daysToDueDate(order.due_date)!).color}`}>
-                                      {getUrgencyBadge(daysToDueDate(order.due_date)!).label}
-                                    </span>
+                                    {order._is_canarias_urgent && (
+                                      <span className="px-2 py-0.5 bg-orange-600/20 border border-orange-500/50 rounded text-[10px] font-bold text-orange-300 flex items-center gap-1">
+                                        CANARIAS
+                                      </span>
+                                    )}
+                                    {order._is_grouped_material && (
+                                      <span className="px-2 py-0.5 bg-emerald-600/20 border border-emerald-500/50 rounded text-[10px] font-bold text-emerald-300 flex items-center gap-1">
+                                        AGRUPADO
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {daysToDueDate(order.due_date) !== 999 && (
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getUrgencyBadge(daysToDueDate(order.due_date)!).color}`}>
+                                        {getUrgencyBadge(daysToDueDate(order.due_date)!).label}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-2 text-right">
+                                  <div className={dueInfo.badge}>{dueInfo.label}</div>
+                                  {order.due_date && daysToDueDate(order.due_date) !== 999 && (
+                                    <div className="text-[10px] font-black uppercase text-[#8B8D90] px-2 py-1 bg-white/5 rounded border border-white/10 min-w-[65px] text-center">
+                                      <span className="text-sm block leading-none">{daysToDueDate(order.due_date)}</span>
+                                      DÍAS
+                                    </div>
                                   )}
                                 </div>
-                                <div className={dueInfo.badge}>{dueInfo.label}</div>
                               </div>
                               <div className="space-y-2">
                                 <p className="font-bold text-white text-base leading-tight">

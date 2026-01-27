@@ -8,6 +8,7 @@
  */
 
 import { WorkOrder } from '@/types/production';
+import { getDeliveryBreakdown, getWorkdaysRemaining } from '@/utils/workday-utils';
 
 export interface WorkOrderWithPriority extends WorkOrder {
     _priority_score?: number;
@@ -25,8 +26,8 @@ export function isMondayToWednesday(dateString?: string): boolean {
     try {
         const date = dateString ? new Date(dateString) : new Date();
         const dayOfWeek = date.getDay();
-        // 1=Lunes, 2=Martes, 3=Miércoles
-        return dayOfWeek >= 1 && dayOfWeek <= 3;
+        // 0=Domingo (preparación), 1=Lunes, 2=Martes, 3=Miércoles
+        return dayOfWeek >= 0 && dayOfWeek <= 3;
     } catch {
         return false;
     }
@@ -162,24 +163,25 @@ export function sortWorkOrdersByPriority(orders: WorkOrder[]): WorkOrderWithPrio
 }
 
 /**
- * Obtiene el badge de urgencia (Sin Emojis)
+ * Obtiene el badge de urgencia (Días Laborables + Dinámico por Región)
  */
-export function getUrgencyBadge(daysRemaining: number): { label: string; color: string } | null {
+export function getUrgencyBadge(
+    daysRemaining: number,
+    region?: string
+): { label: string; color: string } | null {
+    // Obtener umbral dinámico según región (shippingDays + 1)
+    const breakdown = getDeliveryBreakdown(region);
+    const urgentThreshold = breakdown.shippingDays + 1;
+
     if (daysRemaining < 0) {
         return {
             label: 'VENCIDO',
             color: 'bg-red-900/40 text-red-400 border-red-500/30'
         };
     }
-    if (daysRemaining <= 2) {
+    if (daysRemaining <= urgentThreshold) {
         return {
             label: 'URGENTE',
-            color: 'bg-red-900/20 text-red-300 border-red-500/20'
-        };
-    }
-    if (daysRemaining <= 5) {
-        return {
-            label: 'PRÓXIMO',
             color: 'bg-amber-900/40 text-amber-400 border-amber-500/30'
         };
     }

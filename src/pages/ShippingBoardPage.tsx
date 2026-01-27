@@ -8,7 +8,8 @@ import { Clock, CheckCircle2, Package, Truck } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { summarizeMaterials } from "@/lib/materials";
-import { sortWorkOrdersByPriority, isMondayToWednesday, daysToDueDate } from "@/services/priority-service";
+import { sortWorkOrdersByPriority, isMondayToWednesday, daysToDueDate, getUrgencyBadge } from "@/services/priority-service";
+import { getWorkdaysRemaining } from "@/utils/workday-utils";
 
 interface ShippingOrder {
     id: string;
@@ -40,8 +41,6 @@ interface ShippingOrder {
     _priority_score?: number;
     _priority_level?: 'critical' | 'warning' | 'material' | 'normal';
 }
-
-// Lógica de 12 horas eliminada para historial inmediato
 
 export default function ShippingBoardPage() {
     const [searchParams] = useSearchParams();
@@ -85,12 +84,21 @@ export default function ShippingBoardPage() {
         return () => clearInterval(interval);
     }, []);
 
+    const isLight = theme === "light";
+    const colors = {
+        page: isLight ? "bg-white text-slate-900" : "bg-black text-white",
+        header: isLight ? "bg-white border-slate-200" : "bg-black border-white/10",
+        tableHeader: isLight ? "bg-slate-50 text-slate-500 border-slate-200" : "bg-[#111] text-gray-500 border-white/5",
+        row: isLight ? "bg-white" : "bg-[#1A1D1F]",
+        progress: isLight ? "bg-slate-200" : "bg-black/50",
+        stat: isLight ? "bg-slate-50 border-slate-200 text-slate-700" : "bg-[#0F1113] border-[#45474A]/60",
+        footer: isLight ? "bg-white border-slate-200 text-slate-500" : "bg-black border-white/5 text-gray-500",
+    };
+
     const fetchOrders = async () => {
         const { data: ordersData, error: ordersError } = await supabaseProductivity
             .from("produccion_work_orders")
             .select("*")
-            // Solo mostrar pedidos LISTO_ENVIO (listos para escaneo de envío)
-            // Excluir ENVIADO y ENTREGADO que ya fueron procesados
             .eq('status', 'LISTO_ENVIO')
             .order("priority", { ascending: false })
             .order("created_at", { ascending: false })
@@ -122,7 +130,7 @@ export default function ShippingBoardPage() {
             ].filter(Boolean).join(',');
             const { data } = await supabaseProductivity
                 .from('comercial_orders')
-                .select('order_number, admin_code, lines, fabric')
+                .select('order_number, admin_code, lines, fabric, delivery_region, region')
                 .or(orFilters);
             commercialOrders = data as any[] | null;
         }
@@ -157,39 +165,27 @@ export default function ShippingBoardPage() {
                 : (specs.color || order.color || "N/D");
 
             const nStatus = normalizeStatus(order.status);
-            const now = new Date();
-            const due = order.due_date ? new Date(order.due_date) : null;
-            const diffDays = due ? Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+            const workdaysRemaining = getWorkdaysRemaining(order.due_date);
+            const regionToUse = commOrder?.delivery_region || commOrder?.region || order.region || specs.region || "PENINSULA";
+            const urgencyBadge = getUrgencyBadge(workdaysRemaining, regionToUse);
 
-            let dueBadge = { label: "SIN FECHA", color: "bg-gray-100 text-gray-500 border-gray-200", boxValue: "-", boxLabel: "DÍAS" };
-            if (diffDays !== null) {
-                if (diffDays < 0) {
-                    dueBadge = {
-                        label: "VENCIDO",
-                        color: "bg-red-100 text-red-600 border-red-200",
-                        boxValue: Math.abs(diffDays).toString(),
-                        boxLabel: Math.abs(diffDays) === 1 ? "DÍA" : "DÍAS"
-                    };
-                } else {
-                    dueBadge = {
-                        label: diffDays <= 3 ? "URGENTE" : "A TIEMPO",
-                        color: diffDays <= 3 ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-emerald-100 text-emerald-600 border-emerald-200",
-                        boxValue: diffDays.toString(),
-                        boxLabel: diffDays === 1 ? "DÍA" : "DÍAS"
-                    };
-                }
-            }
+            const dueBadge = {
+                label: urgencyBadge?.label || "SIN FECHA",
+                color: urgencyBadge?.color || (isLight ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-white/5 text-gray-400 border-white/10"),
+                boxValue: workdaysRemaining === 999 ? "-" : Math.abs(workdaysRemaining).toString(),
+                boxLabel: Math.abs(workdaysRemaining) === 1 ? "DÍA" : "DÍAS"
+            };
 
             return {
                 ...order,
                 order_number: order.order_number || order.work_order_number || order.id,
                 customer_name: order.customer_company || order.customer_name || specs.customer_name || "Cliente Final",
-                region: order.region || specs.region || "PENINSULA",
+                region: regionToUse,
                 fabric: materialList || "N/D",
                 color: colorList || "N/D",
                 quantity_total: order.quantity_total || order.quantity || specs.quantity || 1,
                 packageProgress: order.packages_count ? (order.scanned_packages / order.packages_count) * 100 : 0,
-                isUrgent: order.needs_shipping_validation || (diffDays !== null && diffDays <= 2),
+                isUrgent: order.needs_shipping_validation || (workdaysRemaining !== 999 && workdaysRemaining <= 2),
                 isRecentShipment: false,
                 dueBadge,
                 status: nStatus,
@@ -197,20 +193,8 @@ export default function ShippingBoardPage() {
             };
         });
 
-        // Aplicar ordenamiento jerárquico P1/P2/P3
         const sortedOrders = sortWorkOrdersByPriority(transformed as any);
         setOrders(sortedOrders as unknown as ShippingOrder[]);
-    };
-
-    const isLight = theme === "light";
-    const colors = {
-        page: isLight ? "bg-white text-slate-900" : "bg-black text-white",
-        header: isLight ? "bg-white border-slate-200" : "bg-black border-white/10",
-        tableHeader: isLight ? "bg-slate-50 text-slate-500 border-slate-200" : "bg-[#111] text-gray-500 border-white/5",
-        row: isLight ? "bg-white" : "bg-[#1A1D1F]",
-        progress: isLight ? "bg-slate-200" : "bg-black/50",
-        stat: isLight ? "bg-slate-50 border-slate-200 text-slate-700" : "bg-[#0F1113] border-[#45474A]/60",
-        footer: isLight ? "bg-white border-slate-200 text-slate-500" : "bg-black border-white/5 text-gray-500",
     };
 
     return (
@@ -259,8 +243,6 @@ export default function ShippingBoardPage() {
                     </div>
                 ) : (
                     orders.map((order) => {
-                        // Determinar borde de prioridad (Kiosko = parpadeo/blink)
-                        // v3.1.0 usa clases de responsive.css
                         let borderClass = "";
                         if (order._is_canarias_urgent) {
                             borderClass = "blink-priority-canarias";
@@ -313,18 +295,17 @@ export default function ShippingBoardPage() {
                                         </div>
                                     </div>
                                     {/* Etiqueta AGRUPADO: Verde si aplica, Gris si no */}
-                                    <span className={cn("text-[10px] font-bold uppercase", order._is_grouped_material ? "text-emerald-500" : "text-gray-400 opacity-30")}>
+                                    <span className={cn("text-[10px] font-bold uppercase flex items-center gap-1", order._is_grouped_material ? "text-emerald-500" : "text-gray-400 opacity-30")}>
                                         AGRUPADO
                                     </span>
                                     {/* Etiqueta CANARIAS: Naranja si aplica, Gris si no */}
-                                    <span className={cn("text-[10px] font-bold uppercase", order._is_canarias_urgent ? "text-orange-500" : "text-gray-400 opacity-30")}>
+                                    <span className={cn("text-[10px] font-bold uppercase flex items-center gap-1", order._is_canarias_urgent ? "text-orange-500" : "text-gray-400 opacity-30")}>
                                         CANARIAS
                                     </span>
                                 </div>
                             </div>
                         );
                     })
-
                 )}
             </div>
 

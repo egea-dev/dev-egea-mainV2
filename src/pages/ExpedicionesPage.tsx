@@ -69,7 +69,7 @@ export default function ExpedicionesPage() {
             const { data, error } = await supabaseProductivity
                 .from('comercial_orders')
                 .select('*')
-                .in('status', ['LISTO_ENVIO', 'ENVIADO', 'ENTREGADO'])
+                .in('status', ['PTE_ENVIO', 'LISTO_ENVIO', 'ENVIADO', 'ENTREGADO'])
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -80,13 +80,13 @@ export default function ExpedicionesPage() {
     // Filtrar pedidos pendientes
     const pendingOrders = useMemo(() => {
         return orders.filter(o =>
-            (o.status === 'LISTO_ENVIO' || o.status === 'ENVIADO') && !o.processed_at
+            o.status === 'PTE_ENVIO' || o.status === 'LISTO_ENVIO'
         );
     }, [orders]);
 
     // Filtrar pedidos procesados
     const processedOrders = useMemo(() => {
-        return orders.filter(o => !!o.processed_at || o.status === 'ENTREGADO');
+        return orders.filter(o => o.status === 'ENVIADO' || o.status === 'ENTREGADO');
     }, [orders]);
 
     // Pedidos a mostrar según modo
@@ -174,7 +174,12 @@ export default function ExpedicionesPage() {
                         {displayedOrders.map((order) => {
                             const daysRemaining = getWorkdaysRemaining(order.due_date);
                             const urgency = getUrgencyBadge(daysRemaining);
-                            const isEnviado = order.status === 'ENVIADO';
+                            const isProcessed = order.status === 'ENVIADO' || order.status === 'ENTREGADO';
+                            const statusLabel = order.status === 'ENTREGADO'
+                                ? 'ENTREGADO'
+                                : isProcessed
+                                    ? 'PROCESADO'
+                                    : 'PTE_ENVIO';
 
                             return (
                                 <Card
@@ -196,12 +201,12 @@ export default function ExpedicionesPage() {
                                                     variant="outline"
                                                     className={cn(
                                                         "text-xs",
-                                                        isEnviado
-                                                            ? "border-blue-500 text-blue-400"
+                                                        isProcessed
+                                                            ? "border-emerald-500 text-emerald-400"
                                                             : "border-amber-500 text-amber-400"
                                                     )}
                                                 >
-                                                    {isEnviado ? 'ENVIADO' : 'LISTO_ENVIO'}
+                                                    {statusLabel}
                                                 </Badge>
                                                 {urgency && urgency.label && (
                                                     <Badge className={cn("text-xs", urgency.color)}>

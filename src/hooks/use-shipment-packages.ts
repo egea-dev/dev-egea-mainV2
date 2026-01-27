@@ -1,5 +1,5 @@
-/**
- * Hook para gestión de bultos de envío (Shipment Packages)
+﻿/**
+ * Hook para gestiÃ³n de bultos de envÃ­o (Shipment Packages)
  * 
  * Proporciona operaciones CRUD para los bultos asociados a un pedido
  */
@@ -106,7 +106,7 @@ export const useCreatePackage = () => {
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['shipment-packages', data.order_id] });
-            toast.success(`Bulto ${data.package_number} añadido`);
+            toast.success(`Bulto ${data.package_number} aÃ±adido`);
         },
         onError: (error: any) => {
             toast.error(`Error al crear bulto: ${error.message}`);
@@ -176,7 +176,7 @@ export const useDeletePackage = () => {
 };
 
 /**
- * Hook para obtener el siguiente número de bulto disponible
+ * Hook para obtener el siguiente nÃºmero de bulto disponible
  */
 export const useNextPackageNumber = (orderId: string | undefined) => {
     return useQuery({
@@ -217,7 +217,7 @@ export const calculateTotalWeight = (packages: ShipmentPackage[]): number => {
 };
 
 /**
- * Valida los bultos antes de procesar el envío
+ * Valida los bultos antes de procesar el envÃ­o
  */
 export interface PackageValidationResult {
     isValid: boolean;
@@ -228,9 +228,13 @@ export const validatePackagesForShipping = (
     packages: ShipmentPackage[],
     expectedTotalUnits: number,
     carrierCompany: string | null,
-    trackingNumber: string | null
+    trackingNumber: string | null,
+    options?: {
+        requireTracking?: boolean;
+    }
 ): PackageValidationResult => {
     const errors: string[] = [];
+    const requireTracking = options?.requireTracking ?? true;
 
     // Al menos 1 bulto registrado
     if (packages.length === 0) {
@@ -249,14 +253,14 @@ export const validatePackagesForShipping = (
         errors.push(`Falta el peso en ${missingWeights.length} bulto(s)`);
     }
 
-    // Empresa de envíos seleccionada
+    // Empresa de envÃ­os seleccionada
     if (!carrierCompany) {
-        errors.push('Debe seleccionar una empresa de envíos');
+        errors.push('Debe seleccionar una empresa de envÃ­os');
     }
 
-    // Número de envío rellenado
-    if (!trackingNumber || trackingNumber.trim() === '') {
-        errors.push('Debe introducir el número de envío/tracking');
+    // NÃºmero de envÃ­o rellenado
+    if (requireTracking && (!trackingNumber || trackingNumber.trim() === '')) {
+        errors.push('Debe introducir el nÃºmero de envÃ­o/tracking');
     }
 
     return {
@@ -264,3 +268,4 @@ export const validatePackagesForShipping = (
         errors
     };
 };
+
