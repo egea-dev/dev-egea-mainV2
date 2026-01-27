@@ -1252,7 +1252,12 @@ export function ProductionPage() {
                               <span className="font-mono font-bold text-sm text-[#B5B8BA]">
                                 {order.order_number}
                               </span>
-                              <div className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full px-2 py-0.5 font-bold uppercase">
+                              <div className={cn(
+                                "text-[10px] rounded-full px-2 py-0.5 font-bold uppercase border",
+                                order.status === 'ENVIADO' ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/30" :
+                                  order.status === 'ENTREGADO' ? "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30" :
+                                    "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                              )}>
                                 {order.status}
                               </div>
                             </div>

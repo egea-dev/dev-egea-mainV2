@@ -80,9 +80,9 @@ const getOrderColor = (status: string) => {
         case 'LISTO_ENVIO':
             return { bg: 'bg-card/90', text: 'text-blue-300', border: 'border-blue-500/50', badge: 'bg-blue-400' };
         case 'ENVIADO':
-            return { bg: 'bg-card/90', text: 'text-emerald-300', border: 'border-emerald-400/50', badge: 'bg-emerald-400' };
+            return { bg: 'bg-card/90', text: 'text-cyan-300', border: 'border-cyan-400/50', badge: 'bg-cyan-400' };
         case 'ENTREGADO':
-            return { bg: 'bg-card/90', text: 'text-emerald-300', border: 'border-emerald-500/50', badge: 'bg-emerald-500' };
+            return { bg: 'bg-card/90', text: 'text-fuchsia-300', border: 'border-fuchsia-500/50', badge: 'bg-fuchsia-500' };
         case 'CANCELADO':
             return { bg: 'bg-card/90', text: 'text-red-300', border: 'border-red-500/50', badge: 'bg-red-500' };
         default:
@@ -258,7 +258,7 @@ export const CalendarModule = ({
         try {
             if (mode === 'commercial') {
                 // Update order delivery_date in PRODUCTIVITY database
-                const { error } = await supabaseProductivity
+                const { error } = await (supabaseProductivity as any)
                     .from('comercial_orders')
                     .update({ delivery_date: newDate })
                     .eq('id', itemToMove.id);
@@ -267,7 +267,7 @@ export const CalendarModule = ({
                 toast.success(`Pedido ${itemToMove.order_number} asignado a ${format(targetDay, 'd MMM', { locale: es })}`);
             } else {
                 // Update task start_date in screen_data
-                const { error } = await supabase
+                const { error } = await (supabase as any)
                     .from('screen_data')
                     .update({ start_date: newDate })
                     .eq('id', itemToMove.id);

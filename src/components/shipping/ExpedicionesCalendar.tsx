@@ -1,8 +1,8 @@
 ﻿/**
- * ExpedicionesCalendar - Calendario especÃ­fico para Expediciones
+ * ExpedicionesCalendar - Calendario específico para Expediciones
  * 
  * - Vista mensual por defecto
- * - Estados especificos: PTE_ENVIO, ENVIADO, ENTREGADO
+ * - Estados específicos: PTE_ENVIO, ENVIADO, ENTREGADO
  * - Sin tabs Comercial/Instalaciones
  * - Muestra pedidos pendientes Y procesados
  */
@@ -58,22 +58,22 @@ interface ExpedicionesCalendarProps {
     onOrderClick?: (order: any) => void;
 }
 
-// Estados especÃ­ficos de Expediciones
+// Estados específicos de Expediciones
 const EXPEDICIONES_STATUS_LEGEND = [
-    { value: 'PTE_ENVIO', label: 'Pendiente EnvÃ­o', color: 'bg-amber-500' },
-    { value: 'ENVIADO', label: 'Procesado', color: 'bg-emerald-500' },
-    { value: 'ENTREGADO', label: 'Entregado', color: 'bg-blue-500' },
+    { value: 'PTE_ENVIO', label: 'Pendiente Envío', color: 'bg-blue-500' },
+    { value: 'ENVIADO', label: 'Procesado', color: 'bg-cyan-500' },
+    { value: 'ENTREGADO', label: 'Entregado', color: 'bg-fuchsia-500' },
 ] as const;
 
 const getExpedicionesStatusColor = (status: string) => {
     switch (status) {
         case 'PTE_ENVIO':
         case 'LISTO_ENVIO':
-            return { bg: 'bg-card/90', text: 'text-amber-300', border: 'border-amber-500/50', badge: 'bg-amber-500' };
-        case 'ENVIADO':
-            return { bg: 'bg-card/90', text: 'text-emerald-300', border: 'border-emerald-500/50', badge: 'bg-emerald-500' };
-        case 'ENTREGADO':
             return { bg: 'bg-card/90', text: 'text-blue-300', border: 'border-blue-500/50', badge: 'bg-blue-500' };
+        case 'ENVIADO':
+            return { bg: 'bg-card/90', text: 'text-cyan-300', border: 'border-cyan-500/50', badge: 'bg-cyan-500' };
+        case 'ENTREGADO':
+            return { bg: 'bg-card/90', text: 'text-fuchsia-300', border: 'border-fuchsia-500/50', badge: 'bg-fuchsia-500' };
         default:
             return { bg: 'bg-card/90', text: 'text-muted-foreground', border: 'border-border/60', badge: 'bg-muted-foreground' };
     }
@@ -142,7 +142,7 @@ export const ExpedicionesCalendar = ({
         return eachDayOfInterval({ start, end });
     }, [currentDate, viewMode]);
 
-    const weekDays = ['Lun', 'Mar', 'MiÃ©', 'Jue', 'Vie', 'SÃ¡b'];
+    const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     const workingDays = useMemo(() => calendarDays.filter(day => day.getDay() !== 0), [calendarDays]);
 
     const handlePrev = () => {
@@ -177,7 +177,7 @@ export const ExpedicionesCalendar = ({
         return format(currentDate, 'MMMM yyyy', { locale: es });
     }, [currentDate, viewMode]);
 
-    // Obtener pedidos para un dÃ­a (por delivery_date o due_date)
+    // Obtener pedidos para un día (por delivery_date o due_date)
     const getDayOrders = (day: Date) => {
         return orders.filter(order => {
             const dateField = order.delivery_date || order.due_date;
@@ -240,7 +240,7 @@ export const ExpedicionesCalendar = ({
         setDragOverDay(null);
     };
 
-    // Contadores para estadÃ­sticas
+    // Contadores para estadísticas
     const stats = useMemo(() => {
         const pendientes = orders.filter(o => o.status === 'PTE_ENVIO' || o.status === 'LISTO_ENVIO').length;
         const procesados = orders.filter(o => o.status === 'ENVIADO').length;
@@ -254,18 +254,16 @@ export const ExpedicionesCalendar = ({
             <div className="flex flex-col gap-4 p-4 rounded-3xl border border-border/60 bg-card backdrop-blur-md shadow-2xl">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl border bg-primary/10 border-primary/20 text-primary">
-                            <Truck className="w-5 h-5" />
-                        </div>
+                        <Truck className="w-5 h-5 text-primary" />
                         <div className="flex-1">
                             <h2 className="text-xl font-bold text-white tracking-tight">Calendario de Expediciones</h2>
                             <p className="text-xs text-slate-400 font-medium">
-                                PrevisiÃ³n de entregas y envÃ­os â€¢ {stats.total} pedidos
+                                Previsión de entregas y envíos • {stats.total} pedidos
                             </p>
                         </div>
                     </div>
 
-                    {/* EstadÃ­sticas rÃ¡pidas */}
+                    {/* Estadísticas rápidas */}
                     <div className="flex gap-2">
                         <Badge variant="outline" className="border-amber-500/50 text-amber-400 py-1 px-3">
                             <Package className="w-3 h-3 mr-1.5" />
@@ -522,7 +520,7 @@ export const ExpedicionesCalendar = ({
                     <DialogHeader>
                         <DialogTitle className="text-xl font-bold flex items-center gap-2">
                             <CalendarIcon className="w-5 h-5 text-primary" />
-                            {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : 'Detalle del dÃ­a'}
+                            {selectedDate ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es }) : 'Detalle del día'}
                         </DialogTitle>
                         <DialogDescription>
                             Expediciones programadas para esta fecha.
@@ -565,7 +563,7 @@ export const ExpedicionesCalendar = ({
                                 })
                             ) : (
                                 <div className="text-center py-10 text-muted-foreground border border-dashed border-border/60 rounded-xl">
-                                    No hay expediciones para este dÃ­a.
+                                    No hay expediciones para este día.
                                 </div>
                             )}
                         </div>
@@ -580,6 +578,3 @@ export const ExpedicionesCalendar = ({
 };
 
 export default ExpedicionesCalendar;
-
-
-

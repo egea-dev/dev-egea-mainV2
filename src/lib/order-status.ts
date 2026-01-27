@@ -58,8 +58,8 @@ export const ORDER_STATUS_BADGES: Record<OrderStatus, string> = {
   PAGADO: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
   EN_PROCESO: "bg-amber-500/15 text-amber-300 border-amber-500/40",
   PTE_ENVIO: "bg-blue-500/15 text-blue-300 border-blue-500/40",
-  ENVIADO: "bg-emerald-400/15 text-emerald-300 border-emerald-400/40",
-  ENTREGADO: "bg-emerald-600/15 text-emerald-300 border-emerald-600/40",
+  ENVIADO: "bg-cyan-500/15 text-cyan-300 border-cyan-500/40",
+  ENTREGADO: "bg-fuchsia-600/15 text-fuchsia-300 border-fuchsia-600/40",
   CANCELADO: "bg-red-500/15 text-red-300 border-red-500/40",
 };
 
@@ -68,7 +68,7 @@ export const ORDER_STATUS_TEXT: Record<OrderStatus, string> = {
   PAGADO: "text-emerald-400",
   EN_PROCESO: "text-amber-400",
   PTE_ENVIO: "text-blue-400",
-  ENVIADO: "text-emerald-300",
-  ENTREGADO: "text-emerald-400",
+  ENVIADO: "text-cyan-400",
+  ENTREGADO: "text-fuchsia-400",
   CANCELADO: "text-red-400",
 };

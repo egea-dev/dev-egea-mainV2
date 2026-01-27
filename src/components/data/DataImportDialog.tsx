@@ -9,9 +9,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { upsertTask } from "@/lib/upsert-task"
 import { supabase } from "@/integrations/supabase/client"
-import { read, utils } from "xlsx"
 import { mapRowToTemplateData } from "@/lib/template-import"
 import { format } from "date-fns"
+import { loadXlsx } from "@/lib/xlsx-loader"
 
 type RawCell = string | number | boolean | Date | null | undefined
 type NormalizedPayload = Record<string, unknown>
@@ -212,9 +212,10 @@ export const DataImportDialog = ({ open, onOpenChange, screenId, templateFields,
 
     setLoading(true)
     try {
+      const { read, utils } = await loadXlsx()
       const buffer = await file.arrayBuffer()
-  const workbook = read(buffer, { type: "array", cellDates: true })
-  const sheets = workbook.SheetNames.map((name) => ({
+      const workbook = read(buffer, { type: "array", cellDates: true })
+      const sheets = workbook.SheetNames.map((name) => ({
         name,
         matrix: utils.sheet_to_json(workbook.Sheets[name], {
           header: 1,

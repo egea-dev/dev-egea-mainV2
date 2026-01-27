@@ -83,11 +83,11 @@ interface Order {
   _priority_score?: number;
 }
 
-// Eliminada lÃ³gica de TWELVE_HOURS_MS para que los envÃ­os pasen al historial inmediatamente
+// Eliminada lógica de TWELVE_HOURS_MS para que los envíos pasen al historial inmediatamente
 
 const summarizeLines = (order: Order) => {
   if (!order.lines || !order.lines.length) return 'Sin desglose cargado';
-  const preview = order.lines.slice(0, 2).map(line => `${line.quantity} x ${line.width}x${line.height}cm`).join('  Â·  ');
+  const preview = order.lines.slice(0, 2).map(line => `${line.quantity} x ${line.width}x${line.height}cm`).join('  ·  ');
   const remaining = order.lines.length > 2 ? ` +${order.lines.length - 2}` : '';
   return `${preview}${remaining}`;
 };
@@ -117,7 +117,7 @@ export default function ShippingScanPage() {
   const orientation = useOrientation();
   const deviceType = useDeviceType();
 
-  // Estado para alertas mÃ³viles
+  // Estado para alertas móviles
   const [alertState, setAlertState] = useState<{
     isOpen: boolean;
     type: AlertType;
@@ -157,14 +157,14 @@ export default function ShippingScanPage() {
   const loadOrders = async () => {
     try {
       setIsLoading(true);
-      console.log('ðŸ” Cargando Ã³rdenes de envÃ­o...');
+      console.log('🔍 Cargando órdenes de envío...');
 
       const { data: ordersData, error: ordersError } = await (supabaseProductivity.from('produccion_work_orders') as any)
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('ðŸ“¦ Ã“rdenes recibidas:', ordersData?.length || 0, 'registros');
-      if (ordersError) console.error('âŒ Error cargando Ã³rdenes:', ordersError);
+      console.log('📦 Órdenes recibidas:', ordersData?.length || 0, 'registros');
+      if (ordersError) console.error('❌ Error cargando órdenes:', ordersError);
 
       if (ordersError) throw ordersError;
 
@@ -189,7 +189,7 @@ export default function ShippingScanPage() {
       const data = ordersData?.map((o: any) => {
         const commOrder = commercialData.find((c: any) => c.order_number === o.order_number || (o.admin_code && c.admin_code === o.admin_code));
 
-        // Priorizar lÃ­neas de la columna JSON, si no, usar la tabla relacional
+        // Priorizar líneas de la columna JSON, si no, usar la tabla relacional
         const lines = (Array.isArray(o.lines) && o.lines.length > 0)
           ? o.lines
           : (linesData?.filter((l: any) => l.work_order_id === o.id) || []);
@@ -214,14 +214,14 @@ export default function ShippingScanPage() {
       });
       setOrders(data || []);
     } catch (error: any) {
-      console.error('ðŸ’¥ Error loading orders:', error);
-      toast.error('Error al cargar Ã³rdenes: ' + error.message);
+      console.error('💥 Error loading orders:', error);
+      toast.error('Error al cargar órdenes: ' + error.message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Cargar Ã³rdenes al montar
+  // Cargar órdenes al montar
   useEffect(() => {
     loadOrders();
   }, []);
@@ -230,25 +230,25 @@ export default function ShippingScanPage() {
     // Estados que ya NO deben aparecer en expediciones activas
     const archivedStatuses = ['ENVIADO', 'ENTREGADO', 'CANCELADO'];
 
-    // Log para depuraciÃ³n
-    console.log('ðŸ“‹ Estados de pedidos cargados:', orders.map(o => ({ order_number: o.order_number, status: o.status })));
+    // Log para depuración
+    console.log('📋 Estados de pedidos cargados:', orders.map(o => ({ order_number: o.order_number, status: o.status })));
 
     const filtered = orders.filter(o => {
       // Excluir pedidos ya archivados
       if (archivedStatuses.includes(o.status)) return false;
 
-      // Solo mostrar pedidos LISTO_ENVIO (producciÃ³n terminada, listos para escanear)
+      // Solo mostrar pedidos LISTO_ENVIO (producción terminada, listos para escanear)
       return o.status === 'LISTO_ENVIO';
     });
 
-    // APLICAR PRIORIZACIÃ“N DINÃMICA
+    // APLICAR PRIORIZACIÓN DINÁMICA
     return sortWorkOrdersByPriority(filtered as any);
   }, [orders]);
 
   const historyShipments = useMemo(() => {
     return orders.filter(o => {
       // Solo pedidos ya enviados o entregados van al historial
-      // LISTO_ENVIO NO estÃ¡ aquÃ­ porque ahora estÃ¡ en activeShipments
+      // LISTO_ENVIO NO está aquí porque ahora está en activeShipments
       return o.status === 'ENVIADO' || o.status === 'ENTREGADO';
     });
   }, [orders]);
@@ -263,7 +263,7 @@ export default function ShippingScanPage() {
       // Solo enviar campos que existen en produccion_work_orders
       const validFields: Record<string, any> = {};
 
-      // Campos vÃ¡lidos segÃºn el esquema de produccion_work_orders
+      // Campos válidos según el esquema de produccion_work_orders
       const allowedFields = ['status', 'priority', 'notes', 'quality_check_status', 'updated_at'];
 
       for (const key of allowedFields) {
@@ -275,7 +275,7 @@ export default function ShippingScanPage() {
       // Siempre actualizar updated_at
       validFields.updated_at = new Date().toISOString();
 
-      if (Object.keys(validFields).length > 1) { // MÃ¡s que solo updated_at
+      if (Object.keys(validFields).length > 1) { // Más que solo updated_at
         const { error } = await supabaseProductivity
           .from('produccion_work_orders')
           .update(validFields as any)
@@ -287,11 +287,11 @@ export default function ShippingScanPage() {
         }
       }
 
-      // SincronizaciÃ³n con comercial_orders si el estado cambia
+      // Sincronización con comercial_orders si el estado cambia
       if (patch.status) {
         const order = orders.find(o => o.id === orderId);
         if (order && order.order_number) {
-          console.log(`ðŸ”„ Sincronizando estado ${patch.status} con comercial para orden ${order.order_number}`);
+          console.log(`🔄 Sincronizando estado ${patch.status} con comercial para orden ${order.order_number}`);
 
           const { error: syncError } = await supabaseProductivity
             .from('comercial_orders')
@@ -301,7 +301,7 @@ export default function ShippingScanPage() {
           if (syncError) {
             console.warn("Error sincronizando estado con comercial:", syncError);
           } else {
-            console.log(`âœ“ Sincronizado estado ${patch.status} en comercial_orders para ${order.order_number}`);
+            console.log(`✓ Sincronizado estado ${patch.status} en comercial_orders para ${order.order_number}`);
           }
         }
       }
@@ -313,7 +313,7 @@ export default function ShippingScanPage() {
   };
 
   const handleScan = async (code: string) => {
-    // Parsear el cÃ³digo QR usando la utilidad centralizada
+    // Parsear el código QR usando la utilidad centralizada
     const qrData = parseQRCode(code);
     const orderNum = qrData.orderNumber || extractOrderNumber(code);
 
@@ -330,13 +330,13 @@ export default function ShippingScanPage() {
     }
 
     if (scannedOrder && scannedOrder.order_number !== orderNum && scannedPackagesCount > 0 && scannedPackagesCount < (scannedOrder.packages_count || 1)) {
-      showAlert('error', 'Â¡ALTO!', 'EstÃ¡s escaneando un pedido diferente mientras el actual estÃ¡ incompleto. No mezcles pedidos.', () => { });
+      showAlert('error', '¡ALTO!', 'Estás escaneando un pedido diferente mientras el actual está incompleto. No mezcles pedidos.', () => { });
       return;
     }
 
     const order = orders.find(o => o.order_number === orderNum);
     if (order) {
-      // Validar los datos del QR contra la orden de la BD INCLUYENDO el desglose de lÃ­neas
+      // Validar los datos del QR contra la orden de la BD INCLUYENDO el desglose de líneas
       const validation = validateQRWithLines(qrData, {
         order_number: order.order_number,
         customer_name: order.customer_name,
@@ -344,41 +344,41 @@ export default function ShippingScanPage() {
         color: order.color,
         quantity_total: order.quantity_total,
         status: order.status,
-        lines: order.lines,  // â† NUEVO: Validar desglose de lÃ­neas
+        lines: order.lines,  // ← NUEVO: Validar desglose de líneas
       });
 
-      // Mostrar alertas segÃºn el resultado de la validaciÃ³n
+      // Mostrar alertas según el resultado de la validación
       if (!validation.isValid) {
-        showAlert('error', 'QR InvÃ¡lido', 'El nÃºmero de orden del QR no coincide con ningÃºn pedido en el sistema.');
+        showAlert('error', 'QR Inválido', 'El número de orden del QR no coincide con ningún pedido en el sistema.');
         return;
       }
 
-      // Verificar discrepancias en el desglose de lÃ­neas
+      // Verificar discrepancias en el desglose de líneas
       if (validation.linesDiscrepancies && validation.linesDiscrepancies.length > 0) {
         const linesMessage = validation.linesDiscrepancies.join('\n');
         showAlert(
           'warning',
-          'âš ï¸ Advertencia: Problemas en el desglose',
-          `Se detectaron problemas en el desglose de artÃ­culos:\n\n${linesMessage}\n\nRevisa el pedido antes de continuar.`
+          '⚠️ Advertencia: Problemas en el desglose',
+          `Se detectaron problemas en el desglose de artículos:\n\n${linesMessage}\n\nRevisa el pedido antes de continuar.`
         );
       } else if (validation.hasDiscrepancies) {
         const discrepancyMessage = validation.discrepancies.join('\n');
         showAlert(
           'warning',
           'Advertencia: Discrepancias detectadas',
-          `Se encontraron diferencias entre el QR y la base de datos:\n\n${discrepancyMessage}\n\nSe usarÃ¡n los datos de la base de datos.`
+          `Se encontraron diferencias entre el QR y la base de datos:\n\n${discrepancyMessage}\n\nSe usarán los datos de la base de datos.`
         );
       } else if (qrData.isLegacyFormat) {
-        toast.info(`QR en formato antiguo - Datos tÃ©cnicos cargados desde BD`);
+        toast.info(`QR en formato antiguo - Datos técnicos cargados desde BD`);
       }
 
-      // Validar que la orden estÃ© lista para envÃ­o
+      // Validar que la orden esté lista para envío
       const validStatuses = ['PTE_ENVIO', 'LISTO_ENVIO', 'ENVIADO'];
       const isValidForShipping = validStatuses.includes(order.status) ||
         (order.status === 'EN_PROCESO' && order.needs_shipping_validation);
 
       if (!isValidForShipping) {
-        toast.error(`Este pedido no estÃ¡ listo para envÃ­o (Estado: ${order.status})`);
+        toast.error(`Este pedido no está listo para envío (Estado: ${order.status})`);
         return;
       }
       const isReEntry = (order.scanned_packages || 0) > 0 && (order.scanned_packages || 0) < (order.packages_count || 1);
@@ -392,7 +392,7 @@ export default function ShippingScanPage() {
       setScannedPackagesCount(order.scanned_packages || 0);
 
       const linesCount = order.lines?.length || 0;
-      toast.success(`âœ“ Orden ${orderNum} validada (${linesCount} lÃ­neas)`);
+      toast.success(`✓ Orden ${orderNum} validada (${linesCount} líneas)`);
     } else {
       toast.error(`Pedido no encontrado: ${orderNum}`);
     }
@@ -414,31 +414,31 @@ export default function ShippingScanPage() {
     }
 
     try {
-      console.log('ðŸš€ Iniciando validaciÃ³n de envÃ­o para:', scannedOrder.id);
+      console.log('🚀 Iniciando validación de envío para:', scannedOrder.id);
 
       // Cambiar estado a ENVIADO para que aparezca en historial
       // (ENVIADO indica que ya fue validado y despachado)
       const { data: prodData, error: prodError } = await (supabaseProductivity as any)
         .from('produccion_work_orders')
         .update({
-          status: 'ENVIADO',  // Estado final despuÃ©s de validar envÃ­o
+          status: 'ENVIADO',  // Estado final después de validar envío
           tracking_number: resolvedTracking || null,
           updated_at: new Date().toISOString()
         } as any)
         .eq('id', scannedOrder.id)
         .select();
 
-      console.log('ðŸ“¤ Resultado update produccion_work_orders:', { prodData, prodError });
+      console.log('📊 Resultado update produccion_work_orders:', { prodData, prodError });
 
       if (prodError) {
-        console.error('âŒ Error actualizando produccion_work_orders:', prodError);
+        console.error('❌ Error actualizando produccion_work_orders:', prodError);
         toast.error('Error al actualizar el estado del pedido: ' + prodError.message);
         return;
       }
 
-      // Sincronizar con comercial_orders - aquÃ­ sÃ­ usamos ENVIADO
+      // Sincronizar con comercial_orders - aquí sí usamos ENVIADO
       if (scannedOrder.order_number) {
-        console.log(`ðŸ”„ Sincronizando estado ENVIADO con comercial para orden ${scannedOrder.order_number}`);
+        console.log(`🔄 Sincronizando estado ENVIADO con comercial para orden ${scannedOrder.order_number}`);
         const { data: commData, error: commError } = await (supabaseProductivity as any)
           .from('comercial_orders')
           .update({
@@ -449,18 +449,18 @@ export default function ShippingScanPage() {
           .eq('order_number', scannedOrder.order_number)
           .select();
 
-        console.log('ðŸ“¤ Resultado update comercial_orders:', { commData, commError });
+        console.log('📊 Resultado update comercial_orders:', { commData, commError });
 
         if (commError) {
-          console.warn('âš ï¸ Error sincronizando con comercial_orders:', commError);
+          console.warn('⚠️ Error sincronizando con comercial_orders:', commError);
         } else if (!commData || commData.length === 0) {
-          console.log(`â„¹ï¸ No existe pedido comercial con order_number ${scannedOrder.order_number} - sincronizaciÃ³n no aplicable (pedido solo de producciÃ³n)`);
+          console.log(`ℹ️ No existe pedido comercial con order_number ${scannedOrder.order_number} - sincronización no aplicable (pedido solo de producción)`);
         } else {
-          console.log(`âœ“ Sincronizado estado ENVIADO en comercial_orders para ${scannedOrder.order_number}`);
+          console.log(`✓ Sincronizado estado ENVIADO en comercial_orders para ${scannedOrder.order_number}`);
         }
 
-        // Archivar el pedido llamando a la funciÃ³n de base de datos
-        console.log(`ðŸ“¦ Archivando pedido ${scannedOrder.order_number}...`);
+        // Archivar el pedido llamando a la función de base de datos
+        console.log(`📦 Archivando pedido ${scannedOrder.order_number}...`);
         const { data: archiveData, error: archiveError } = await (supabaseProductivity as any)
           .rpc('archive_completed_order', {
             p_order_number: scannedOrder.order_number,
@@ -469,21 +469,21 @@ export default function ShippingScanPage() {
           });
 
         if (archiveError) {
-          console.warn('âš ï¸ No se pudo archivar (funciÃ³n RPC puede no existir aÃºn):', archiveError.message);
-          // No bloquear el flujo si el archivado falla - puede que la migraciÃ³n no se haya aplicado
+          console.warn('⚠️ No se pudo archivar (función RPC puede no existir aún):', archiveError.message);
+          // No bloquear el flujo si el archivado falla - puede que la migración no se haya aplicado
         } else {
-          console.log(`âœ“ Pedido archivado con ID: ${archiveData}`);
+          console.log(`✓ Pedido archivado con ID: ${archiveData}`);
         }
       }
 
-      // Alerta de Ã©xito
-      toast.success('âœ“ EnvÃ­o validado correctamente');
+      // Alerta de éxito
+      toast.success('✓ Envío validado correctamente');
 
       await loadOrders();
       setScannedOrder(null);
     } catch (error: any) {
-      console.error('âŒ Error general en validateShipment:', error);
-      toast.error('Error al validar envÃ­o: ' + error.message);
+      console.error('❌ Error general en validateShipment:', error);
+      toast.error('Error al validar envío: ' + error.message);
     }
   };
 
@@ -718,8 +718,8 @@ export default function ShippingScanPage() {
 
   return (
     <PageShell
-      title="ExpediciÃ³n y LogÃ­stica"
-      description="Control de salidas y gestiÃ³n de envÃ­os"
+      title="Expedición y Logística"
+      description="Control de salidas y gestión de envíos"
       className="space-y-0"
       actions={
         <div className="flex gap-2">
@@ -733,10 +733,10 @@ export default function ShippingScanPage() {
       }
     >
       <div className="flex flex-col gap-2">
-        {/* ESCÃNER RESPONSIVE CON BOTÃ“N CTA */}
+        {/* ESCÁNER RESPONSIVE CON BOTÓN CTA */}
         <RoleBasedRender hideForRoles={['admin', 'manager']}>
           <div className="w-full">
-            {/* Scanner Button - Reemplaza Ã¡rea de escÃ¡ner estÃ¡tico */}
+            {/* Scanner Button - Reemplaza área de escáner estático */}
             <div className="bg-[#323438] border border-[#45474A] rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
                 <QrCode className="w-5 h-5 text-indigo-400" />
@@ -754,7 +754,7 @@ export default function ShippingScanPage() {
               <div className="flex gap-2 mt-3">
                 <input
                   type="text"
-                  placeholder="O introduce cÃ³digo manualmente..."
+                  placeholder="O introduce código manualmente..."
                   className="flex-1 bg-[#1A1D1F] border border-[#45474A] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-indigo-500 outline-none"
                   value={qrInput}
                   onChange={(e) => setQrInput(e.target.value)}
@@ -779,12 +779,12 @@ export default function ShippingScanPage() {
             handleScan(code);
             setScannerModalOpen(false);
           }}
-          title="Escanear Pedido de EnvÃ­o"
+          title="Escanear Pedido de Envío"
         />
 
         {/* CONTENEDOR DE COLA Y DETALLE - LADO A LADO EN DESKTOP */}
         <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
-          {/* COLA DE ALMACÃ‰N */}
+          {/* COLA DE ALMACÉN */}
           <div className="w-full lg:w-[450px] shrink-0 flex flex-col gap-4">
             <Tabs defaultValue="active" className="w-full">
               <div className="p-1 mb-4">
@@ -1227,7 +1227,7 @@ export default function ShippingScanPage() {
                       }}
                       className="w-full py-3 bg-[#45474A] text-white rounded-xl hover:bg-[#6E6F71] font-medium"
                     >
-                      Volver al EscÃ¡ner
+                      Volver al Escáner
                     </button>
                   )}
                 </div>
@@ -1235,7 +1235,7 @@ export default function ShippingScanPage() {
             ) : (
               <div className="h-full border-2 border-dashed border-[#45474A] rounded-2xl flex flex-col items-center justify-center text-[#8B8D90] bg-[#1A1D1F]/50">
                 <Truck className="w-16 h-16 mb-4 opacity-30" />
-                <h3 className="text-xl font-bold text-[#8B8D90] mb-2">Zona de ExpediciÃ³n</h3>
+                <h3 className="text-xl font-bold text-[#8B8D90] mb-2">Zona de Expedición</h3>
                 <p className="text-[#6E6F71] max-w-md text-center">
                   Selecciona un pedido de la lista o escanea el QR para verificar bultos y procesar la salida.
                 </p>

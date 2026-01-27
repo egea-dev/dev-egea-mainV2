@@ -1,8 +1,9 @@
-import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+import { loadXlsx } from './xlsx-loader';
 
 // Función para exportar a Excel
-export const exportToExcel = (data: Record<string, unknown>[], fileName: string) => {
+export const exportToExcel = async (data: Record<string, unknown>[], fileName: string) => {
+  const XLSX = await loadXlsx();
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Datos");

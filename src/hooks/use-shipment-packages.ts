@@ -1,5 +1,5 @@
 ﻿/**
- * Hook para gestiÃ³n de bultos de envÃ­o (Shipment Packages)
+ * Hook para gestión de bultos de envío (Shipment Packages)
  * 
  * Proporciona operaciones CRUD para los bultos asociados a un pedido
  */
@@ -106,7 +106,7 @@ export const useCreatePackage = () => {
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['shipment-packages', data.order_id] });
-            toast.success(`Bulto ${data.package_number} aÃ±adido`);
+            toast.success(`Bulto ${data.package_number} añadido`);
         },
         onError: (error: any) => {
             toast.error(`Error al crear bulto: ${error.message}`);
@@ -176,7 +176,7 @@ export const useDeletePackage = () => {
 };
 
 /**
- * Hook para obtener el siguiente nÃºmero de bulto disponible
+ * Hook para obtener el siguiente número de bulto disponible
  */
 export const useNextPackageNumber = (orderId: string | undefined) => {
     return useQuery({
@@ -217,7 +217,7 @@ export const calculateTotalWeight = (packages: ShipmentPackage[]): number => {
 };
 
 /**
- * Valida los bultos antes de procesar el envÃ­o
+ * Valida los bultos antes de procesar el envío
  */
 export interface PackageValidationResult {
     isValid: boolean;
@@ -253,14 +253,14 @@ export const validatePackagesForShipping = (
         errors.push(`Falta el peso en ${missingWeights.length} bulto(s)`);
     }
 
-    // Empresa de envÃ­os seleccionada
+    // Empresa de envíos seleccionada
     if (!carrierCompany) {
-        errors.push('Debe seleccionar una empresa de envÃ­os');
+        errors.push('Debe seleccionar una empresa de envíos');
     }
 
-    // NÃºmero de envÃ­o rellenado
+    // Número de envío rellenado
     if (requireTracking && (!trackingNumber || trackingNumber.trim() === '')) {
-        errors.push('Debe introducir el nÃºmero de envÃ­o/tracking');
+        errors.push('Debe introducir el número de envío/tracking');
     }
 
     return {

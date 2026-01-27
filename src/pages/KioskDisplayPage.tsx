@@ -38,7 +38,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
     CONFECCION: { label: "Confección", color: "bg-violet-500/10 text-violet-400 border-violet-500/30", icon: Pause },
     TAPICERIA: { label: "Tapicería", color: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30", icon: Pause },
     CONTROL_CALIDAD: { label: "Calidad", color: "bg-amber-500/10 text-amber-400 border-amber-500/30", icon: AlertTriangle },
-    LISTO_ENVIO: { label: "Listo", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", icon: CheckCircle2 },
+    LISTO_ENVIO: { label: "Listo", color: "bg-blue-500/10 text-blue-400 border-blue-500/30", icon: CheckCircle2 },
 };
 
 const KioskDisplayPage: React.FC = () => {
@@ -128,9 +128,9 @@ const KioskDisplayPage: React.FC = () => {
 
             const commDataList = (commResp as any[]) || [];
 
-            let finalCommData = null;
+            let finalCommData: any = null;
             if (prodData && commDataList.length > 0) {
-                finalCommData = commDataList.find(c => c.order_number === prodData.order_number) || commDataList[0];
+                finalCommData = commDataList.find((c: any) => c.order_number === (prodData as any).order_number) || commDataList[0];
             } else if (commDataList.length > 0) {
                 finalCommData = commDataList[0];
             }

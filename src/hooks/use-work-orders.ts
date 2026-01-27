@@ -141,7 +141,7 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
     });
 };
 
-// Hook para obtener una work order especÃ­fica
+// Hook para obtener una work order específica
 export const useWorkOrder = (id: string) => {
     return useQuery({
         queryKey: ['work-order', id],
@@ -287,7 +287,7 @@ export const useUpdateWorkOrderStatus = () => {
             return data as WorkOrder;
         },
         onSuccess: async (data, variables) => {
-            // SincronizaciÃ³n ProducciÃ³n -> Comercial
+            // Sincronización Producción -> Comercial
             if (data?.order_number) {
                 const mapProductionToCommercial = (status: string): string | null => {
                     switch (status.toUpperCase()) {
@@ -305,34 +305,20 @@ export const useUpdateWorkOrderStatus = () => {
                     }
                 };
 
-                const commStatus = mapProductionToCommercial(variables.status);
-                if (commStatus) {
-                    console.log(`ðŸ”„ Sincronizando estado ${commStatus} con comercial para orden ${data.order_number}`);
+                const commercialStatus = mapProductionToCommercial(data.status);
 
-                    // Preparar payload con flag de notificaciÃ³n si es ENVIADO
-                    const updatePayload: any = { status: commStatus };
-                    if (commStatus === 'ENVIADO') {
-                        updatePayload.shipping_notification_pending = true;
-                    }
-
-                    const { error: syncError } = await (supabase as any)
+                if (commercialStatus) {
+                    await supabase
                         .from('comercial_orders')
-                        .update(updatePayload)
+                        .update({
+                            status: commercialStatus,
+                            updated_at: new Date().toISOString()
+                        } as any)
                         .eq('order_number', data.order_number);
-
-                    if (syncError) {
-                        console.warn("Error sincronizando estado con comercial:", syncError);
-                    } else {
-                        console.log(`âœ“ Sincronizado estado ${commStatus} en comercial`);
-                        if (commStatus === 'ENVIADO') {
-                            console.log(`ðŸ“§ NotificaciÃ³n de envÃ­o pendiente para ${data.order_number}`);
-                        }
-                    }
                 }
             }
 
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
             toast.success("Estado actualizado exitosamente");
         },
         onError: (error: any) => {
@@ -340,7 +326,6 @@ export const useUpdateWorkOrderStatus = () => {
         }
     });
 };
-
 
 // Hook para asignar usuario
 export const useAssignTechnician = () => {
@@ -466,4 +451,3 @@ export const useUpdateQualityCheck = () => {
         }
     });
 };
-

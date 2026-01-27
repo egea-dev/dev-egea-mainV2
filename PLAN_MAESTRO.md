@@ -1,41 +1,49 @@
-﻿# PLAN MAESTRO – AUDITORIA INTEGRAL
-**Proyecto:** Revision de arquitectura, UI/UX, seguridad y preparacion de sub-agentes  
+﻿# PLAN MAESTRO – AUDITORÍA INTEGRAL
+**Proyecto:** Revisión de arquitectura, UI/UX, seguridad y preparación de sub-agentes  
 **Fecha:** 2026-01-27  
 **Autor:** Codex (resumen ejecutivo sin Chain-of-Thought)
 
-## 0) Advertencias y reglas
-- No se incluye Chain-of-Thought. Solo resumenes claros y decisiones.
-- No se usaran comandos `--force-with-lease` salvo solicitud explicita.
+---
 
-## 1) Analisis de logica (Grafo de dependencias)
+## 0) Advertencias y reglas
+- No se incluye Chain-of-Thought. Solo resúmenes claros y decisiones.
+- No se usarán comandos `--force-with-lease` salvo solicitud explícita.
+
+---
+
+## 1) Análisis de lógica (Grafo de dependencias)
 
 ### Objetivo
-Hacer el grafo de dependencias mas logico eliminando ciclos y clarificando capas.
+Hacer el grafo de dependencias más lógico eliminando ciclos y clarificando capas.
 
 ### Entregables
-- Mapa del grafo con modulos y dependencias.
+- Mapa del grafo con módulos y dependencias.
 - Lista de ciclos (A → B → C → A).
 - Plan de refactor priorizado.
 
-### Criterios de aceptacion
-- Identificacion de ciclos reales.
+### Criterios de aceptación
+- Identificación de ciclos reales.
 - Propuesta de refactor por capas.
 - Riesgos y mitigaciones claras.
 
-## 2) Auditoria UI/UX (Tailwind + WCAG)
+---
+
+## 2) Auditoría UI/UX (Tailwind + WCAG)
 
 ### Objetivo
 Garantizar consistencia visual y accesibilidad.
 
 ### Entregables
-- Lista de inconsistencias (tipografia, spacing, color).
-- Quick wins (cambios rapidos).
-- Recomendaciones WCAG (AA minimo).
+- Lista de inconsistencias (tipografía, spacing, color).
+- Quick wins (cambios rápidos).
+- Recomendaciones WCAG (AA mínimo).
 
-### Criterios de aceptacion
+### Criterios de aceptación
 - Contraste AA validado.
-- Navegacion por teclado revisada.
-- Labels/ARIA correctos en inputs criticos.
+- Navegación por teclado revisada.
+- Labels/ARIA correctos en inputs críticos.
+
+---
 
 ## 3) Seguridad (SAST + Hardening)
 
@@ -43,14 +51,16 @@ Garantizar consistencia visual y accesibilidad.
 Detectar vulnerabilidades y proponer endurecimiento inmediato.
 
 ### Entregables
-- Hallazgos por severidad (Critico/Alto/Medio/Bajo).
+- Hallazgos por severidad (Crítico/Alto/Medio/Bajo).
 - Plan de hardening inmediato.
-- Priorizacion P0/P1/P2.
+- Priorización P0/P1/P2.
 
-### Criterios de aceptacion
+### Criterios de aceptación
 - Al menos 5 hallazgos revisados.
-- Mitigacion concreta por hallazgo.
+- Mitigación concreta por hallazgo.
 - Riesgos residuales documentados.
+
+---
 
 ## 4) Meta-Prompting (Prompts perfectos)
 
@@ -64,61 +74,70 @@ Generar prompts para sub-agentes por cada mejora clave.
 
 # PROMPTS PERFECTOS (listos para sub-agentes)
 
-### Prompt A – Eliminar ciclos de dependencias
-```
+## Prompt A – Eliminar ciclos de dependencias
+```markdown
 Eres un sub-agente experto en arquitectura de monorepos.
 Tarea: detectar y eliminar ciclos de dependencias en el grafo.
-Contexto: modulos principales del repo (apps/, packages/, libs/).
-Restricciones: no romper APIs publicas; cambios minimos.
+Contexto: módulos principales del repo (apps/, packages/, libs/).
+Restricciones: no romper APIs públicas; cambios mínimos.
 Output esperado: lista de ciclos + plan de refactor + propuesta de patch.
-Criterios de aceptacion:
+Criterios de aceptación:
 - Ciclos identificados con rutas concretas.
-- Propuesta de extraccion o inversion de dependencias.
-- Riesgos de regresion descritos.
+- Propuesta de extracción o inversión de dependencias.
+- Riesgos de regresión descritos.
 ```
 
-### Prompt B – Auditoria UI/UX Tailwind + WCAG
-```
+---
+
+## Prompt B – Auditoría UI/UX Tailwind + WCAG
+```markdown
 Eres un sub-agente experto en UI/UX y accesibilidad.
 Tarea: auditar consistencia de UI y WCAG.
-Contexto: componentes base y paginas principales.
-Restricciones: mantener diseno actual; cambios incrementales.
-Output esperado: lista de inconsistencias + fixes rapidos.
-Criterios de aceptacion:
+Contexto: componentes base y páginas principales.
+Restricciones: mantener diseño actual; cambios incrementales.
+Output esperado: lista de inconsistencias + fixes rápidos.
+Criterios de aceptación:
 - Contraste AA validado.
-- Navegacion por teclado comprobada.
-- Labels/ARIA correctos en inputs criticos.
+- Navegación por teclado comprobada.
+- Labels/ARIA correctos en inputs críticos.
 ```
 
-### Prompt C – SAST + Hardening inmediato
-```
+---
+
+## Prompt C – SAST + Hardening inmediato
+```markdown
 Eres un sub-agente experto en seguridad de aplicaciones.
 Tarea: realizar SAST y proponer hardening inmediato.
 Contexto: backend, frontend y API routes.
 Restricciones: no agregar dependencias nuevas sin justificar.
-Output esperado: hallazgos por severidad + plan de mitigacion.
-Criterios de aceptacion:
+Output esperado: hallazgos por severidad + plan de mitigación.
+Criterios de aceptación:
 - Al menos 5 hallazgos potenciales revisados.
-- Riesgo y mitigacion documentados.
+- Riesgo y mitigación documentados.
 - Prioridades claras (P0, P1, P2).
 ```
 
-### Prompt D – Consolidar patrones duplicados UI
-```
+---
+
+## Prompt D – Consolidar patrones duplicados UI
+```markdown
 Eres un sub-agente experto en frontend.
 Tarea: detectar patrones UI duplicados y consolidarlos.
 Contexto: componentes y estilos repetidos.
 Restricciones: no cambiar comportamiento visible.
-Output esperado: lista de duplicados + propuesta de componente unico.
-Criterios de aceptacion:
-- Reduccion de duplicacion.
+Output esperado: lista de duplicados + propuesta de componente único.
+Criterios de aceptación:
+- Reducción de duplicación.
 - No regresiones visuales.
 ```
 
 ---
 
-## Resultado final esperado
-- Grafo de dependencias claro y sin ciclos.
-- UI consistente y accesible (WCAG AA).
-- Informe SAST con hardening inmediato.
-- Prompts listos para delegar mejoras.
+# RESULTADO FINAL ESPERADO
+
+| Área | Entregable | Estado |
+|------|-----------|--------|
+| Grafo de dependencias | Mapa limpio sin ciclos | ⏳ Pendiente |
+| UI/UX | Informe de consistencia + WCAG AA | ⏳ Pendiente |
+| Seguridad | Informe SAST + hardening | ⏳ Pendiente |
+| Meta-Prompting | 4 prompts listos | ✅ Completado |

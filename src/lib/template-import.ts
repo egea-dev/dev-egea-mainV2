@@ -1,4 +1,4 @@
-import { read, utils } from 'xlsx'
+import { loadXlsx } from './xlsx-loader'
 
 type FieldType = 'text' | 'number' | 'date'
 
@@ -58,9 +58,10 @@ const inferFieldType = (values: RawCell[]): FieldType => {
 }
 
 const parseSheet = (
-  sheet: import('xlsx').WorkSheet,
+  sheet: unknown,
   sheetName: string,
-  options: ParseTemplateOptions
+  options: ParseTemplateOptions,
+  utils: { sheet_to_json: (sheet: unknown, opts: { header: number; defval: string; blankrows: boolean }) => unknown }
 ): ImportedTemplate => {
   const matrix = utils.sheet_to_json(sheet, {
     header: 1,
@@ -143,11 +144,12 @@ export const parseTemplatesFromWorkbook = async (
   file: File | ArrayBuffer,
   options: ParseTemplateOptions = {}
 ): Promise<ImportedTemplate[]> => {
+  const { read, utils } = await loadXlsx()
   const buffer = file instanceof File ? await file.arrayBuffer() : file
   const workbook = read(buffer, { type: 'array', cellDates: true })
 
   return workbook.SheetNames.map((sheetName) =>
-    parseSheet(workbook.Sheets[sheetName], sheetName, options)
+    parseSheet(workbook.Sheets[sheetName], sheetName, options, utils)
   )
 }
 

@@ -1,13 +1,13 @@
 ﻿/**
- * ShippedOrdersPanel - Componente para gestion de expediciones (PROCESADO/ENVIADO)
+ * ShippedOrdersPanel - Componente para gestión de expediciones (PROCESADO/ENVIADO)
  * 
  * Muestra pedidos en estado ENVIADO con:
  * - Datos generales del pedido (solo lectura)
  * - Trazabilidad del pedido
- * - GestiÃ³n de bultos (CRUD)
- * - Selector de empresa de envÃ­os
+ * - Gestión de bultos (CRUD)
+ * - Selector de empresa de envíos
  * - Campo de tracking
- * - Boton "CONFIRMAR ENVIO" con validaciones
+ * - Boton "CONFIRMAR ENVÍO" con validaciones
  */
 
 import React, { useState } from 'react';
@@ -67,7 +67,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
     const updatePackage = useUpdatePackage();
     const deletePackage = useDeletePackage();
 
-    // CÃ¡lculos
+    // Cálculos
     const totalUnits = calculateTotalUnits(packages);
     const totalWeight = calculateTotalWeight(packages);
     const expectedUnits = order.quantity_total || 0;
@@ -127,7 +127,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
         if (!validation.isValid) {
             toast.error(
                 <div>
-                    <p className="font-bold mb-2">No se puede procesar el envÃ­o:</p>
+                    <p className="font-bold mb-2">No se puede procesar el envío:</p>
                     <ul className="list-disc list-inside">
                         {validation.errors.map((error, idx) => (
                             <li key={idx}>{error}</li>
@@ -155,7 +155,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                 basePayload.carrier_company = resolvedCarrier;
             }
 
-            let { error: updateError } = await supabaseProductivity
+            let { error: updateError } = await (supabaseProductivity as any)
                 .from('comercial_orders')
                 .update(basePayload)
                 .eq('id', order.id);
@@ -163,7 +163,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
             if (updateError && String(updateError.message || '').includes('carrier_company')) {
                 const fallbackPayload = { ...basePayload };
                 delete fallbackPayload.carrier_company;
-                const fallback = await supabaseProductivity
+                const fallback = await (supabaseProductivity as any)
                     .from('comercial_orders')
                     .update(fallbackPayload)
                     .eq('id', order.id);
@@ -185,7 +185,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                     .eq('order_number', order.order_number);
             }
 
-            toast.success('Envio procesado correctamente. Notificacion enviada a comercial.');
+            toast.success('Envío procesado correctamente. Notificación enviada a comercial.');
             onProcessed?.();
         } catch (error: any) {
             toast.error(`Error al procesar: ${error.message}`);
@@ -199,9 +199,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
             {/* Header con estado */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-500/20 rounded-lg">
-                        <Send className="w-5 h-5 text-blue-400" />
-                    </div>
+                    <Send className="w-5 h-5 text-blue-400" />
                     <div>
                         <h3 className="text-lg font-bold text-white">Pedido {order.order_number}</h3>
                         <p className="text-sm text-gray-400">{order.customer_company || order.customer_name}</p>
@@ -229,7 +227,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                         <p className="text-white">{order.contact_name || '-'}</p>
                     </div>
                     <div>
-                        <span className="text-gray-400">RegiÃ³n:</span>
+                        <span className="text-gray-400">Región:</span>
                         <p className="text-white">{order.region || '-'}</p>
                     </div>
                     <div>
@@ -237,7 +235,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                         <p className="text-white font-bold text-lg">{expectedUnits} uds</p>
                     </div>
                     <div className="md:col-span-2">
-                        <span className="text-gray-400">DirecciÃ³n:</span>
+                        <span className="text-gray-400">Dirección:</span>
                         <p className="text-white">{order.delivery_address || '-'}</p>
                     </div>
                     <div>
@@ -247,13 +245,13 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                 </CardContent>
             </Card>
 
-            {/* GestiÃ³n de Bultos */}
+            {/* Gestión de Bultos */}
             <Card className="bg-card/50 border-border/60">
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-sm font-medium text-gray-400 uppercase tracking-wide flex items-center gap-2">
                             <Package className="w-4 h-4" />
-                            GestiÃ³n de Bultos
+                            Gestión de Bultos
                         </CardTitle>
                         <Button
                             size="sm"
@@ -262,7 +260,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                             className="bg-emerald-600 hover:bg-emerald-700"
                         >
                             <Plus className="w-4 h-4 mr-1" />
-                            AÃ±adir Bulto
+                            Añadir Bulto
                         </Button>
                     </div>
                 </CardHeader>
@@ -273,7 +271,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                         <div className="text-center py-8 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <AlertTriangle className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                             <p className="text-yellow-300">No hay bultos registrados</p>
-                            <p className="text-gray-400 text-sm">AÃ±ade al menos un bulto para continuar</p>
+                            <p className="text-gray-400 text-sm">Añade al menos un bulto para continuar</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -285,7 +283,10 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                                             <th className="p-2 text-left">Bulto</th>
                                             <th className="p-2 text-left">Unidades</th>
                                             <th className="p-2 text-left">Peso (kg)</th>
-                                            <th className="p-2 text-left">Dimensiones (cm)</th>
+                                            <th className="p-2 text-left flex flex-col">
+                                                <span>Dimensiones (cm)</span>
+                                                <span className="text-[9px] text-gray-500 normal-case font-normal">X (base) × Y (altura) × Z (fondo)</span>
+                                            </th>
                                             <th className="p-2"></th>
                                         </tr>
                                     </thead>
@@ -322,33 +323,32 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                                                     </div>
                                                 </td>
                                                 <td className="p-2">
-                                                    <div className="flex items-center gap-1">
-                                                        <Ruler className="w-3 h-3 text-gray-400" />
+                                                    <div className="flex items-center gap-1.5 min-w-[200px]">
                                                         <Input
                                                             type="number"
                                                             min="0"
                                                             value={pkg.height_cm || ''}
                                                             onChange={(e) => handleUpdatePackage(pkg, 'height_cm', parseFloat(e.target.value) || 0)}
-                                                            className="w-14 h-8 bg-muted/30 border-border/60"
-                                                            placeholder="Alto"
+                                                            className="w-16 h-8 bg-muted/30 border-border/60 text-center"
+                                                            placeholder="X"
                                                         />
-                                                        <span className="text-gray-400">Ã—</span>
+                                                        <span className="text-gray-500 text-xs">×</span>
                                                         <Input
                                                             type="number"
                                                             min="0"
                                                             value={pkg.width_cm || ''}
                                                             onChange={(e) => handleUpdatePackage(pkg, 'width_cm', parseFloat(e.target.value) || 0)}
-                                                            className="w-14 h-8 bg-muted/30 border-border/60"
-                                                            placeholder="Ancho"
+                                                            className="w-16 h-8 bg-muted/30 border-border/60 text-center"
+                                                            placeholder="Y"
                                                         />
-                                                        <span className="text-gray-400">Ã—</span>
+                                                        <span className="text-gray-500 text-xs">×</span>
                                                         <Input
                                                             type="number"
                                                             min="0"
                                                             value={pkg.length_cm || ''}
                                                             onChange={(e) => handleUpdatePackage(pkg, 'length_cm', parseFloat(e.target.value) || 0)}
-                                                            className="w-14 h-8 bg-muted/30 border-border/60"
-                                                            placeholder="Largo"
+                                                            className="w-16 h-8 bg-muted/30 border-border/60 text-center"
+                                                            placeholder="Z"
                                                         />
                                                     </div>
                                                 </td>
@@ -399,17 +399,17 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                 </CardContent>
             </Card>
 
-            {/* Datos de Empresa de EnvÃ­os */}
+            {/* Datos de Empresa de Envíos */}
             <Card className="bg-card/50 border-border/60">
                 <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-gray-400 uppercase tracking-wide flex items-center gap-2">
                         <Truck className="w-4 h-4" />
-                        Datos de EnvÃ­o
+                        Datos de Envío
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">Empresa de EnvÃ­os</label>
+                        <label className="text-sm text-gray-400">Empresa de Envíos</label>
                         <Select value={carrierCompany} onValueChange={setCarrierCompany}>
                             <SelectTrigger className="bg-muted/30 border-border/60">
                                 <SelectValue placeholder="Selecciona empresa..." />
@@ -443,7 +443,7 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                 </CardContent>
             </Card>
 
-            {/* BotÃ³n PROCESADO */}
+            {/* Botón PROCESADO */}
             <div className="flex justify-end">
                 <Button
                     size="lg"
@@ -456,19 +456,18 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                     ) : (
                         <>
                             <CheckCircle className="w-5 h-5 mr-2" />
-                            CONFIRMAR ENVÃO
+                            CONFIRMAR ENVÍO
                         </>
                     )}
                 </Button>
             </div>
 
-            {/* Info sobre acciones del botÃ³n CONFIRMAR ENVÃO */}
+            {/* Info sobre acciones del botón CONFIRMAR ENVÍO */}
             <div className="text-xs text-gray-400 text-center">
-                Al pulsar "CONFIRMAR ENVIO", el pedido pasara a ENVIADO y se notificara a comercial
+                Al pulsar "CONFIRMAR ENVÍO", el pedido pasará a ENVIADO y se notificará a comercial
             </div>
         </div>
     );
 };
 
 export default ShippedOrdersPanel;
-

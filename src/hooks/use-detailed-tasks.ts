@@ -131,7 +131,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     // Aplicar ordenamiento
     query = query.order(sort.field, { ascending: sort.direction === 'asc' });
 
-    // Aplicar paginaciÃ³n
+    // Aplicar paginación
     const from = (pagination.page - 1) * pagination.pageSize;
     const to = from + pagination.pageSize - 1;
     query = query.range(from, to);
@@ -254,7 +254,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
       // Intentar obtener la tarea desde el estado local (vista detailed_tasks)
       let task = tasks.find((candidate) => candidate.id === taskId);
 
-      // Si no estÃ¡ en memoria, obtenerla desde la vista
+      // Si no está en memoria, obtenerla desde la vista
       if (!task) {
         const { data, error } = await supabase
           .from('detailed_tasks')
@@ -266,7 +266,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
       }
 
       if (!task) {
-        throw new Error('No se encontrÃ³ la tarea a completar');
+        throw new Error('No se encontró la tarea a completar');
       }
 
       // Preparar asignaciones para el archivado
@@ -343,7 +343,7 @@ export function useDetailedTasks(options: UseDetailedTasksOptions = {}) {
     fetchTasks();
   }, [fetchTasks]);
 
-  // Auto-refresh si estÃ¡ habilitado
+  // Auto-refresh si está habilitado
   useEffect(() => {
     if (!autoRefresh) return;
 

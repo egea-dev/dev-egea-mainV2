@@ -1,0 +1,18 @@
+- Fecha/hora: 2026-01-27 10:32
+- Task ID: TASK-01.1
+- Acción: Actualizar react-router-dom a ^6.30.3 y regenerar package-lock.json con npm install.
+- Archivos tocados: MainControl-Egea/package.json; MainControl-Egea/package-lock.json
+- Resultado (OK/BLOQUEADO): OK
+- Próximo paso: Iniciar TASK-01.2 (evaluar xlsx).
+- Fecha/hora: 2026-01-27 10:35
+- Task ID: TASK-01.2
+- Acción: Revisar uso de xlsx y evaluar opciones (upgrade/migracion). Se identifico que el paquete npm xlsx esta en 0.18.5 y los advisories marcan ReDoS < 0.20.2; la version parchada no esta publicada en npm y exceljs presenta limitaciones en browser.
+- Archivos tocados: (sin cambios de codigo)
+- Resultado (OK/BLOQUEADO): BLOQUEADO
+- Próximo paso: Definir decision (CDN 0.20.2, migracion a exceljs, o restringir a CSV) y aplicar patch.
+- Fecha/hora: 2026-01-27 12:38
+- Task ID: TASK-01.2
+- Acción: Migrar uso de xlsx a carga via CDN (SheetJS 0.20.2), eliminar dependencia npm y ajustar importaciones para usar loader asíncrono.
+- Archivos tocados: MainControl-Egea/package.json; MainControl-Egea/package-lock.json; MainControl-Egea/src/lib/xlsx-loader.ts; MainControl-Egea/src/lib/export.ts; MainControl-Egea/src/lib/template-import.ts; MainControl-Egea/src/components/data/DataImportDialog.tsx
+- Resultado (OK/BLOQUEADO): OK
+- Próximo paso: Iniciar TASK-01.3 (versionar políticas RLS).
