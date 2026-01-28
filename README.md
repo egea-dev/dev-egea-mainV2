@@ -19,20 +19,18 @@ https://localhost:8083
 
 ---
 
-## 🏗️ Arquitectura
+Este proyecto utiliza una **arquitectura modular basada en dominios (Feature-driven)** y una **arquitectura dual de bases de datos**:
 
-Este proyecto utiliza una **arquitectura dual de bases de datos**:
+- **📁 Features (`src/features`)**: Organización por módulos de negocio (Comercial, Producción, Logística). Cada módulo encapsula sus propios servicios, componentes y utilidades.
+- **⚙️ Capa de Servicios**: Toda la lógica de negocio pesada, validaciones y sincronizaciones entre DBs reside en servicios puros (`orderService.ts`, `workOrderService.ts`), desacoplando la UI de las reglas de negocio.
+- **🔵 DB MAIN**: Core (autenticación, usuarios, permisos, instalaciones).
+- **🟢 DB PRODUCTIVITY**: Módulos de negocio (comercial, producción, logística).
 
-- **🔵 MAIN**: Core (autenticación, usuarios, permisos, instalaciones)
-- **🟢 PRODUCTIVITY**: Módulos de negocio (comercial, producción, logística)
-
-Ambas bases de datos comparten la misma sesión de autenticación mediante un interceptor de fetch.
+Ambas bases de datos comparten la misma sesión de autenticación mediante un interceptor de fetch o sesiones paralelas persistentes.
 
 ### Documentación Completa
 
-- 📖 [ARCHITECTURE.md](./ARCHITECTURE.md) - Arquitectura del sistema
-- 📘 [SUPABASE_CLIENTS_GUIDE.md](./SUPABASE_CLIENTS_GUIDE.md) - Guía de uso de clientes Supabase
-- 📗 [DATABASE_STRUCTURE.md](./DATABASE_STRUCTURE.md) - Esquema de base de datos MAIN
+- 📖 [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) - Arquitectura del sistema
 
 ---
 
@@ -41,22 +39,21 @@ Ambas bases de datos comparten la misma sesión de autenticación mediante un in
 ```
 egea-Main-control/
 ├── src/
-│   ├── components/          # Componentes React
-│   │   ├── dashboard/       # Dashboard Admin
-│   │   ├── commercial/      # Módulo Comercial
-│   │   ├── installations/   # Módulo Instalaciones
-│   │   └── ...
-│   ├── hooks/               # Custom hooks
+│   ├── features/            # 🚀 Módulos de Negocio (Clean Architecture)
+│   │   ├── commercial/      # Servicios y componentes de pedidos
+│   │   ├── production/      # Servicios y gestión de taller
+│   │   └── shipping/        # Logística y expediciones
+│   ├── components/          # Componentes compartidos y UI base
+│   │   ├── layout/          # Estructura visual global
+│   │   └── ui/              # Primitivos (shadcn/ui)
+│   ├── hooks/               # Orquestadores de consultas (TanStack Query)
 │   ├── integrations/
-│   │   └── supabase/        # Clientes Supabase
-│   │       ├── client.ts    # ⚠️ Configuración de clientes
-│   │       ├── types.ts     # Tipos MAIN
-│   │       └── types-productivity.ts  # Tipos PRODUCTIVITY
-│   ├── pages/               # Páginas principales
-│   └── lib/                 # Utilidades
+│   │   └── supabase/        # Clientes y tipos generados
+│   ├── pages/               # Vistas principales (Varios módulos)
+│   └── lib/                 # Utilidades globales unificadas
 ├── supabase/
-│   └── migrations/          # Migraciones SQL (MAIN)
-└── docs/                    # Documentación adicional
+│   └── rls_hardening/       # Scripts de seguridad recomendada
+└── ...
 ```
 
 ---
@@ -181,9 +178,7 @@ Ambas bases de datos implementan RLS. Asegúrate de estar autenticado para acced
 
 ## 📚 Documentación Adicional
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Arquitectura completa del sistema
-- [SUPABASE_CLIENTS_GUIDE.md](./SUPABASE_CLIENTS_GUIDE.md) - Guía detallada de clientes
-- [DATABASE_STRUCTURE.md](./DATABASE_STRUCTURE.md) - Esquema de base de datos
+- [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) - Arquitectura completa del sistema
 
 ---
 
@@ -207,7 +202,7 @@ Ambas bases de datos implementan RLS. Asegúrate de estar autenticado para acced
 
 **Causa**: Usar el cliente incorrecto para una tabla.
 
-**Solución**: Verificar en [SUPABASE_CLIENTS_GUIDE.md](./SUPABASE_CLIENTS_GUIDE.md) qué cliente usar.
+**Solución**: Verificar la tabla de mapeo rápido en la sección de Arquitectura.
 
 ### Error: "table does not exist"
 

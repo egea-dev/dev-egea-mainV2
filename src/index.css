@@ -8,40 +8,45 @@
 
 @layer base {
   :root {
-    /* Base clara inspirada en la referencia */
-    --background: 0 0% 94%;
-    --foreground: 222 18% 18%;
+    /* Base clara refinada (Premium Light Mode) */
+    --background: 0 0% 98%;
+    --foreground: 222 18% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 18% 18%;
+    --card-foreground: 222 18% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 18% 18%;
+    --popover-foreground: 222 18% 12%;
 
-    /* Burdeos */
-    --primary: 346 71% 29%;
+    /* Burdeos Corporativo: Ajustado para mejor legibilidad en fondo claro */
+    --primary: 346 71% 35%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 222 18% 18%;
+    --secondary: 210 20% 98%;
+    --secondary-foreground: 222 18% 12%;
 
-    --muted: 210 16% 94%;
-    --muted-foreground: 215 10% 40%;
+    --muted: 210 16% 96%;
+    --muted-foreground: 215 10% 45%;
 
-    --info: 204 80% 75%;
-    --info-foreground: 210 24% 32%;
-    --warning: 38 92% 56%;
-    --warning-foreground: 24 32% 18%;
+    --info: 204 80% 90%;
+    --info-foreground: 210 24% 25%;
+    --warning: 38 92% 92%;
+    --warning-foreground: 24 32% 15%;
 
-    --accent: 210 18% 92%;
-    --accent-foreground: 222 18% 18%;
+    --accent: 210 18% 96%;
+    --accent-foreground: 222 18% 12%;
 
-    --destructive: 0 78% 55%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 12% 88%;
-    --input: 214 12% 88%;
-    --ring: 346 71% 29%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 346 71% 35%;
+
+    /* Efectos Glassmorphism Adaptativos */
+    --glass-background: 0 0% 100% / 0.7;
+    --glass-border: 220 13% 91% / 0.5;
+    --glass-blur: 12px;
 
     --radius: 1rem;
 
@@ -81,6 +86,10 @@
     --info-foreground: 210 32% 92%;
     --warning: 38 100% 62%;
     --warning-foreground: 24 32% 18%;
+
+    /* Glassmorphism Dark */
+    --glass-background: 20 10% 14% / 0.7;
+    --glass-border: 20 8% 22% / 0.5;
   }
 
   .egea {
@@ -111,6 +120,10 @@
     --border: 345 12% 22%;
     --input: 345 12% 22%;
     --ring: 346 70% 45%;
+
+    /* Glassmorphism Egea */
+    --glass-background: 345 18% 12% / 0.7;
+    --glass-border: 345 12% 22% / 0.5;
   }
 }
 
@@ -277,9 +290,7 @@
 }
 
 @layer utilities {
-  :where([class*="bg-blue-"], [class*="bg-sky-"], [class*="bg-indigo-"]) :not(button):not(a):not(input):not(select):not(textarea) {
-    background-color: hsl(var(--card)) !important;
-  }
+
 
   .bg-pulse-neutral {
     background-color: hsl(var(--card));

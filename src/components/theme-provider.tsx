@@ -39,10 +39,6 @@ export function ThemeProvider({
       const resolvedSystem = systemMedia.matches ? "dark" : "light";
       let resolvedTheme = theme === "system" ? resolvedSystem : theme;
 
-      if (!mobileMedia.matches && resolvedTheme === "light") {
-        resolvedTheme = "dark";
-      }
-
       root.classList.add(resolvedTheme);
     };
 

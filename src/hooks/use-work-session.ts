@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import dayjs from 'dayjs';
+import { formatDistanceToNow, differenceInMilliseconds } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import type { SessionLocation, Task, WorkSession } from '@/types';
-import relativeTime from 'dayjs/plugin/relativeTime';
-import 'dayjs/locale/es';
 import { normalizeTaskLocation } from '@/utils/task';
-
-dayjs.extend(relativeTime);
-dayjs.locale('es');
 
 type ManualLocation = SessionLocation;
 
@@ -154,7 +150,7 @@ export const useWorkSession = ({ profileId, taskId, task }: UseWorkSessionParams
     queryKey: sessionQueryKey(profileId),
     enabled: Boolean(profileId),
     staleTime: 15_000,
-    refetchInterval: (current) => (current && current.status === 'active' ? 30_000 : false),
+    refetchInterval: (query) => (query.state.data && (query.state.data as any).status === 'active' ? 30_000 : false),
     queryFn: async () => {
       if (!profileId) return null;
       const { data, error } = await supabase
@@ -182,9 +178,9 @@ export const useWorkSession = ({ profileId, taskId, task }: UseWorkSessionParams
   const durationMs = useMemo(() => {
     const session = sessionData;
     if (!session) return 0;
-    const start = dayjs(session.started_at);
-    const end = session.ended_at ? dayjs(session.ended_at) : dayjs(now);
-    return end.diff(start);
+    const start = new Date(session.started_at);
+    const end = session.ended_at ? new Date(session.ended_at) : new Date(now);
+    return differenceInMilliseconds(end, start);
   }, [sessionData, now]);
 
   const durationLabel = useMemo(() => formatDuration(durationMs), [durationMs]);
@@ -201,10 +197,10 @@ export const useWorkSession = ({ profileId, taskId, task }: UseWorkSessionParams
     const session = sessionData;
     if (!session) return 'Sin registros';
     if (session.status === 'active') {
-      return `Iniciada ${dayjs(session.started_at).fromNow()}`;
+      return `Iniciada ${formatDistanceToNow(new Date(session.started_at), { addSuffix: true, locale: es })}`;
     }
     if (session.ended_at) {
-      return `Finalizada ${dayjs(session.ended_at).fromNow()}`;
+      return `Finalizada ${formatDistanceToNow(new Date(session.ended_at), { addSuffix: true, locale: es })}`;
     }
     return 'Sesion sin informacion de cierre';
   }, [sessionData]);

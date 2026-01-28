@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Profile, Task, Vehicle } from '@/types';
 import type { JsonObject, Screen } from '@/integrations/supabase/types';
-import dayjs from 'dayjs';
+import { format, isAfter, isBefore, addDays, subDays, isSameDay, startOfDay } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { upsertTask } from '@/lib/upsert-task';
 
@@ -91,15 +92,18 @@ export const useUsers = () => {
       //   console.warn('Error fetching workload stats:', statsError);
       // }
 
-      const today = dayjs();
+      const today = new Date();
       const statsMap = new Map(); // Sin stats por ahora
 
       return (profiles ?? []).map((profileRow: any) => {
         const row = profileRow as ProfileRow;
         const availability = Array.isArray(row.user_availability) ? row.user_availability : [];
-        const onLeave = availability.find((entry) =>
-          today.isAfter(dayjs(entry.start_date).subtract(1, 'day')) && today.isBefore(dayjs(entry.end_date).add(1, 'day'))
-        );
+        const onLeave = availability.find((entry) => {
+          const start = startOfDay(new Date(entry.start_date));
+          const end = startOfDay(new Date(entry.end_date));
+          const now = startOfDay(today);
+          return (isAfter(now, subDays(start, 1)) && isBefore(now, addDays(end, 1)));
+        });
         const status = onLeave?.reason ?? (profileRow.status || 'activo');
 
         const active_tasks_count = statsMap.get(profileRow.id) || 0;
@@ -127,7 +131,7 @@ export const useVehicles = () => {
 // --- GESTIÓN DE TAREAS (Planning) ---
 
 export const useTasksByDate = (date: Date) => {
-  const dateString = dayjs(date).format('YYYY-MM-DD');
+  const dateString = format(date, 'yyyy-MM-dd');
   return useQuery({
     queryKey: ['tasks', dateString],
     queryFn: async () => {
@@ -218,11 +222,11 @@ export const useUpsertTask = () => {
     onSuccess: (data) => {
       toast.success(`Tarea ${data.task_id_in ? 'actualizada' : 'creada'} correctamente.`);
       // Invalidar queries para el rango de fechas afectado para refrescar la vista
-      let currentDate = dayjs(data.start_date_in);
-      const endDate = dayjs(data.end_date_in);
-      while (currentDate.isBefore(endDate) || currentDate.isSame(endDate, 'day')) {
-        queryClient.invalidateQueries({ queryKey: ['tasks', currentDate.format('YYYY-MM-DD')] });
-        currentDate = currentDate.add(1, 'day');
+      let currentDate = new Date(data.start_date_in);
+      const endDate = new Date(data.end_date_in);
+      while (isBefore(currentDate, endDate) || isSameDay(currentDate, endDate)) {
+        queryClient.invalidateQueries({ queryKey: ['tasks', format(currentDate, 'yyyy-MM-dd')] });
+        currentDate = addDays(currentDate, 1);
       }
       queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
     },
@@ -235,7 +239,7 @@ export const useUpsertTask = () => {
 
 export const useUpdateTaskOrder = (date: Date | undefined) => {
   const queryClient = useQueryClient();
-  const dateString = dayjs(date).format('YYYY-MM-DD');
+  const dateString = date ? format(date, 'yyyy-MM-dd') : '';
   return useMutation({
     mutationFn: async (orderedTasks: Task[]) => {
       const updates = orderedTasks.map((task, index) =>
@@ -254,7 +258,7 @@ export const useUpdateTaskOrder = (date: Date | undefined) => {
 
 export const useAssignToTask = (date: Date | undefined) => {
   const queryClient = useQueryClient();
-  const dateString = dayjs(date).format('YYYY-MM-DD');
+  const dateString = date ? format(date, 'yyyy-MM-dd') : '';
   return useMutation({
     mutationFn: async ({ taskId, itemId, type }: { taskId: string, itemId: string, type: 'user' | 'vehicle' }) => {
       let result;
@@ -320,7 +324,7 @@ export const useArchiveTask = () => {
 export const useCreateSharedPlan = () => {
   return useMutation({
     mutationFn: async (planDate: Date) => {
-      const dateString = dayjs(planDate).format('YYYY-MM-DD');
+      const dateString = format(planDate, 'yyyy-MM-dd');
       const { data, error } = await supabase.from('shared_plans').insert({ plan_date: dateString }).select('access_token').single();
       if (error) throw error;
       return data.access_token;

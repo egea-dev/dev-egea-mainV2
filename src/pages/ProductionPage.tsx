@@ -3,9 +3,9 @@ import { supabaseProductivity } from '@/integrations/supabase';
 import { QrCode, Camera, ArrowRight, Clock, CheckCircle, Printer, Package, AlertTriangle, AlertOctagon, FileText, History, ListFilter, Calendar } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import PageShell from '@/components/layout/PageShell';
-import QRScanner from '@/components/common/QRScanner';
-import { RoleBasedRender } from '@/components/common/RoleBasedRender';
-import { MobileAlert, AlertType } from '@/components/common/MobileAlert';
+import QRScanner from '@/components/shared/QRScanner';
+import { RoleBasedRender } from '@/components/shared/RoleBasedRender';
+import { MobileAlert, AlertType } from '@/components/shared/MobileAlert';
 import { IncidentReportButton } from '@/components/incidents/IncidentReportButton';
 import { IncidentReportModal } from '@/components/incidents/IncidentReportModal';
 import { toast } from 'sonner';
@@ -13,11 +13,11 @@ import { printHtmlToIframe } from '@/utils/print';
 import { parseQRCode, validateQRWithLines, extractOrderNumber } from '@/lib/qr-utils';
 import { summarizeMaterials } from '@/lib/materials';
 import { cn } from "@/lib/utils";
-import { ScannerButton } from '@/components/scanner/ScannerButton';
-import { ScannerModal } from '@/components/scanner/ScannerModal';
+import { ScannerButton } from '@/features/scanner/components/ScannerButton';
+import { ScannerModal } from '@/features/scanner/components/ScannerModal';
 import { useOrientation, useDeviceType } from '@/hooks/useOrientation';
 import { sortWorkOrdersByPriority, daysToDueDate, getUrgencyBadge } from '@/services/priority-service';
-import ProductionCalendar from '@/components/production/ProductionCalendar';
+import ProductionCalendar from '@/features/production/components/ProductionCalendar';
 
 function escapeZpl(str: string): string {
   if (!str) return "";
@@ -26,12 +26,12 @@ function escapeZpl(str: string): string {
 
 const getDueBadge = (order: Order) => {
   if (!order.due_date) {
-    return { label: 'Sin fecha', badge: 'text-[#B5B8BA]' };
+    return { label: 'Sin fecha', badge: 'text-muted-foreground' };
   }
   const days = Math.ceil((new Date(order.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  if (days <= 0) return { label: 'Vencido', badge: 'text-red-300 bg-red-900/30 border border-red-500/30 rounded-full px-3 py-0.5 text-xs font-bold' };
-  if (days <= 2) return { label: `${days} días`, badge: 'text-amber-300 bg-amber-900/30 border border-amber-500/30 rounded-full px-3 py-0.5 text-xs font-bold' };
-  return { label: `${days} días`, badge: 'text-emerald-300 bg-emerald-900/20 border border-emerald-500/30 rounded-full px-3 py-0.5 text-xs font-bold' };
+  if (days <= 0) return { label: 'Vencido', badge: 'text-destructive bg-destructive/10 border border-destructive/20 rounded-full px-3 py-0.5 text-xs font-bold' };
+  if (days <= 2) return { label: `${days} dias`, badge: 'text-[hsl(var(--warning))] bg-warning/10 border border-warning/20 rounded-full px-3 py-0.5 text-xs font-bold' };
+  return { label: `${days} dias`, badge: 'text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-0.5 text-xs font-bold' };
 };
 
 type GlobalProductionPolling = typeof globalThis & {
@@ -972,13 +972,13 @@ export function ProductionPage() {
       className="space-y-0"
       actions={
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-[#1A1D1F] px-3 py-1.5 rounded-full border border-[#2A2D31]">
+          <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-full border border-border">
             <div className={cn(
               "w-2 h-2 rounded-full animate-pulse",
               printerStatus === 'online' ? "bg-emerald-500" :
                 printerStatus === 'offline' ? "bg-red-500" : "bg-amber-500"
             )} />
-            <span className="text-[10px] font-bold text-[#B5B8BA] uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Zebra {printerStatus === 'online' ? 'OK' : printerStatus === 'offline' ? 'Error' : '...'}
             </span>
           </div>
@@ -998,10 +998,10 @@ export function ProductionPage() {
         <RoleBasedRender hideForRoles={['admin', 'manager']}>
           <div className="w-full">
             {/* Scanner Button */}
-            <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-lg p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
-                <QrCode className="w-5 h-5 text-[#FF6B35]" />
-                <h3 className="text-white font-bold">Escaneo de Producción</h3>
+                <QrCode className="w-5 h-5 text-primary" />
+                <h3 className="text-foreground font-bold">Escaneo de Producción</h3>
               </div>
 
               <ScannerButton
@@ -1017,14 +1017,14 @@ export function ProductionPage() {
                 <input
                   type="text"
                   placeholder="O introduce código manualmente..."
-                  className="flex-1 bg-[#0D0F11] border border-[#2A2D31] rounded-lg px-4 py-3 text-base text-white placeholder-[#6E6F71] focus:ring-2 focus:ring-[#FF6B35] outline-none"
+                  className="flex-1 bg-muted/40 border border-border rounded-lg px-4 py-3 text-base text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary outline-none"
                   value={qrInput}
                   onChange={(e) => setQrInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleScan(qrInput)}
                 />
                 <button
                   onClick={() => handleScan(qrInput)}
-                  className="px-5 py-3 bg-[#FF6B35] text-white rounded-lg hover:bg-[#FF8555] transition font-semibold flex items-center justify-center min-w-[60px]"
+                  className="px-5 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition font-semibold flex items-center justify-center min-w-[60px]"
                 >
                   <ArrowRight className="w-5 h-5" />
                 </button>
@@ -1058,14 +1058,14 @@ export function ProductionPage() {
                 <TabsList className="grid w-full grid-cols-2 bg-transparent">
                   <TabsTrigger
                     value="active"
-                    className="data-[state=active]:bg-[#2A2D31] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center justify-center gap-2 h-11"
+                    className="data-[state=active]:bg-muted data-[state=active]:text-foreground text-muted-foreground py-2.5 rounded-lg flex items-center justify-center gap-2 h-11"
                   >
                     <ListFilter className="w-4 h-4" />
                     Activos ({activeQueue.length})
                   </TabsTrigger>
                   <TabsTrigger
                     value="history"
-                    className="data-[state=active]:bg-[#2A2D31] data-[state=active]:text-white text-[#B5B8BA] py-2.5 rounded-lg flex items-center justify-center gap-2 h-11"
+                    className="data-[state=active]:bg-muted data-[state=active]:text-foreground text-muted-foreground py-2.5 rounded-lg flex items-center justify-center gap-2 h-11"
                   >
                     <History className="w-4 h-4" />
                     Historial
@@ -1075,13 +1075,13 @@ export function ProductionPage() {
 
               <TabsContent value="active" className="m-0 focus-visible:ring-0">
                 <div className="flex flex-col min-h-[500px]">
-                  <h3 className="text-[#B5B8BA] font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
-                    <Clock className="w-4 h-4 mr-2 text-indigo-400" />
+                  <h3 className="text-muted-foreground font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
+                    <Clock className="w-4 h-4 mr-2 text-primary" />
                     Cola de producción activa
                   </h3>
-                  {isLoading && <div className="text-sm text-[#B5B8BA] py-4">Cargando órdenes...</div>}
+                  {isLoading && <div className="text-sm text-muted-foreground py-4">Cargando órdenes...</div>}
                   {!isLoading && activeQueue.length === 0 && (
-                    <div className="flex-1 flex flex-col items-center justify-center text-[#B5B8BA] text-center opacity-40 py-12">
+                    <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-center opacity-40 py-12">
                       <CheckCircle className="w-12 h-12 mb-3" />
                       <p className="text-sm font-medium">Todo al día</p>
                       <p className="text-xs uppercase tracking-tighter">No hay pedidos pendientes</p>
@@ -1116,14 +1116,14 @@ export function ProductionPage() {
                               }}
                               className={cn(
                                 "w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden",
-                                isSelected ? "bg-indigo-900/20 border-indigo-500/50" : "bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41]",
+                                isSelected ? "bg-primary/10 border-primary/50" : "bg-card border-border hover:border-primary/30",
                                 borderClass
                               )}
                             >
                               <div className="flex justify-between items-start mb-2">
                                 <div className="flex flex-col gap-2">
                                   <div className="flex items-center gap-2">
-                                    <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-indigo-400' : 'text-[#B5B8BA]'}`}>
+                                    <span className={`font-mono font-bold text-sm tracking-tight ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
                                       {order.order_number}
                                     </span>
                                     {order._is_canarias_urgent && (
@@ -1148,7 +1148,7 @@ export function ProductionPage() {
                                 <div className="flex flex-col items-end gap-2 text-right">
                                   <div className={dueInfo.badge}>{dueInfo.label}</div>
                                   {order.due_date && daysToDueDate(order.due_date) !== 999 && (
-                                    <div className="text-[10px] font-black uppercase text-[#8B8D90] px-2 py-1 bg-white/5 rounded border border-white/10 min-w-[65px] text-center">
+                                    <div className="text-[10px] font-black uppercase text-muted-foreground px-2 py-1 bg-muted rounded border border-border min-w-[65px] text-center">
                                       <span className="text-sm block leading-none">{daysToDueDate(order.due_date)}</span>
                                       DÍAS
                                     </div>
@@ -1156,10 +1156,10 @@ export function ProductionPage() {
                                 </div>
                               </div>
                               <div className="space-y-2">
-                                <p className="font-bold text-white text-base leading-tight">
+                                <p className="font-bold text-foreground text-base leading-tight">
                                   {order.customer_name}
                                 </p>
-                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#B5B8BA]">
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                   <span className="flex items-center gap-1">
                                     <Package className="w-3 h-3" /> {order.quantity_total} uds
                                   </span>
@@ -1172,9 +1172,9 @@ export function ProductionPage() {
                             {/* Expansión Vertical (Solo Móvil) */}
                             {deviceType === 'mobile' && (
                               <div className={cn("order-details-expanded", isExpanded && "show")}>
-                                <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-xl p-4 mt-2 space-y-4">
+                                <div className="bg-muted border border-border rounded-xl p-4 mt-2 space-y-4">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-xs text-[#B5B8BA] uppercase font-bold tracking-wider">{order.status}</span>
+                                    <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{order.status}</span>
                                     <div className="flex gap-2">
                                       {['PENDIENTE', 'CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD'].includes(order.status) && (
                                         <button
@@ -1186,7 +1186,7 @@ export function ProductionPage() {
                                       )}
                                       <button
                                         onClick={(e) => { e.stopPropagation(); printZebraLabel(); }}
-                                        className="p-2 bg-[#FF6B35] text-white rounded-lg"
+                                        className="p-2 bg-primary text-primary-foreground rounded-lg"
                                       >
                                         <Printer className="w-5 h-5" />
                                       </button>
@@ -1195,18 +1195,18 @@ export function ProductionPage() {
 
                                   {/* Info Detallada */}
                                   <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div className="bg-[#0D0F11] p-2 rounded border border-[#2A2D31]">
-                                      <p className="text-[10px] text-[#B5B8BA]">Material</p>
-                                      <p className="font-bold text-white truncate">{order.fabric}</p>
+                                    <div className="bg-card p-2 rounded border border-border">
+                                      <p className="text-[10px] text-muted-foreground">Material</p>
+                                      <p className="font-bold text-foreground truncate">{order.fabric}</p>
                                     </div>
-                                    <div className="bg-[#0D0F11] p-2 rounded border border-[#2A2D31]">
-                                      <p className="text-[10px] text-[#B5B8BA]">Total Uds</p>
-                                      <p className="font-bold text-white">{order.quantity_total}</p>
+                                    <div className="bg-card p-2 rounded border border-border">
+                                      <p className="text-[10px] text-muted-foreground">Total Uds</p>
+                                      <p className="font-bold text-foreground">{order.quantity_total}</p>
                                     </div>
                                   </div>
 
                                   {/* Desglose resumido */}
-                                  <div className="text-[11px] text-[#B5B8BA] bg-[#0D0F11]/50 p-2 rounded italic">
+                                  <div className="text-[11px] text-muted-foreground bg-muted/50 p-2 rounded italic">
                                     {renderLinePreview(order)}
                                   </div>
                                 </div>
@@ -1222,8 +1222,8 @@ export function ProductionPage() {
 
               <TabsContent value="history" className="m-0 focus-visible:ring-0">
                 <div className="flex flex-col min-h-[500px]">
-                  <h3 className="text-[#B5B8BA] font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
-                    <History className="w-4 h-4 mr-2 text-emerald-400" />
+                  <h3 className="text-muted-foreground font-bold text-xs uppercase tracking-widest mb-4 flex items-center">
+                    <History className="w-4 h-4 mr-2 text-emerald-500" />
                     Historial de pedidos finalizados
                   </h3>
                   {!isLoading && historyQueue.length === 0 && (
@@ -1244,8 +1244,8 @@ export function ProductionPage() {
                               setPackagesInput(order.packages_count || 1);
                             }}
                             className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden ${isSelected
-                              ? 'bg-emerald-900/10 border-emerald-500/50 ring-1 ring-emerald-500/20'
-                              : 'bg-[#0D0F11] border-[#2A2D31] hover:border-[#3A3D41] opacity-75 hover:opacity-100'
+                              ? 'bg-emerald-500/10 border-emerald-500/30'
+                              : 'bg-card border-border hover:border-border/80 opacity-75 hover:opacity-100'
                               }`}
                           >
                             <div className="flex justify-between items-start mb-2">
@@ -1262,10 +1262,10 @@ export function ProductionPage() {
                               </div>
                             </div>
                             <div className="space-y-1">
-                              <p className="font-bold text-white text-sm">
+                              <p className="font-bold text-foreground text-sm">
                                 {order.customer_name}
                               </p>
-                              <p className="text-[10px] text-[#B5B8BA]">
+                              <p className="text-[10px] text-muted-foreground">
                                 Finalizado: {order.updated_at ? new Date(order.updated_at).toLocaleString() : '---'}
                               </p>
                             </div>
@@ -1282,25 +1282,25 @@ export function ProductionPage() {
           {/* COLUMNA DERECHA */}
           <div className="flex-1">
             {scannedOrder ? (
-              <div className="bg-[#1A1D21] border border-[#2A2D31] rounded-2xl h-full flex flex-col">
-                <div className="border-b border-[#2A2D31] p-6">
+              <div className="bg-card border border-border rounded-2xl h-full flex flex-col">
+                <div className="border-b border-border p-6">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-2xl font-bold text-white">{scannedOrder.order_number}</h2>
-                      <p className="text-sm text-[#B5B8BA]">{scannedOrder.customer_name || 'Cliente Nuevo'}</p>
+                      <h2 className="text-2xl font-bold text-foreground">{scannedOrder.order_number}</h2>
+                      <p className="text-sm text-muted-foreground">{scannedOrder.customer_name || 'Cliente Nuevo'}</p>
                     </div>
-                    <span className="text-sm px-3 py-1 bg-[#2A2D31] text-white rounded-full">{scannedOrder.status}</span>
+                    <span className="text-sm px-3 py-1 bg-muted text-foreground rounded-full">{scannedOrder.status}</span>
                   </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                   {/* Protocolo de revisión detallado */}
                   {['CORTE', 'CONFECCION', 'TAPICERIA', 'CONTROL_CALIDAD', 'EN_PROCESO'].includes(scannedOrder.status) && (
-                    <div className="bg-amber-900/10 border border-amber-500/30 p-5 rounded-xl flex items-start gap-4">
-                      <AlertOctagon className="w-8 h-8 text-amber-500 shrink-0 mt-1" />
+                    <div className="bg-warning/10 border border-warning/30 p-5 rounded-xl flex items-start gap-4">
+                      <AlertOctagon className="w-8 h-8 text-[hsl(var(--warning))] shrink-0 mt-1" />
                       <div className="text-sm">
-                        <h4 className="font-bold text-amber-400 uppercase mb-2 tracking-wide text-lg">PROTOCOLO DE REVISIÓN</h4>
-                        <ul className="space-y-2 text-[#B5B8BA]">
+                        <h4 className="font-bold text-[hsl(var(--warning))] uppercase mb-2 tracking-wide text-lg">PROTOCOLO DE REVISIÓN</h4>
+                        <ul className="space-y-2 text-muted-foreground">
                           <li>• Atención: revisa que <strong>color y medidas</strong> coincidan con la orden.</li>
                           <li>• Introduce el número correcto de bultos al finalizar.</li>
                           <li>• Valida e imprime las etiquetas correspondientes.</li>
@@ -1312,17 +1312,17 @@ export function ProductionPage() {
 
                   {/* Información de producción */}
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
-                      <p className="text-xs text-[#B5B8BA]">Material</p>
-                      <p className="font-bold text-white">{scannedOrder.fabric || 'Sin especificar'}</p>
+                    <div className="bg-muted/30 p-3 rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">Material</p>
+                      <p className="font-bold text-foreground">{scannedOrder.fabric || 'Sin especificar'}</p>
                     </div>
-                    <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
-                      <p className="text-xs text-[#B5B8BA]">Total Uds</p>
-                      <p className="font-bold text-white">{scannedOrder.quantity_total || 0}</p>
+                    <div className="bg-muted/30 p-3 rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">Total Uds</p>
+                      <p className="font-bold text-foreground">{scannedOrder.quantity_total || 0}</p>
                     </div>
-                    <div className="bg-[#0D0F11] p-3 rounded-lg border border-[#2A2D31]">
-                      <p className="text-xs text-[#B5B8BA]">Bultos</p>
-                      <p className="font-bold text-white">{scannedOrder.packages_count || 'Por definir'}</p>
+                    <div className="bg-muted/30 p-3 rounded-lg border border-border">
+                      <p className="text-xs text-muted-foreground">Bultos</p>
+                      <p className="font-bold text-foreground">{scannedOrder.packages_count || 'Por definir'}</p>
                     </div>
                   </div>
 
@@ -1341,7 +1341,7 @@ export function ProductionPage() {
                           <button
                             type="button"
                             onClick={() => setPackagesInput((prev) => Math.max(1, (prev || 1) - 1))}
-                            className="h-12 w-12 rounded-xl border border-[#2A2D31] bg-transparent text-white text-2xl font-bold hover:bg-transparent transition"
+                            className="h-12 w-12 rounded-xl border border-border bg-transparent text-foreground text-2xl font-bold hover:bg-muted transition"
                             aria-label="Reducir bultos"
                           >
                             -
@@ -1351,12 +1351,12 @@ export function ProductionPage() {
                             min="1"
                             value={packagesInput}
                             onChange={(e) => setPackagesInput(parseInt(e.target.value) || 1)}
-                            className="w-24 sm:w-28 bg-transparent border border-[#2A2D31] rounded-xl p-3 text-center text-2xl font-bold text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                            className="w-24 sm:w-28 bg-transparent border border-border rounded-xl p-3 text-center text-2xl font-bold text-foreground focus:ring-2 focus:ring-primary outline-none"
                           />
                           <button
                             type="button"
                             onClick={() => setPackagesInput((prev) => (prev || 1) + 1)}
-                            className="h-12 w-12 rounded-xl border border-[#2A2D31] bg-transparent text-white text-2xl font-bold hover:bg-transparent transition"
+                            className="h-12 w-12 rounded-xl border border-border bg-transparent text-foreground text-2xl font-bold hover:bg-muted transition"
                             aria-label="Aumentar bultos"
                           >
                             +
@@ -1424,27 +1424,27 @@ export function ProductionPage() {
                   )}
 
                   {/* Tabla de desglose */}
-                  <div className="border border-[#2A2D31] rounded-xl overflow-hidden">
+                  <div className="border border-border rounded-xl overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-[#0D0F11]">
+                      <thead className="bg-muted/50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Cant.</th>
-                          <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Medidas</th>
-                          <th className="px-4 py-2 text-left text-[#B5B8BA] font-medium">Notas</th>
+                          <th className="px-4 py-2 text-left text-muted-foreground font-medium">Cant.</th>
+                          <th className="px-4 py-2 text-left text-muted-foreground font-medium">Medidas</th>
+                          <th className="px-4 py-2 text-left text-muted-foreground font-medium">Notas</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#2A2D31]">
+                      <tbody className="divide-y divide-border">
                         {scannedOrder.lines && scannedOrder.lines.length > 0 ? (
                           scannedOrder.lines.map((line, idx) => (
                             <tr key={line.id || `${scannedOrder.id}-${idx}`}>
-                              <td className="px-4 py-2 font-bold text-white">{line.quantity}</td>
-                              <td className="px-4 py-2 text-[#B5B8BA]">{line.width} x {line.height}</td>
-                              <td className="px-4 py-2 italic text-[#B5B8BA]">{line.notes || '-'}</td>
+                              <td className="px-4 py-2 font-bold text-foreground">{line.quantity}</td>
+                              <td className="px-4 py-2 text-muted-foreground">{line.width} x {line.height}</td>
+                              <td className="px-4 py-2 italic text-muted-foreground">{line.notes || '-'}</td>
                             </tr>
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={3} className="px-4 py-6 text-center text-[#B5B8BA]">
+                            <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
                               Sin desglose registrado
                             </td>
                           </tr>
@@ -1455,7 +1455,7 @@ export function ProductionPage() {
                 </div>
 
                 {/* Botones de acción */}
-                <div className="p-6 border-t border-[#2A2D31]">
+                <div className="p-6 border-t border-border">
                   {scannedOrder.status === 'PENDIENTE' && (
                     <button
                       onClick={startProduction}
@@ -1486,7 +1486,7 @@ export function ProductionPage() {
                             confirmProductionFinish
                           );
                         }}
-                        className="w-full py-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-500 font-bold text-sm rounded-xl flex items-center justify-center transition border border-amber-500/30"
+                        className="w-full py-3 bg-warning/10 hover:bg-warning/20 text-[hsl(var(--warning))] font-bold text-sm rounded-xl flex items-center justify-center transition border border-warning/30"
                       >
                         <AlertTriangle className="w-4 h-4 mr-2" />
                         OMITIR IMPRESIÓN Y FINALIZAR
@@ -1498,27 +1498,27 @@ export function ProductionPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={printShippingLabel}
-                        className="flex-1 py-3 px-3 bg-[#2A2D31] hover:bg-[#3A3D41] text-white font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
+                        className="flex-1 py-3 px-3 bg-muted hover:bg-muted/80 text-foreground font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
                       >
                         <Printer className="w-4 h-4 flex-shrink-0" />
                         <span className="whitespace-nowrap">Reimprimir</span>
                       </button>
                       <button
                         onClick={printZebraLabel}
-                        className="flex-1 py-3 px-3 bg-[#FF6B35] hover:bg-[#FF8555] text-white font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
+                        className="flex-1 py-3 px-3 bg-primary text-primary-foreground font-semibold text-sm rounded-lg flex items-center justify-center transition gap-2"
                       >
                         <Printer className="w-4 h-4 flex-shrink-0" />
                       </button>
-                      <div className="flex-[2] py-3 px-3 bg-[#0D0F11] text-emerald-400 rounded-lg font-semibold text-xs sm:text-sm text-center border border-emerald-500/30 flex items-center justify-center gap-2">
+                      <div className="flex-[2] py-3 px-3 bg-muted text-emerald-500 rounded-lg font-semibold text-xs sm:text-sm text-center border border-emerald-500/30 flex items-center justify-center gap-2">
                         <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">Listo ({scannedOrder.packages_count} Bultos)</span>
+                        <span className="whitespace-nowrap">Listo ({scannedOrder.packages_count} Bultos)</span>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="h-full border-2 border-dashed border-[#2A2D31] rounded-2xl flex flex-col items-center justify-center text-[#B5B8BA] bg-[#0D0F11] p-12">
+              <div className="h-full border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center text-muted-foreground bg-muted/20 p-12">
                 <QrCode className="w-16 h-16 mb-4 opacity-30" />
                 <p className="text-lg font-medium">Escanea un código para ver detalles</p>
                 <p className="text-sm text-center max-w-md mt-2">

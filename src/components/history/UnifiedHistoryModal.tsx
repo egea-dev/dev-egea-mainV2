@@ -15,7 +15,8 @@ import {
     MapPin,
     FileText
 } from 'lucide-react';
-import dayjs from 'dayjs';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 // Tipos para el historial unificado
 export interface TimelineEvent {
@@ -150,7 +151,7 @@ export function UnifiedHistoryModal({ item, open, onOpenChange }: UnifiedHistory
                         {item.customer_name}
                         <span className="text-muted-foreground">•</span>
                         <Calendar className="w-4 h-4" />
-                        {dayjs(item.created_at).format('DD/MM/YYYY')}
+                        {item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy') : '-'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -178,7 +179,7 @@ export function UnifiedHistoryModal({ item, open, onOpenChange }: UnifiedHistory
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="font-medium">{event.title}</span>
                                             <span className="text-xs text-muted-foreground">
-                                                {dayjs(event.date).format('DD/MM/YYYY HH:mm')}
+                                                {format(new Date(event.date), 'dd/MM/yyyy HH:mm')}
                                             </span>
                                         </div>
                                         {event.description && (
@@ -216,7 +217,7 @@ export function UnifiedHistoryModal({ item, open, onOpenChange }: UnifiedHistory
                                     {/* Info básica */}
                                     <div className="grid grid-cols-2 gap-2">
                                         <div><span className="text-muted-foreground">Estado:</span> {item.commercial.status}</div>
-                                        <div><span className="text-muted-foreground">Fecha:</span> {dayjs(item.commercial.created_at).format('DD/MM/YYYY')}</div>
+                                        <div><span className="text-muted-foreground">Fecha:</span> {item.commercial.created_at ? format(new Date(item.commercial.created_at), 'dd/MM/yyyy') : '-'}</div>
                                         {item.commercial.admin_code && <div><span className="text-muted-foreground">Código Admin:</span> {item.commercial.admin_code}</div>}
                                         {item.commercial.customer_code && <div><span className="text-muted-foreground">Código Cliente:</span> {item.commercial.customer_code}</div>}
                                     </div>
@@ -238,7 +239,7 @@ export function UnifiedHistoryModal({ item, open, onOpenChange }: UnifiedHistory
                                         <div className="border-t border-border/50 pt-2">
                                             <div className="text-xs text-muted-foreground font-medium mb-1">ENTREGA</div>
                                             <div className="grid grid-cols-2 gap-2">
-                                                {item.commercial.delivery_date && <div><span className="text-muted-foreground">Fecha:</span> {dayjs(item.commercial.delivery_date).format('DD/MM/YYYY')}</div>}
+                                                {item.commercial.delivery_date && <div><span className="text-muted-foreground">Fecha:</span> {format(new Date(item.commercial.delivery_date), 'dd/MM/yyyy')}</div>}
                                                 {item.commercial.delivery_region && <div><span className="text-muted-foreground">Región:</span> {item.commercial.delivery_region}</div>}
                                                 {item.commercial.delivery_city && <div><span className="text-muted-foreground">Ciudad:</span> {item.commercial.delivery_city}</div>}
                                                 {item.commercial.delivery_address && <div className="col-span-2"><span className="text-muted-foreground">Dirección:</span> {item.commercial.delivery_address}</div>}
@@ -325,7 +326,7 @@ export function UnifiedHistoryModal({ item, open, onOpenChange }: UnifiedHistory
                                         <div><span className="text-muted-foreground">Estado:</span> {item.production.status}</div>
                                         {item.production.operator && <div><span className="text-muted-foreground">Operario:</span> {item.production.operator}</div>}
                                         {item.production.quality_status && <div><span className="text-muted-foreground">Control Calidad:</span> {item.production.quality_status}</div>}
-                                        {item.production.completed_at && <div><span className="text-muted-foreground">Completado:</span> {dayjs(item.production.completed_at).format('DD/MM/YYYY HH:mm')}</div>}
+                                        {item.production.completed_at && <div><span className="text-muted-foreground">Completado:</span> {format(new Date(item.production.completed_at), 'dd/MM/yyyy HH:mm')}</div>}
                                         {item.production.notes && <div className="col-span-2"><span className="text-muted-foreground">Notas:</span> {item.production.notes}</div>}
                                     </div>
                                 </CollapsibleContent>
@@ -347,8 +348,8 @@ export function UnifiedHistoryModal({ item, open, onOpenChange }: UnifiedHistory
                                         {item.shipping.status && <div><span className="text-muted-foreground">Estado:</span> {item.shipping.status}</div>}
                                         {item.shipping.tracking_number && <div><span className="text-muted-foreground">Tracking:</span> {item.shipping.tracking_number}</div>}
                                         {item.shipping.carrier && <div><span className="text-muted-foreground">Transportista:</span> {item.shipping.carrier}</div>}
-                                        {item.shipping.shipped_at && <div><span className="text-muted-foreground">Enviado:</span> {dayjs(item.shipping.shipped_at).format('DD/MM/YYYY HH:mm')}</div>}
-                                        {item.shipping.delivered_at && <div><span className="text-muted-foreground">Entregado:</span> {dayjs(item.shipping.delivered_at).format('DD/MM/YYYY HH:mm')}</div>}
+                                        {item.shipping.shipped_at && <div><span className="text-muted-foreground">Enviado:</span> {format(new Date(item.shipping.shipped_at), 'dd/MM/yyyy HH:mm')}</div>}
+                                        {item.shipping.delivered_at && <div><span className="text-muted-foreground">Entregado:</span> {format(new Date(item.shipping.delivered_at), 'dd/MM/yyyy HH:mm')}</div>}
                                         {item.shipping.address && <div className="col-span-2"><span className="text-muted-foreground">Dirección:</span> {item.shipping.address}</div>}
                                     </div>
                                 </CollapsibleContent>
@@ -372,7 +373,7 @@ export function UnifiedHistoryModal({ item, open, onOpenChange }: UnifiedHistory
                                             <div><span className="text-muted-foreground">Técnicos:</span> {item.installation.technicians.join(', ')}</div>
                                         )}
                                         {item.installation.vehicle && <div><span className="text-muted-foreground">Vehículo:</span> {item.installation.vehicle}</div>}
-                                        {item.installation.completed_at && <div><span className="text-muted-foreground">Completado:</span> {dayjs(item.installation.completed_at).format('DD/MM/YYYY HH:mm')}</div>}
+                                        {item.installation.completed_at && <div><span className="text-muted-foreground">Completado:</span> {format(new Date(item.installation.completed_at), 'dd/MM/yyyy HH:mm')}</div>}
                                         {item.installation.notes && <div className="col-span-2"><span className="text-muted-foreground">Notas:</span> {item.installation.notes}</div>}
                                     </div>
                                 </CollapsibleContent>

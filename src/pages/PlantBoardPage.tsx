@@ -88,13 +88,13 @@ export default function PlantBoardPage() {
 
     const isLight = theme === "light";
     const colors = {
-        page: isLight ? "bg-white text-slate-900" : "bg-black text-white",
-        header: isLight ? "bg-white border-slate-200" : "bg-black border-white/10",
-        tableHeader: isLight ? "bg-slate-50 text-slate-500 border-slate-200" : "bg-[#111] text-gray-500 border-white/5",
-        row: isLight ? "bg-white" : "bg-[#1A1D1F]",
-        progress: isLight ? "bg-slate-200" : "bg-black/50",
-        stat: isLight ? "bg-slate-50 border-slate-200 text-slate-700" : "bg-[#0F1113] border-[#45474A]/60",
-        footer: isLight ? "bg-white border-slate-200 text-slate-500" : "bg-black border-white/5 text-gray-500",
+        page: "bg-background text-foreground",
+        header: "bg-card/50 border-border backdrop-blur-sm",
+        tableHeader: "bg-muted/50 text-muted-foreground border-border",
+        row: "bg-card border-border shadow-sm",
+        progress: "bg-secondary",
+        stat: "bg-muted/30 border-border text-foreground",
+        footer: "bg-card/50 border-border text-muted-foreground",
     };
 
     const fetchOrders = async () => {
@@ -189,7 +189,7 @@ export default function PlantBoardPage() {
                 label: urgencyBadge?.label || "SIN FECHA",
                 color: urgencyBadge?.color || (isLight ? "bg-gray-100 text-gray-500 border-gray-200" : "bg-white/5 text-gray-400 border-white/10"),
                 boxValue: workdaysRemaining === 999 ? "-" : Math.abs(workdaysRemaining).toString(),
-                boxLabel: Math.abs(workdaysRemaining) === 1 ? "DÍA" : "DÍAS"
+                boxLabel: Math.abs(workdaysRemaining) === 1 ? "DIA" : "DIAS"
             };
 
 
@@ -220,7 +220,7 @@ export default function PlantBoardPage() {
                 <div className="flex items-center gap-6">
                     <img src="/img/Egea- Evolucio Gold.png" alt="Egea Gold" className="h-12 w-auto object-contain" />
                     <div className="flex flex-col">
-                        <h1 className={cn("text-3xl font-black tracking-wider uppercase flex items-center gap-3", isLight ? "text-slate-900" : "text-white")}>
+                        <h1 className="text-3xl font-black tracking-wider uppercase flex items-center gap-3 text-foreground">
                             <span className="text-[#D4AF37]">PRODUCCIÓN</span>
                         </h1>
                         <div className="flex items-center gap-2 text-emerald-500 text-sm font-bold uppercase tracking-widest pl-1">
@@ -234,7 +234,7 @@ export default function PlantBoardPage() {
                 </div>
 
                 <div className="text-right">
-                    <div className={cn("text-6xl font-mono font-bold tracking-tight leading-none", isLight ? "text-slate-900" : "text-white")}>
+                    <div className="text-6xl font-mono font-bold tracking-tight leading-none text-foreground">
                         {format(currentTime, "HH:mm")}
                     </div>
                     <div className="text-lg text-gray-400 font-medium uppercase tracking-widest mt-1">
@@ -275,25 +275,25 @@ export default function PlantBoardPage() {
                         return (
                             <div key={order.id} className={cn("relative grid grid-cols-12 gap-4 items-center p-4 rounded-lg shadow-lg", colors.row, borderClass)}>
                                 <div className="col-span-2">
-                                    <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>{order.order_number}</div>
+                                    <div className="text-2xl font-black text-foreground">{order.order_number}</div>
                                     <div className="text-xs text-gray-500 font-mono mt-1">{order.admin_code || order.id.slice(0, 8)}</div>
                                 </div>
                                 <div className="col-span-2">
-                                    <div className={cn("text-2xl font-black truncate", isLight ? "text-slate-900" : "text-white")}>{order.customer_name}</div>
-                                    <div className={cn("text-2xl font-black uppercase tracking-wider mt-1", isLight ? "text-slate-900" : "text-white")}>{order.region}</div>
+                                    <div className="text-2xl font-black truncate text-foreground">{order.customer_name}</div>
+                                    <div className="text-2xl font-black uppercase tracking-wider mt-1 text-foreground">{order.region}</div>
                                 </div>
                                 <div className="col-span-3">
-                                    <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-gray-300")}>{order.fabric}</div>
-                                    <div className={cn("text-2xl font-black mb-2", isLight ? "text-slate-900" : "text-gray-400")}>{order.color}</div>
+                                    <div className="text-2xl font-black text-foreground/90">{order.fabric}</div>
+                                    <div className="text-2xl font-black mb-2 text-foreground/80">{order.color}</div>
                                 </div>
                                 <div className="col-span-1">
-                                    <div className={cn("text-2xl font-black", isLight ? "text-slate-900" : "text-white")}>{order.quantity_total} uds</div>
+                                    <div className="text-2xl font-black text-foreground">{order.quantity_total} uds</div>
                                 </div>
                                 <div className="col-span-2 pr-10">
                                     <div className="flex items-center gap-3">
                                         <Package className={`w-8 h-8 ${(order.packageProgress || 0) === 100 ? 'text-emerald-500' : (order.packageProgress || 0) >= 50 ? 'text-blue-400' : 'text-amber-500'}`} />
                                         <div className="flex-1">
-                                            <div className={cn("text-2xl font-black mb-1", isLight ? "text-slate-900" : "text-white")}>
+                                            <div className="text-2xl font-black mb-1 text-foreground">
                                                 {order.scanned_packages || 0}/{order.packages_count || 1}
                                             </div>
                                             <Progress

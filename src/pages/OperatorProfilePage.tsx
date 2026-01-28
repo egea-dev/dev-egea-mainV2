@@ -24,10 +24,9 @@ import {
     Moon,
     LogOut
 } from "lucide-react";
-import dayjs from "dayjs";
-import "dayjs/locale/es";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
-dayjs.locale("es");
 
 export default function OperatorProfilePage() {
     const { data: profile, isLoading } = useProfile();
@@ -120,7 +119,7 @@ export default function OperatorProfilePage() {
                         </div>
 
                         <p className="text-sm text-muted-foreground">
-                            Miembro desde {dayjs(profile?.created_at).format("MMMM YYYY")}
+                            Miembro desde {profile?.created_at ? format(new Date(profile.created_at), "MMMM yyyy", { locale: es }) : "N/D"}
                         </p>
                     </div>
                 </CardContent>

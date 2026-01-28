@@ -12,10 +12,10 @@ export default function UsersAndVehiclesPage() {
       description="Gestion de usuarios y flota disponible."
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-border/60 bg-background/40 p-6">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <UserList users={users} onUsersUpdate={fetchData} />
         </div>
-        <div className="rounded-2xl border border-border/60 bg-background/40 p-6">
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
           <VehicleList vehicles={vehicles} onVehiclesUpdate={fetchData} />
         </div>
       </div>

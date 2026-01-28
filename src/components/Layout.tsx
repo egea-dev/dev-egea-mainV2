@@ -36,8 +36,10 @@ import { useRolePreview } from "@/context/RolePreviewContext";
 import type { AppRole } from "@/config/navigation";
 import { RolePreviewSelector } from "./layout/RolePreviewSelector";
 import { VersionDisplay } from "./VersionDisplay";
+import { ThemeImage } from "./ui/ThemeImage";
 
-const logoPlaceholder = "/logo-placeholder.png";
+const logoLight = "/img/logo-placeholder.png";
+const logoDark = "/img/logo-placeholder.png";
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -124,8 +126,8 @@ const SidebarContentComponent = ({
           className="flex w-full items-center gap-3"
           aria-current={isActive(item.path) ? "page" : undefined}
         >
-          <item.icon className={cn("h-4 w-4 shrink-0", variant === "nested" && "h-3.5 w-3.5")} />
-          <span className={cn("truncate", isCollapsed && "hidden")}>{item.label}</span>
+          <item.icon className={cn("h-4 w-4 shrink-0", variant === "nested" && "h-3.5 w-3.5")} aria-hidden="true" />
+          <span className={cn("truncate", isCollapsed ? "sr-only" : "inline")}>{item.label}</span>
         </NavLink>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -220,7 +222,12 @@ const SidebarContentComponent = ({
         </SidebarMenu>
         {!isCollapsed && (
           <div className="px-4 pt-4 space-y-2">
-            <img src={logoPlaceholder} alt="Egea" className="mx-auto h-8 opacity-80" />
+            <ThemeImage
+              lightSrc={logoLight}
+              darkSrc={logoDark}
+              alt="Egea"
+              className="mx-auto h-8 opacity-90 hover:opacity-100"
+            />
             <div className="flex justify-center">
               <VersionDisplay variant="badge" showChangelog />
             </div>
@@ -266,7 +273,7 @@ const MainLayout = ({
           isCollapsed ? "md:ml-14" : "md:ml-64"
         )}
       >
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-[hsl(var(--glass-background))] px-4 backdrop-blur-[var(--glass-blur)] border-[hsl(var(--glass-border))] sm:px-6">
           <div className="flex items-center gap-2">
             <Sheet>
               <SheetTrigger asChild>
@@ -462,7 +469,12 @@ export const CompactLayout = ({ children, profile, navItems: navItemsProp }: Lay
       </main>
 
       <div className="mt-6 flex justify-center pb-6">
-        <img src={logoPlaceholder} alt="Egea" className="h-10 opacity-80" />
+        <ThemeImage
+          lightSrc={logoLight}
+          darkSrc={logoDark}
+          alt="Egea"
+          className="h-10 opacity-90"
+        />
       </div>
 
       <Button

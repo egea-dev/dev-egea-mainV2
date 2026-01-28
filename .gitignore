@@ -96,8 +96,12 @@ coverage/
 # ===================================
 # CARPETAS BULK/ARCHIVE (históricos)
 # ===================================
-- Bulk/
-BULK/
+
+# Antigravity Security Block
+BULK/config/
+BULK/logs/
+BULK/temp/
+
 **/backup/
 **/backups/
 **/old-*/

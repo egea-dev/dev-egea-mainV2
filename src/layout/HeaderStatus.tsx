@@ -119,14 +119,24 @@ export const HeaderStatus = ({ role }: HeaderStatusProps) => {
     <div className="flex items-center gap-4 text-sm">
       <div className="flex items-center gap-3">
         {/* DB MAIN Status */}
-        <div className="flex items-center gap-1.5" title={mainConnected ? "MAIN: Conectado" : "MAIN: Desconectado"}>
-          <Wifi className={cn("h-4 w-4 transition-colors", mainConnected ? "text-emerald-500" : "text-destructive")} />
+        <div
+          className="flex items-center gap-1.5"
+          title={mainConnected ? "MAIN: Conectado" : "MAIN: Desconectado"}
+          role="status"
+          aria-label={`Estado DB MAIN: ${mainConnected ? 'Conectado' : 'Desconectado'}`}
+        >
+          <Wifi className={cn("h-4 w-4 transition-colors", mainConnected ? "text-emerald-500" : "text-destructive")} aria-hidden="true" />
           <span className="hidden lg:inline text-xs font-medium text-muted-foreground">MAIN</span>
         </div>
 
         {/* DB PRODUCTIVITY Status */}
-        <div className="flex items-center gap-1.5" title={productivityConnected ? "PRODUCTIVITY: Conectado" : "PRODUCTIVITY: Desconectado"}>
-          <Wifi className={cn("h-4 w-4 transition-colors", productivityConnected ? "text-emerald-500" : "text-destructive")} />
+        <div
+          className="flex items-center gap-1.5"
+          title={productivityConnected ? "PRODUCTIVITY: Conectado" : "PRODUCTIVITY: Desconectado"}
+          role="status"
+          aria-label={`Estado DB PRODUCTIVITY: ${productivityConnected ? 'Conectado' : 'Desconectado'}`}
+        >
+          <Wifi className={cn("h-4 w-4 transition-colors", productivityConnected ? "text-emerald-500" : "text-destructive")} aria-hidden="true" />
           <span className="hidden lg:inline text-xs font-medium text-muted-foreground">PROD</span>
         </div>
       </div>
@@ -148,6 +158,8 @@ export const HeaderStatus = ({ role }: HeaderStatusProps) => {
         </Button>
       )}
       <div
+        role="timer"
+        aria-live="polite"
         className={cn(
           "font-mono bg-primary text-primary-foreground px-3 py-1.5 rounded-md transition-all duration-300 font-semibold text-base shadow-sm",
           (!mainConnected || !productivityConnected) && "bg-destructive text-destructive-foreground animate-pulse"

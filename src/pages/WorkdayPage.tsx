@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import dayjs from "dayjs";
-import "dayjs/locale/es";
-import relativeTime from "dayjs/plugin/relativeTime";
+import {
+  format,
+  formatDistanceToNow,
+  isAfter,
+  isBefore,
+  isSameDay,
+  addDays,
+  subDays,
+  startOfDay
+} from "date-fns";
+import { es } from "date-fns/locale";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,8 +31,7 @@ import { buildMapsSearchUrl } from "@/utils/maps";
 import { WeeklyCalendar } from "@/components/calendar/WeeklyCalendar";
 import { IncidentReportModal } from "@/components/incidents/IncidentReportModal";
 
-dayjs.extend(relativeTime);
-dayjs.locale("es");
+
 
 export default function WorkdayPage() {
   const { data: profile } = useProfile();
@@ -106,14 +114,14 @@ export default function WorkdayPage() {
   // Tarea activa (la primera pendiente o en curso)
   const activeTask = useMemo(() => {
     if (tasksForUser.length === 0) return null;
-    const now = dayjs();
+    const now = new Date();
 
     // Buscar tarea en curso (dentro del rango de fechas)
     const current = tasksForUser.find((task) => {
       if (!task.start_date || !task.end_date) return false;
-      const start = dayjs(task.start_date);
-      const end = dayjs(task.end_date);
-      return now.isAfter(start) && now.isBefore(end);
+      const start = new Date(task.start_date);
+      const end = new Date(task.end_date);
+      return isAfter(now, start) && isBefore(now, end);
     });
 
     // Si no hay tarea en curso, tomar la primera pendiente
@@ -129,12 +137,13 @@ export default function WorkdayPage() {
   // Estadísticas de tareas para visualización (revisa TODAS las fechas)
   // IMPORTANTE: Las tareas permanecen visibles hasta que admin/manager las validen
   const taskStats = useMemo(() => {
-    const now = dayjs();
+    const now = new Date();
+    const today = startOfDay(now);
 
     // Tareas atrasadas: TODAS las tareas de días anteriores
     const overdueTasks = tasksForUser.filter((task) => {
       if (!task.start_date) return false;
-      return dayjs(task.start_date).isBefore(now, 'day');
+      return isBefore(new Date(task.start_date), today);
     });
 
     // Tareas pendientes: Estados pendiente, urgente, a la espera
@@ -155,7 +164,7 @@ export default function WorkdayPage() {
     // Próximas tareas: Programadas para el futuro
     const futureTasks = tasksForUser.filter((task) => {
       if (!task.start_date) return false;
-      return dayjs(task.start_date).isAfter(now, 'day');
+      return isAfter(new Date(task.start_date), today) && !isSameDay(new Date(task.start_date), today);
     });
 
 
@@ -230,8 +239,8 @@ export default function WorkdayPage() {
     }
 
     const fetchCalendar = async () => {
-      const startWindow = dayjs().subtract(30, "day").format("YYYY-MM-DD");
-      const endWindow = dayjs().add(45, "day").format("YYYY-MM-DD");
+      const startWindow = format(subDays(new Date(), 30), "yyyy-MM-dd");
+      const endWindow = format(addDays(new Date(), 45), "yyyy-MM-dd");
       const { data } = await supabase
         .from("screen_data")
         .select("id, start_date, state, responsible_profile_id, task_profiles(profile_id)")
@@ -250,7 +259,7 @@ export default function WorkdayPage() {
         if (task?.start_date) taskDates.add(task.start_date);
       });
 
-      setCalendarTaskDays(Array.from(taskDates).map((value) => dayjs(value).toDate()));
+      setCalendarTaskDays(Array.from(taskDates).map((value) => new Date(value)));
     };
 
     fetchCalendar();
@@ -266,7 +275,7 @@ export default function WorkdayPage() {
 
   // Formato de fecha y hora actual
   const formattedDateTime = useMemo(() => {
-    return dayjs(currentTime).format("dddd D [de] MMMM - HH:mm:ss").toUpperCase();
+    return format(currentTime, "eeee d 'de' MMMM - HH:mm:ss", { locale: es }).toUpperCase();
   }, [currentTime]);
 
   // Registrar llegada/salida para una tarea específica
@@ -313,8 +322,8 @@ export default function WorkdayPage() {
   // Componente de tarjeta de tarea con botones
   const TaskCard = ({ task, isActive = false }: { task: Task; isActive?: boolean }) => {
     const formatTaskWindow = (t: Task) => {
-      const start = t.start_date ? dayjs(t.start_date).format("HH:mm") : "00:00";
-      const end = t.end_date ? dayjs(t.end_date).format("HH:mm") : "00:00";
+      const start = t.start_date ? format(new Date(t.start_date), "HH:mm") : "00:00";
+      const end = t.end_date ? format(new Date(t.end_date), "HH:mm") : "00:00";
       return `${start} - ${end}`;
     };
 
@@ -338,8 +347,8 @@ export default function WorkdayPage() {
               <p>Ubicación: {task.data?.location ?? "Por confirmar"}</p>
               <p>
                 Montaje: {task.data?.installation_date
-                  ? dayjs(task.data.installation_date).format("DD/MM/YYYY")
-                  : dayjs(task.start_date).format("DD/MM/YYYY")}
+                  ? format(new Date(task.data.installation_date), "dd/MM/yyyy")
+                  : format(new Date(task.start_date), "dd/MM/yyyy")}
               </p>
             </div>
           </div>
@@ -679,7 +688,7 @@ export default function WorkdayPage() {
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Fecha de inicio</p>
                 <p className="text-sm">
-                  {detailsTask?.start_date ? dayjs(detailsTask.start_date).format("DD/MM/YYYY") : "N/A"}
+                  {detailsTask?.start_date ? format(new Date(detailsTask.start_date), "dd/MM/yyyy") : "N/A"}
                 </p>
               </div>
 
@@ -688,7 +697,7 @@ export default function WorkdayPage() {
               <div className="space-y-2">
                 <p className="text-sm font-semibold">Fecha de cierre</p>
                 <p className="text-sm">
-                  {detailsTask?.end_date ? dayjs(detailsTask.end_date).format("DD/MM/YYYY") : "N/A"}
+                  {detailsTask?.end_date ? format(new Date(detailsTask.end_date), "dd/MM/yyyy") : "N/A"}
                 </p>
               </div>
 
@@ -842,7 +851,7 @@ export default function WorkdayPage() {
                           {task.start_date && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="h-3 w-3" />
-                              <span>{dayjs(task.start_date).format("DD/MM/YYYY HH:mm")}</span>
+                              <span>{format(new Date(task.start_date), "dd/MM/yyyy HH:mm")}</span>
                             </div>
                           )}
                         </div>

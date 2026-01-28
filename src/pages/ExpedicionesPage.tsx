@@ -35,8 +35,8 @@ import { toast } from 'sonner';
 import PageShell from '@/components/layout/PageShell';
 import { sortWorkOrdersByPriority, getUrgencyBadge } from '@/services/priority-service';
 import { getWorkdaysRemaining } from '@/utils/workday-utils';
-import { ExpedicionesCalendar } from '@/components/shipping/ExpedicionesCalendar';
-import ShippedOrdersPanel from '@/components/shipping/ShippedOrdersPanel';
+import { ExpedicionesCalendar } from '@/features/logistics/components/ExpedicionesCalendar';
+import ShippedOrdersPanel from '@/features/logistics/components/ShippedOrdersPanel';
 
 // Tipos
 interface Order {

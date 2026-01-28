@@ -21,7 +21,8 @@ import {
   Clock,
   Truck
 } from 'lucide-react';
-import dayjs from 'dayjs';
+import { format, isAfter, isBefore, addDays, parseISO, isValid } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { TaskStateBadge, StatusBadge, VehicleBadge } from '@/components/badges';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -226,8 +227,8 @@ const ArchiveChart = ({ tasks, orders }: { tasks: ArchivedTaskRecord[], orders: 
     const monthlyData: Record<string, ChartData> = {};
 
     tasks.forEach(task => {
-      const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
-      const month = archivedAt?.isValid() ? archivedAt.format('YYYY-MM') : 'Sin fecha';
+      const archivedAt = task.archived_at ? new Date(task.archived_at) : null;
+      const month = archivedAt && isValid(archivedAt) ? format(archivedAt, 'yyyy-MM') : 'Sin fecha';
       const group = task.screen_group || 'Sin grupo';
 
       if (!monthlyData[month]) {
@@ -241,8 +242,8 @@ const ArchiveChart = ({ tasks, orders }: { tasks: ArchivedTaskRecord[], orders: 
     });
 
     orders.forEach(order => {
-      const updatedAt = order.updated_at ? dayjs(order.updated_at) : null;
-      const month = updatedAt?.isValid() ? updatedAt.format('YYYY-MM') : 'Sin fecha';
+      const updatedAt = order.updated_at ? new Date(order.updated_at) : null;
+      const month = updatedAt && isValid(updatedAt) ? format(updatedAt, 'yyyy-MM') : 'Sin fecha';
 
       if (!monthlyData[month]) {
         monthlyData[month] = { month, Instalaciones: 0, Confección: 0, Tapicería: 0, Producción: 0, Otros: 0 };
@@ -265,7 +266,7 @@ const ArchiveChart = ({ tasks, orders }: { tasks: ArchivedTaskRecord[], orders: 
           return (
             <div key={item.month} className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>{dayjs(item.month).format('MMM YYYY')}</span>
+                <span>{item.month !== 'Sin fecha' ? format(new Date(item.month + '-01'), 'MMM yyyy', { locale: es }) : 'Sin fecha'}</span>
                 <span className="font-medium">{total} registros</span>
               </div>
               <div className="flex gap-1 h-6">
@@ -368,9 +369,9 @@ export default function ArchivePage() {
       const groupMatch = groupFilter === "all" || task.screen_group === groupFilter;
       const stateMatch = stateFilter === "all" || task.state === stateFilter;
 
-      const archivedAt = task.archived_at ? dayjs(task.archived_at) : null;
-      const dateMatch = (!dateFrom || (archivedAt?.isAfter(dayjs(dateFrom)) ?? false)) &&
-        (!dateTo || (archivedAt?.isBefore(dayjs(dateTo).add(1, 'day')) ?? false));
+      const archivedAt = task.archived_at ? new Date(task.archived_at) : null;
+      const dateMatch = (!dateFrom || (archivedAt && isAfter(archivedAt, new Date(dateFrom)))) &&
+        (!dateTo || (archivedAt && isBefore(archivedAt, addDays(new Date(dateTo), 1))));
 
       return searchMatch && groupMatch && stateMatch && dateMatch;
     });
@@ -386,9 +387,9 @@ export default function ArchivePage() {
 
       const stateMatch = stateFilter === "all" || order.status === stateFilter;
 
-      const updatedAt = order.updated_at ? dayjs(order.updated_at) : null;
-      const dateMatch = (!dateFrom || (updatedAt?.isAfter(dayjs(dateFrom)) ?? false)) &&
-        (!dateTo || (updatedAt?.isBefore(dayjs(dateTo).add(1, 'day')) ?? false));
+      const updatedAt = order.updated_at ? new Date(order.updated_at) : null;
+      const dateMatch = (!dateFrom || (updatedAt && isAfter(updatedAt, new Date(dateFrom)))) &&
+        (!dateTo || (updatedAt && isBefore(updatedAt, addDays(new Date(dateTo), 1))));
 
       return searchMatch && stateMatch && dateMatch;
     });
@@ -407,7 +408,7 @@ export default function ArchivePage() {
       csvData = filteredTasks.map(t => {
         const d = (t.data ?? {}) as Record<string, any>;
         return [
-          dayjs(t.archived_at).format('DD/MM/YYYY HH:mm'),
+          format(new Date(t.archived_at), 'dd/MM/yyyy HH:mm'),
           d.site || '',
           d.client || '',
           d.description || '',
@@ -419,7 +420,7 @@ export default function ArchivePage() {
     } else {
       headers = ['Finalizado', 'Nº Pedido', 'Cliente', 'Estado', 'Notas'];
       csvData = filteredOrders.map(o => [
-        dayjs(o.updated_at).format('DD/MM/YYYY HH:mm'),
+        format(new Date(o.updated_at), 'dd/MM/yyyy HH:mm'),
         o.order_number,
         o.customer_name,
         o.status,
@@ -431,7 +432,7 @@ export default function ArchivePage() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `historial_${activeTab}_${dayjs().format('YYYYMMDD')}.csv`);
+    link.setAttribute("download", `historial_${activeTab}_${format(new Date(), 'yyyyMMdd')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -686,7 +687,7 @@ export default function ArchivePage() {
                           {activeTab === "tasks" ? (
                             <>
                               <TableCell className="text-xs text-muted-foreground">
-                                {dayjs(item.archived_at).format('DD/MM/YYYY HH:mm')}
+                                {format(new Date(item.archived_at), 'dd/MM/yyyy HH:mm')}
                               </TableCell>
                               <TableCell>
                                 <div className="font-medium text-slate-200">{item.data?.site || 'N/A'}</div>
@@ -699,7 +700,7 @@ export default function ArchivePage() {
                           ) : (
                             <>
                               <TableCell className="text-xs text-muted-foreground">
-                                {dayjs(item.updated_at).format('DD/MM/YYYY HH:mm')}
+                                {format(new Date(item.updated_at), 'dd/MM/yyyy HH:mm')}
                               </TableCell>
                               <TableCell className="font-medium text-blue-400">{item.order_number}</TableCell>
                               <TableCell className="text-slate-200">{item.customer_name}</TableCell>

@@ -3,17 +3,9 @@ import { supabaseProductivity as supabase } from "@/integrations/supabase";
 import { WorkOrder, WorkOrderStatus, WorkOrderWithDetails } from "@/types/production";
 import { toast } from "sonner";
 import { summarizeMaterials } from "@/lib/materials";
+import { WorkOrderService } from "@/features/production/services/workOrderService";
 
-export const normalizeStatus = (raw?: string) => {
-    const normalized = (raw || '').toUpperCase();
-    const map: Record<string, string> = {
-        EN_CORTE: 'CORTE',
-        EN_CONFECCION: 'CONFECCION',
-        EN_CONTROL_CALIDAD: 'CONTROL_CALIDAD',
-        TERMINADO: 'LISTO_ENVIO'
-    };
-    return map[normalized] || normalized;
-};
+export const normalizeStatus = WorkOrderService.fromLegacyStatus;
 
 // Hook para obtener todas las work orders
 export const useWorkOrders = () => {
@@ -64,7 +56,7 @@ export const useWorkOrders = () => {
                     ...order,
                     order_number: order.order_number || order.work_order_number || order.id,
                     quantity_total: order.quantity_total || order.quantity || specs.quantity,
-                    status: normalizeStatus(order.status),
+                    status: WorkOrderService.fromLegacyStatus(order.status),
                     fabric: materialList,
                     color: colorList,
                     region: commOrder?.delivery_region || commOrder?.region || order.region || specs.region || "PENINSULA"
@@ -80,17 +72,6 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
         queryKey: ['work-orders', status],
         staleTime: 5000,
         queryFn: async () => {
-            const normalizedToLegacy = (raw?: WorkOrderStatus) => {
-                if (!raw) return raw;
-                switch (raw) {
-                    case 'CORTE': return 'EN_CORTE';
-                    case 'CONFECCION': return 'EN_CONFECCION';
-                    case 'CONTROL_CALIDAD': return 'EN_CONTROL_CALIDAD';
-                    case 'LISTO_ENVIO': return 'TERMINADO';
-                    default: return raw;
-                }
-            };
-
             let query = supabase
                 .from('produccion_work_orders')
                 .select('*')
@@ -98,7 +79,7 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
                 .order('created_at', { ascending: false });
 
             if (status) {
-                query = query.eq('status', normalizedToLegacy(status) as any);
+                query = (query.eq('status', WorkOrderService.toLegacyStatus(status) as any) as any);
             }
 
             const { data, error } = await query;
@@ -119,9 +100,7 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
 
             return (data || []).map((order: any) => {
                 const specs = order.technical_specs || {};
-                const lines = (Array.isArray(order.lines) && order.lines.length > 0)
-                    ? order.lines
-                    : (linesData?.filter((line: any) => line.work_order_id === order.id) || []);
+                const lines = linesData?.filter((line: any) => line.work_order_id === order.id) || [];
                 const materialList = summarizeMaterials(lines, specs.fabric || order.fabric || "N/D");
 
                 const colorList = lines.length > 0
@@ -132,7 +111,7 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
                     ...order,
                     order_number: order.order_number || order.work_order_number || order.id,
                     quantity_total: order.quantity_total || order.quantity || specs.quantity,
-                    status: normalizeStatus(order.status),
+                    status: WorkOrderService.fromLegacyStatus(order.status),
                     fabric: materialList,
                     color: colorList
                 };
@@ -140,6 +119,7 @@ export const useWorkOrdersByStatus = (status?: WorkOrderStatus) => {
         },
     });
 };
+
 
 // Hook para obtener una work order específica
 export const useWorkOrder = (id: string) => {
@@ -184,7 +164,7 @@ export const useWorkOrder = (id: string) => {
                 ...order,
                 order_number: order.order_number || order.work_order_number || order.id,
                 quantity_total: order.quantity_total || order.quantity || specs.quantity,
-                status: normalizeStatus(order.status),
+                status: WorkOrderService.fromLegacyStatus(order.status),
                 fabric: materialList,
                 color: colorList
             } as WorkOrderWithDetails;
@@ -199,126 +179,17 @@ export const useUpdateWorkOrderStatus = () => {
     return useMutation({
         mutationFn: async ({
             workOrderId,
-            status,
-            notes
+            status
         }: {
             workOrderId: string;
             status: WorkOrderStatus;
             notes?: string;
         }) => {
-            const normalizedToLegacy = (raw: WorkOrderStatus) => {
-                switch (raw) {
-                    case 'CORTE': return 'EN_CORTE';
-                    case 'CONFECCION': return 'EN_CONFECCION';
-                    case 'CONTROL_CALIDAD': return 'EN_CONTROL_CALIDAD';
-                    case 'LISTO_ENVIO': return 'TERMINADO';
-                    default: return raw;
-                }
-            };
-
-            const schemaProbe = await supabase
-                .from('produccion_work_orders')
-                .select('id')
-                .limit(1);
-
-            const useSchema = !schemaProbe.error && (schemaProbe.data?.length || 0) > 0;
-
-            let data: any = null;
-            let error: any = null;
-
-            if (useSchema) {
-                const fallback = await (supabase
-                    .from('produccion_work_orders') as any)
-                    .update({
-                        status: normalizedToLegacy(status),
-                        updated_at: new Date().toISOString()
-                    } as any)
-                    .eq('id', workOrderId)
-                    .select()
-                    .single();
-                data = fallback.data as any;
-                error = fallback.error;
-            } else {
-                const result = await (supabase
-                    .from('produccion_work_orders') as any)
-                    .update({
-                        status,
-                        updated_at: new Date().toISOString()
-                    } as any)
-                    .eq('id', workOrderId)
-                    .select()
-                    .single();
-
-                data = result.data as any;
-                error = result.error;
-
-                if (error && String(error.message || '').includes('relation')) {
-                    const fallback = await (supabase
-                        .from('produccion_work_orders') as any)
-                        .update({
-                            status: normalizedToLegacy(status),
-                            updated_at: new Date().toISOString()
-                        } as any)
-                        .eq('id', workOrderId)
-                        .select()
-                        .single();
-                    data = fallback.data as any;
-                    error = fallback.error;
-                } else if (error && String(error.message || '').includes('violates check')) {
-                    const fallback = await (supabase
-                        .from('produccion_work_orders') as any)
-                        .update({
-                            status: normalizedToLegacy(status),
-                            updated_at: new Date().toISOString()
-                        } as any)
-                        .eq('id', workOrderId)
-                        .select()
-                        .single();
-                    data = fallback.data as any;
-                    error = fallback.error;
-                }
-            }
-
-            if (error) {
-                console.error("Error updating work order status:", error);
-                throw error;
-            }
-
-            return data as WorkOrder;
+            return WorkOrderService.updateStatus(workOrderId, status);
         },
-        onSuccess: async (data, variables) => {
-            // Sincronización Producción -> Comercial
-            if (data?.order_number) {
-                const mapProductionToCommercial = (status: string): string | null => {
-                    switch (status.toUpperCase()) {
-                        case 'LISTO_ENVIO':
-                        case 'TERMINADO':
-                            // Cuando produccion marca como LISTO_ENVIO, comercial pasa a PTE_ENVIO
-                            // para que expediciones complete datos antes de ENVIADO
-                            return 'PTE_ENVIO';
-                        case 'ENVIADO':
-                            return 'ENVIADO';
-                        case 'ENTREGADO':
-                            return 'ENTREGADO';
-                        default:
-                            return null;
-                    }
-                };
-
-                const commercialStatus = mapProductionToCommercial(data.status);
-
-                if (commercialStatus) {
-                    await supabase
-                        .from('comercial_orders')
-                        .update({
-                            status: commercialStatus,
-                            updated_at: new Date().toISOString()
-                        } as any)
-                        .eq('order_number', data.order_number);
-                }
-            }
-
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
             toast.success("Estado actualizado exitosamente");
         },
         onError: (error: any) => {
@@ -339,22 +210,7 @@ export const useAssignTechnician = () => {
             workOrderId: string;
             technicianId: string | null;
         }) => {
-            const { data, error } = await (supabase
-                .from('produccion_work_orders') as any)
-                .update({
-                    assigned_technician_id: technicianId,
-                    updated_at: new Date().toISOString()
-                } as any)
-                .eq('id', workOrderId)
-                .select()
-                .single();
-
-            if (error) {
-                console.error("Error assigning technician:", error);
-                throw error;
-            }
-
-            return data as WorkOrder;
+            return WorkOrderService.assignTechnician(workOrderId, technicianId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });
@@ -378,22 +234,7 @@ export const useUpdateWorkOrderPriority = () => {
             workOrderId: string;
             priority: number;
         }) => {
-            const { data, error } = await (supabase
-                .from('produccion_work_orders') as any)
-                .update({
-                    priority,
-                    updated_at: new Date().toISOString()
-                } as any)
-                .eq('id', workOrderId)
-                .select()
-                .single();
-
-            if (error) {
-                console.error("Error updating priority:", error);
-                throw error;
-            }
-
-            return data as WorkOrder;
+            return WorkOrderService.updatePriority(workOrderId, priority);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });
@@ -419,28 +260,7 @@ export const useUpdateQualityCheck = () => {
             qualityStatus: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
             notes?: string;
         }) => {
-            const updates: any = {
-                quality_check_status: qualityStatus,
-                updated_at: new Date().toISOString()
-            };
-
-            if (notes) {
-                updates.notes = notes;
-            }
-
-            const { data, error } = await (supabase
-                .from('produccion_work_orders') as any)
-                .update(updates)
-                .eq('id', workOrderId)
-                .select()
-                .single();
-
-            if (error) {
-                console.error("Error updating quality check:", error);
-                throw error;
-            }
-
-            return data as WorkOrder;
+            return WorkOrderService.updateQualityCheck(workOrderId, qualityStatus, notes);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['work-orders'] });

@@ -151,35 +151,35 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
   return (
     <>
       {visibleUsers.length === 0 && users.length > 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-8 text-center">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-slate-900 flex items-center justify-center">
-            <User className="h-8 w-8 text-slate-600" />
+        <div className="rounded-2xl border border-border bg-card p-8 text-center">
+          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+            <User className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-200 mb-2">
+          <h3 className="text-lg font-bold text-foreground mb-2">
             Acceso Restringido
           </h3>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted-foreground">
             Tu rol ({currentUserRole}) no tiene permisos para gestionar usuarios.
           </p>
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/30 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card px-5 py-4 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="rounded-full bg-slate-900 p-2 text-blue-400 border border-slate-800">
+              <div className="rounded-full bg-muted p-2 text-primary border border-border">
                 <User className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                <p className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
                   Gestionar usuarios
                 </p>
-                <p className="text-lg font-semibold text-white">Directorio de perfiles</p>
+                <p className="text-lg font-bold text-foreground">Directorio de perfiles</p>
               </div>
             </div>
             {canCreate && (
               <Button
                 onClick={() => handleOpenDialog()}
-                className="rounded-full bg-blue-600 px-5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 shadow-lg shadow-blue-900/20"
+                className="rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 shadow-lg shadow-primary/20"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Añadir usuario
@@ -187,12 +187,12 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/30 px-4 py-3">
+          <div className="rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
             <Input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Buscar por nombre, email o teléfono"
-              className="border-slate-800 bg-slate-900/50 text-slate-200 placeholder:text-slate-500 focus-visible:ring-blue-500/50"
+              className="border-border bg-muted/30 text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/50"
             />
           </div>
 
@@ -202,11 +202,11 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
               return (
                 <div
                   key={user.id}
-                  className="group flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/20 p-4 transition-colors hover:bg-slate-900/40 hover:border-slate-700"
+                  className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:bg-muted/30 shadow-sm"
                 >
                   <div className="flex flex-col gap-3">
                     <div className="flex items-start gap-3">
-                      <div className="h-11 w-11 rounded-full bg-slate-800 ring-1 ring-slate-700 overflow-hidden">
+                      <div className="h-11 w-11 rounded-full bg-muted ring-1 ring-border overflow-hidden">
                         {user.avatar_url ? (
                           <img
                             src={user.avatar_url}
@@ -215,31 +215,31 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center">
-                            <User className="h-5 w-5 text-slate-500" />
+                            <User className="h-5 w-5 text-muted-foreground" />
                           </div>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1">
-                            <p className="text-sm font-bold text-slate-200">{user.full_name}</p>
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                            <p className="text-sm font-bold text-foreground">{user.full_name}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                               <StatusBadge status={user.status} size="sm" variant="dot" />
-                              <span className="rounded-full bg-slate-800 px-2.5 py-0.5 font-medium capitalize text-slate-400 border border-slate-700">
+                              <span className="rounded-full bg-muted px-2.5 py-0.5 font-bold capitalize text-muted-foreground border border-border">
                                 {user.role}
                               </span>
                               {user.active_tasks_count !== undefined && (
-                                <span className={`rounded-full px-2.5 py-0.5 font-bold border ${user.active_tasks_count > 3 ? 'bg-red-500/10 text-red-400 border-red-500/20' : user.active_tasks_count > 0 ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-slate-800 text-slate-500 border-slate-700'}`}>
+                                <span className={`rounded-full px-2.5 py-0.5 font-bold border ${user.active_tasks_count > 3 ? 'bg-destructive/10 text-destructive border-destructive/20' : user.active_tasks_count > 0 ? 'bg-primary/10 text-primary border-primary/20' : 'bg-muted text-muted-foreground border-border'}`}>
                                   {user.active_tasks_count} {user.active_tasks_count === 1 ? 'tarea' : 'tareas'}
                                 </span>
                               )}
-                              {!user.auth_user_id && <span className="text-amber-500 font-medium">Acceso pendiente</span>}
+                              {!user.auth_user_id && <span className="text-warning font-bold">Acceso pendiente</span>}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold border ${availability.label === "Disponible" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                              availability.label === "Vacaciones" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                                "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold border ${availability.label === "Disponible" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" :
+                              availability.label === "Vacaciones" ? "bg-warning/10 text-warning border-warning/20" :
+                                "bg-destructive/10 text-destructive border-destructive/20"
                               }`}>
                               {availability.label}
                             </span>
@@ -247,7 +247,7 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                                className="h-8 w-8 rounded-full border border-warning/30 bg-warning/10 text-warning hover:bg-warning/20"
                                 title="Invitar o vincular usuario"
                                 onClick={() => handleInviteUser(user)}
                                 disabled={inviteLoadingId === user.id}
@@ -259,7 +259,7 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-full border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white"
+                                className="h-8 w-8 rounded-full border border-border text-muted-foreground hover:bg-muted hover:text-foreground"
                                 onClick={() => handleOpenDialog(user)}
                                 title="Ver o editar usuario"
                               >
@@ -270,7 +270,7 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-full border border-red-900/30 text-slate-500 hover:bg-red-950/30 hover:text-red-400 hover:border-red-900/50"
+                                className="h-8 w-8 rounded-full border border-destructive/30 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
                                 onClick={() => handleDelete(user.id)}
                                 title="Eliminar usuario"
                               >
@@ -279,29 +279,29 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                             )}
                           </div>
                         </div>
-                        <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2 mt-3 p-3 rounded-lg bg-slate-950/20 border border-slate-800/50">
+                        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 mt-3 p-3 rounded-lg bg-muted/20 border border-border/50">
                           <div className="flex items-center gap-2 break-words">
-                            <Mail className="h-3 w-3 text-slate-600" />
-                            <span className="text-slate-400">{user.email ?? "Sin correo"}</span>
+                            <Mail className="h-3 w-3 text-muted-foreground/70" />
+                            <span className="text-foreground/80 font-medium">{user.email ?? "Sin correo"}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Phone className="h-3 w-3 text-slate-600" />
-                            <span className="text-slate-400">{user.phone ?? "Sin teléfono"}</span>
+                            <Phone className="h-3 w-3 text-muted-foreground/70" />
+                            <span className="text-foreground/80 font-medium">{user.phone ?? "Sin teléfono"}</span>
                           </div>
                           {(user.whatsapp) && (
                             <div className="flex items-center gap-2">
                               <MessageCircle className="h-3 w-3 text-emerald-600/70" />
-                              <span className="text-slate-400">{user.whatsapp}</span>
+                              <span className="text-foreground/80 font-medium">{user.whatsapp}</span>
                             </div>
                           )}
                           {user.public_url && (
                             <div className="flex items-center gap-2">
-                              <ExternalLink className="h-3 w-3 text-blue-500/70" />
+                              <ExternalLink className="h-3 w-3 text-primary/70" />
                               <a
                                 href={user.public_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-400 hover:underline hover:text-blue-300"
+                                className="text-primary hover:underline hover:text-primary/80 font-bold"
                               >
                                 Perfil público
                               </a>
@@ -316,7 +316,7 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
             })}
 
             {!filteredUsers.length && (
-              <p className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 px-4 py-8 text-center text-sm text-slate-500">
+              <p className="rounded-2xl border border-dashed border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
                 No se encontraron usuarios con el filtro aplicado.
               </p>
             )}

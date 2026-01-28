@@ -65,14 +65,14 @@ export const TASK_STATES = {
 export type TaskState = typeof TASK_STATES[keyof typeof TASK_STATES];
 
 export const TASK_STATE_COLORS: Record<TaskState, string> = {
-  [TASK_STATES.URGENTE]: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
-  [TASK_STATES.PENDIENTE]: 'bg-slate-500/15 text-slate-300 border-slate-500/40',
-  [TASK_STATES.A_LA_ESPERA]: 'bg-purple-500/15 text-purple-300 border-purple-500/40',
-  [TASK_STATES.EN_FABRICACION]: 'bg-blue-500/15 text-blue-300 border-blue-500/40',
-  [TASK_STATES.TERMINADO]: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
-  [TASK_STATES.INCIDENTE]: 'bg-red-500/15 text-red-300 border-red-500/40',
-  [TASK_STATES.ARREGLO]: 'bg-orange-500/15 text-orange-300 border-orange-500/40',
-  [TASK_STATES.PENDIENTE_VALIDAR]: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/40',
+  [TASK_STATES.URGENTE]: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40',
+  [TASK_STATES.PENDIENTE]: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/40',
+  [TASK_STATES.A_LA_ESPERA]: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40',
+  [TASK_STATES.EN_FABRICACION]: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/40',
+  [TASK_STATES.TERMINADO]: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40',
+  [TASK_STATES.INCIDENTE]: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40',
+  [TASK_STATES.ARREGLO]: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/40',
+  [TASK_STATES.PENDIENTE_VALIDAR]: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/40',
 };
 
 export const TASK_STATE_LABELS: Record<TaskState, string> = {

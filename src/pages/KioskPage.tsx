@@ -167,8 +167,10 @@ const KioskPage = () => {
   const updateThemeMutation = useMutation({
     mutationFn: async ({ id, theme, config }: { id: string; theme: 'dark' | 'light'; config?: any }) => {
       const baseConfig = (config && typeof config === 'object' && !Array.isArray(config)) ? config : {};
+      // @ts-ignore
       const { error } = await supabaseProductivity
         .from("kiosk_screens")
+        // @ts-ignore
         .update({ config: { ...baseConfig, theme } })
         .eq("id", id);
 
@@ -262,8 +264,8 @@ const KioskPage = () => {
     >
       <Tabs defaultValue="production" value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <div className="flex justify-between items-center mb-4">
-          <TabsList className="bg-[#1A1D1F] border border-white/10">
-            <TabsTrigger value="production" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+          <TabsList className="bg-muted border border-border">
+            <TabsTrigger value="production" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <LayoutDashboard className="w-4 h-4 mr-2" /> Producción
             </TabsTrigger>
             <TabsTrigger value="general" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
@@ -278,10 +280,10 @@ const KioskPage = () => {
                   <Plus className="w-4 h-4 mr-2" /> Nueva Pantalla Producción
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-[#1A1D1F] border-white/10 text-white">
+              <DialogContent className="bg-card border-border text-foreground">
                 <DialogHeader>
                   <DialogTitle>Nueva Pantalla de Producción</DialogTitle>
-                  <DialogDescription className="text-gray-400">
+                  <DialogDescription className="text-muted-foreground">
                     Dispositivo conectado a la base de datos de Productividad.
                   </DialogDescription>
                 </DialogHeader>
@@ -292,7 +294,7 @@ const KioskPage = () => {
                       placeholder="Ej: Pantalla Corte 1"
                       value={newScreen.name}
                       onChange={e => setNewScreen({ ...newScreen, name: e.target.value })}
-                      className="bg-black/20 border-white/10"
+                      className="bg-muted/30 border-border"
                     />
                   </div>
                   <div className="space-y-2">
@@ -301,7 +303,7 @@ const KioskPage = () => {
                       placeholder="Ej: Nave Principal - Zona A"
                       value={newScreen.location}
                       onChange={e => setNewScreen({ ...newScreen, location: e.target.value })}
-                      className="bg-black/20 border-white/10"
+                      className="bg-muted/30 border-border"
                     />
                   </div>
                   <div className="space-y-2">
@@ -310,10 +312,10 @@ const KioskPage = () => {
                       value={newScreen.kiosk_type || "MONITOR"}
                       onValueChange={(v: any) => setNewScreen({ ...newScreen, kiosk_type: v })}
                     >
-                      <SelectTrigger className="bg-black/20 border-white/10">
+                      <SelectTrigger className="bg-muted/30 border-border">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#1A1D1F] border-white/10">
+                      <SelectContent className="bg-card border-border">
                         <SelectItem value="MONITOR">Producción (Monitor Planificación)</SelectItem>
                         <SelectItem value="TERMINAL">Almacén (Terminal)</SelectItem>
                         <SelectItem value="TABLET">Tablet / Móvil (Escáner)</SelectItem>
@@ -322,8 +324,8 @@ const KioskPage = () => {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="border-white/10 hover:bg-white/5 hover:text-white">Cancelar</Button>
-                  <Button onClick={() => createMutation.mutate(newScreen)} disabled={createMutation.isPending} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="border-border hover:bg-muted">Cancelar</Button>
+                  <Button onClick={() => createMutation.mutate(newScreen)} disabled={createMutation.isPending} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                     {createMutation.isPending ? "Creando..." : "Crear Pantalla"}
                   </Button>
                 </DialogFooter>
@@ -334,7 +336,7 @@ const KioskPage = () => {
 
         <TabsContent value="production" className="space-y-4">
           {/* HEADER */}
-          <div className="px-8 py-4 bg-[#111] rounded-t-lg grid grid-cols-12 gap-4 text-gray-500 font-bold text-sm uppercase tracking-wider border-b border-white/5">
+          <div className="px-8 py-4 bg-muted/60 rounded-t-lg grid grid-cols-12 gap-4 text-muted-foreground font-bold text-sm uppercase tracking-wider border-b border-border">
             <div className="col-span-3">Nombre / Ubicación</div>
             <div className="col-span-2">Tipo</div>
             <div className="col-span-3">URL</div>
@@ -366,33 +368,33 @@ const KioskPage = () => {
                 return (
                   <div
                     key={screen.id}
-                    className={`grid grid-cols-12 gap-4 items-center bg-[#1A1D1F] p-4 rounded-lg border-l-4 ${borderColor} shadow-lg hover:bg-[#1F2225] transition-colors`}
+                    className={`grid grid-cols-12 gap-4 items-center bg-card p-4 rounded-lg border-l-4 ${borderColor} shadow-sm hover:border-border transition-all border border-transparent`}
                   >
                     {/* COL 1: NOMBRE / UBICACIÓN */}
                     <div className="col-span-3">
-                      <div className="text-white font-bold text-base">{screen.name}</div>
-                      <div className="text-xs text-gray-500 mt-1">{screen.location || 'Sin ubicación'}</div>
+                      <div className="text-foreground font-bold text-base">{screen.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{screen.location || 'Sin ubicación'}</div>
                     </div>
 
                     {/* COL 2: TIPO */}
                     <div className="col-span-2">
                       <div className="flex items-center gap-3">
-                        <typeConfig.icon className="w-6 h-6 text-emerald-500" />
+                        <typeConfig.icon className="w-6 h-6 text-primary" />
                         <div>
-                          <div className="text-sm font-bold text-white">{typeConfig.label}</div>
-                          <div className="text-xs text-gray-500">{destination}</div>
+                          <div className="text-sm font-bold text-foreground">{typeConfig.label}</div>
+                          <div className="text-xs text-muted-foreground">{destination}</div>
                         </div>
                       </div>
                     </div>
 
                     {/* COL 3: URL */}
                     <div className="col-span-3">
-                      <div className="flex items-center gap-2 bg-black/20 p-2 rounded border border-white/5">
-                        <span className="text-xs text-gray-500 truncate flex-1 font-mono">{url}</span>
+                      <div className="flex items-center gap-2 bg-muted/40 p-2 rounded border border-border">
+                        <span className="text-xs text-muted-foreground truncate flex-1 font-mono">{url}</span>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 hover:bg-white/10 hover:text-white flex-shrink-0"
+                          className="h-6 w-6 hover:bg-muted hover:text-foreground flex-shrink-0"
                           onClick={() => handleCopyUrl(url)}
                         >
                           <Copy className="h-3 w-3" />
@@ -400,7 +402,7 @@ const KioskPage = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 hover:bg-emerald-600/20 hover:text-emerald-400 flex-shrink-0"
+                          className="h-6 w-6 hover:bg-primary/20 hover:text-primary flex-shrink-0"
                           onClick={() => window.open(url, '_blank')}
                         >
                           <ExternalLink className="h-3 w-3" />
@@ -420,10 +422,10 @@ const KioskPage = () => {
                           });
                         }}
                       >
-                        <SelectTrigger className="bg-black/20 border-white/10 h-8 text-xs">
+                        <SelectTrigger className="bg-muted/40 border-border h-8 text-xs text-foreground">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-[#1A1D1F] border-white/10">
+                        <SelectContent className="bg-card border-border">
                           <SelectItem value="dark">Actual</SelectItem>
                           <SelectItem value="light">Claro</SelectItem>
                         </SelectContent>
@@ -432,12 +434,12 @@ const KioskPage = () => {
 
                     {/* COL 5: ESTADO */}
                     <div className="col-span-2 flex items-center justify-end gap-2">
-                      <Badge variant="outline" className={screen.is_active ? "bg-emerald-900/40 text-emerald-200 border-emerald-700/50" : "bg-gray-900/40 text-gray-400 border-gray-700/50"}>
+                      <Badge variant="outline" className={screen.is_active ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30" : "bg-muted text-muted-foreground border-border"}>
                         {screen.is_active ? 'ACTIVA' : 'INACTIVA'}
                       </Badge>
-                      <div className="text-center bg-[#0F1113] border border-[#45474A]/60 rounded-lg px-2 py-1">
-                        <span className="text-lg font-black text-white tracking-tighter">{daysElapsed}</span>
-                        <span className="text-xs text-gray-500 uppercase font-bold ml-1">{daysElapsed === 1 ? 'día' : 'días'}</span>
+                      <div className="text-center bg-muted/50 border border-border rounded-lg px-2 py-1">
+                        <span className="text-lg font-black text-foreground tracking-tighter">{daysElapsed}</span>
+                        <span className="text-xs text-muted-foreground uppercase font-bold ml-1">{daysElapsed === 1 ? 'dia' : 'dias'}</span>
                       </div>
                     </div>
 
@@ -446,7 +448,7 @@ const KioskPage = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-900/20"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                         onClick={() => {
                           if (confirm('¿Seguro que quieres eliminar esta pantalla?')) {
                             deleteMutation.mutate(screen.id);

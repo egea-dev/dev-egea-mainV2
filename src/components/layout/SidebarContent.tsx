@@ -18,8 +18,8 @@ import { useProfile } from "@/hooks/use-supabase";
 import { getNavItemsForRole } from "@/config/navigation";
 import type { AppNavGroup, AppNavItem } from "@/config/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
-import NotificationBadge from "@/components/common/NotificationBadge";
-import NotificationPanel from "@/components/common/NotificationPanel";
+import NotificationBadge from "@/components/shared/NotificationBadge";
+import NotificationPanel from "@/components/shared/NotificationPanel";
 
 export const SidebarContentComponent = () => {
   const location = useLocation();

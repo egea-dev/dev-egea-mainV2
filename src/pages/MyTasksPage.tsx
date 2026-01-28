@@ -13,8 +13,10 @@ import {
   AlertTriangle,
   RefreshCw,
 } from "lucide-react";
-import { TaskStateBadge, VehicleBadge } from "@/components/badges";
-import dayjs from "dayjs";
+import { TaskStateBadge } from "@/features/tasks/components/TaskStateBadge";
+import { VehicleBadge } from "@/features/fleet/components/VehicleBadge";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { buildMapsDirectionsUrl, buildMapsSearchUrl } from "@/utils/maps";
 
 interface Task {
@@ -56,7 +58,7 @@ export default function MyTasksPage() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .rpc('get_tasks_by_token', { p_token: token });
+        .rpc('get_tasks_by_token', { p_token: token }) as any;
 
       if (error) {
         const message = error.message ?? '';
@@ -117,7 +119,7 @@ export default function MyTasksPage() {
         .update({
           state: newState,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', taskId);
 
       if (error) throw error;
@@ -201,7 +203,7 @@ export default function MyTasksPage() {
             <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-950/30 border border-slate-800/50">
               <Clock className="h-4 w-4 text-slate-500" />
               <span className="font-mono text-slate-300">
-                {dayjs(task.start_date).format("HH:mm")} - {dayjs(task.end_date).format("HH:mm")}
+                {format(new Date(task.start_date), "HH:mm")} - {format(new Date(task.end_date), "HH:mm")}
               </span>
             </div>
 
@@ -314,7 +316,7 @@ export default function MyTasksPage() {
               Plan de Trabajo
             </h1>
             <p className="text-slate-400 mt-1">
-              {dayjs(notificationData.plan_date).format('DD [de] MMMM, YYYY')}
+              {format(new Date(notificationData.plan_date), "dd 'de' MMMM, yyyy", { locale: es })}
             </p>
           </div>
 
@@ -371,7 +373,7 @@ export default function MyTasksPage() {
           </section>
 
           <div className="border-t border-slate-800 mt-8 pt-6 text-center">
-            <p className="text-xs font-mono text-slate-600 mb-3">Última sincro: {dayjs().format("HH:mm:ss")}</p>
+            <p className="text-xs font-mono text-slate-600 mb-3">Última sincro: {format(new Date(), "HH:mm:ss")}</p>
             <Button
               size="sm"
               variant="outline"

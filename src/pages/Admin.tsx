@@ -31,15 +31,17 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { subDays, format, parseISO, isSameDay, isBefore } from "date-fns";
 import { es } from 'date-fns/locale';
 import { toast } from "sonner";
-import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
-import type { TaskActionConfig } from "@/components/tasks/TaskActionButtons";
+import { TaskDetailsDialog } from "@/features/tasks/components/TaskDetailsDialog";
+import type { TaskActionConfig } from "@/features/tasks/components/TaskActionButtons";
 import { useNavigate } from "react-router-dom";
-import { StatusBadge, VehicleBadge, TaskStateBadge } from "@/components/badges";
+import { StatusBadge } from "@/components/shared/ui/StatusBadge";
+import { VehicleBadge } from "@/features/fleet/components/VehicleBadge";
+import { TaskStateBadge } from "@/features/tasks/components/TaskStateBadge";
 import { useDashboardTasks, useDashboardStats } from "@/hooks/use-detailed-tasks";
 import { useScreens, useVehicles, useUsers } from "@/hooks/use-supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { DetailedTask } from "@/integrations/supabase/client";
-import { TaskDialog } from "@/components/installations/TaskDialog";
+import { TaskDialog } from "@/features/installations/components/TaskDialog";
 import { Badge } from "@/components/ui/badge";
 import { buildMapsSearchUrl } from "@/utils/maps";
 import { normalizeTaskLocation } from "@/utils/task";
@@ -861,19 +863,19 @@ export default function AdminPage() {
       {/* Header Estándar Unificado */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            <LayoutDashboard className="h-8 w-8" />
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <LayoutDashboard className="h-8 w-8 text-primary" />
             Panel de Control
           </h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-muted-foreground mt-1 text-sm font-medium">
             {format(currentTime, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })} · {format(currentTime, 'HH:mm:ss')}
           </p>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
-            <div className="text-sm font-medium text-white">{currentUser?.full_name || 'Usuario'}</div>
-            <div className="text-xs text-slate-500 capitalize">{currentUser?.role || 'Administrador'}</div>
+            <div className="text-sm font-semibold text-foreground">{currentUser?.full_name || 'Usuario'}</div>
+            <div className="text-xs text-muted-foreground capitalize font-bold">{currentUser?.role || 'Administrador'}</div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -900,71 +902,71 @@ export default function AdminPage() {
       <div className="space-y-6">
         {/* Metrics Cards - Responsive Grid Estándar */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
+          <Card className="bg-card border-border/60 shadow-lg hover:border-primary/30 transition-all">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-400">Tareas Totales</CardTitle>
-              <CalendarCheck className="h-4 w-4 text-white" />
+              <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Tareas Totales</CardTitle>
+              <CalendarCheck className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold text-foreground">
                 {statsLoading ? (
                   <div className="animate-pulse bg-muted/60 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.total_tasks || 0
                 )}
               </div>
-              <p className="text-xs text-slate-500">Tareas en el sistema</p>
+              <p className="text-xs text-muted-foreground/80 mt-1">Tareas en el sistema</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
+          <Card className="bg-card border-border/60 shadow-lg hover:border-primary/30 transition-all">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-400">Usuarios Activos</CardTitle>
-              <Users className="h-4 w-4 text-white" />
+              <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Usuarios Activos</CardTitle>
+              <Users className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold text-foreground">
                 {statsLoading ? (
                   <div className="animate-pulse bg-muted/60 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.active_users || 0
                 )}
               </div>
-              <p className="text-xs text-slate-500">Usuarios activos</p>
+              <p className="text-xs text-muted-foreground/80 mt-1">Usuarios activos</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
+          <Card className="bg-card border-border/60 shadow-lg hover:border-primary/30 transition-all">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-400">Vehículos</CardTitle>
-              <Car className="h-4 w-4 text-white" />
+              <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Vehículos</CardTitle>
+              <Car className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold text-foreground">
                 {statsLoading ? (
                   <div className="animate-pulse bg-muted/60 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.active_vehicles || 0
                 )}
               </div>
-              <p className="text-xs text-slate-500">Vehículos registrados</p>
+              <p className="text-xs text-muted-foreground/80 mt-1">Vehículos registrados</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border/60 backdrop-blur-sm shadow-xl">
+          <Card className="bg-card border-border/60 shadow-lg hover:border-primary/30 transition-all">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-400">Pendientes</CardTitle>
-              <ClipboardList className="h-4 w-4 text-white" />
+              <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Pendientes</CardTitle>
+              <ClipboardList className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-white">
+              <div className="text-2xl font-bold text-foreground">
                 {statsLoading ? (
                   <div className="animate-pulse bg-muted/60 h-8 w-12 rounded"></div>
                 ) : (
                   stats?.pending_tasks || 0
                 )}
               </div>
-              <p className="text-xs text-slate-500">Tareas pendientes</p>
+              <p className="text-xs text-muted-foreground/80 mt-1">Tareas pendientes</p>
             </CardContent>
           </Card>
         </div>
@@ -980,13 +982,13 @@ export default function AdminPage() {
         {/* Main Content - Row with 3 Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Data Shortcuts Card */}
-          <Card className="flex-1 bg-card border-border/60 backdrop-blur-sm shadow-xl">
+          <Card className="flex-1 bg-card border-border shadow-md">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-white">
+              <CardTitle className="text-base flex items-center gap-2 text-foreground font-bold">
                 <Database className="h-4 w-4 text-primary" />
                 Accesos Gestión de Datos
               </CardTitle>
-              <CardDescription className="text-slate-500">
+              <CardDescription className="text-muted-foreground font-medium">
                 Configura estos accesos en "Gestión de Tablas de Datos".
               </CardDescription>
             </CardHeader>
@@ -997,7 +999,7 @@ export default function AdminPage() {
                     <Button
                       key={screen.id}
                       variant="outline"
-                      className="w-full justify-between border-border/60 bg-muted/40 hover:bg-muted/60 text-slate-300"
+                      className="w-full justify-between border-border bg-muted/30 hover:bg-muted/50 text-foreground"
                       onClick={() => handleOpenDataShortcut(screen.id)}
                     >
                       <span className="truncate text-left">{screen.name}</span>
@@ -1026,9 +1028,9 @@ export default function AdminPage() {
           </Card>
 
           {/* Confección Card */}
-          <Card className="flex-1 bg-card border-border/60 backdrop-blur-sm shadow-xl">
+          <Card className="flex-1 bg-card border-border shadow-md">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-white">
+              <CardTitle className="text-base flex items-center gap-2 text-foreground font-bold">
                 <div className="w-3 h-3 bg-primary rounded-full shadow-lg shadow-primary/40"></div>
                 Confección
               </CardTitle>
@@ -1045,7 +1047,7 @@ export default function AdminPage() {
                   ))}
                 </div>
               ) : confeccionTasks.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   No hay tareas de confección
                 </div>
               ) : (
@@ -1054,9 +1056,9 @@ export default function AdminPage() {
                     <Table className="min-w-full">
                       <TableHeader>
                         <TableRow className="border-border/60 hover:bg-muted/60">
-                          <TableHead className="text-sm text-slate-400">Nº Orden</TableHead>
-                          <TableHead className="text-sm text-slate-400">Obra</TableHead>
-                          <TableHead className="text-sm text-slate-400">Estado</TableHead>
+                          <TableHead className="text-sm text-muted-foreground font-bold uppercase">Nº Orden</TableHead>
+                          <TableHead className="text-sm text-muted-foreground font-bold uppercase">Obra</TableHead>
+                          <TableHead className="text-sm text-muted-foreground font-bold uppercase">Estado</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1064,10 +1066,10 @@ export default function AdminPage() {
                           const statusColor = getStateBadgeClasses(task.state);
                           return (
                             <TableRow key={task.id} className="border-border/60 hover:bg-muted/60">
-                              <TableCell className="text-sm font-medium text-slate-200">
+                              <TableCell className="text-sm font-bold text-foreground">
                                 {getOrderNumberLabel(task)}
                               </TableCell>
-                              <TableCell className="text-sm text-slate-300">{getConfeccionObraLabel(task)}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground font-medium">{getConfeccionObraLabel(task)}</TableCell>
                               <TableCell>
                                 <Badge variant="secondary" className={statusColor}>
                                   {task.state}
@@ -1111,9 +1113,9 @@ export default function AdminPage() {
           </Card>
 
           {/* Tapicería Card */}
-          <Card className="flex-1 bg-card border-border/60 backdrop-blur-sm shadow-xl">
+          <Card className="flex-1 bg-card border-border shadow-md">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-white">
+              <CardTitle className="text-base flex items-center gap-2 text-foreground font-bold">
                 <div className="w-3 h-3 bg-purple-500 rounded-full shadow-lg shadow-purple-500/50"></div>
                 Tapicería
               </CardTitle>
@@ -1123,9 +1125,9 @@ export default function AdminPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border/60 hover:bg-muted/60">
-                      <TableHead className="text-sm text-slate-400">Nº Orden</TableHead>
-                      <TableHead className="text-sm text-slate-400">Gestor</TableHead>
-                      <TableHead className="text-sm text-slate-400">Estado</TableHead>
+                      <TableHead className="text-sm text-muted-foreground font-bold uppercase">Nº Orden</TableHead>
+                      <TableHead className="text-sm text-muted-foreground font-bold uppercase">Gestor</TableHead>
+                      <TableHead className="text-sm text-muted-foreground font-bold uppercase">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1139,7 +1141,7 @@ export default function AdminPage() {
                       ))
                     ) : tapiceriaTasks.length === 0 ? (
                       <TableRow className="border-border/60 hover:bg-muted/60">
-                        <TableCell colSpan={3} className="text-center text-slate-500 py-8">
+                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                           No hay tareas de tapicería
                         </TableCell>
                       </TableRow>
@@ -1149,8 +1151,8 @@ export default function AdminPage() {
 
                         return (
                           <TableRow key={task.id} className="border-border/60 hover:bg-muted/60">
-                            <TableCell className="text-sm font-medium text-slate-200">{getOrderNumberLabel(task)}</TableCell>
-                            <TableCell className="text-sm text-slate-300">{getTapiceriaGestorLabel(task)}</TableCell>
+                            <TableCell className="text-sm font-bold text-foreground">{getOrderNumberLabel(task)}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground font-medium">{getTapiceriaGestorLabel(task)}</TableCell>
                             <TableCell>
                               <Badge variant="secondary" className={statusColor}>
                                 {task.state}

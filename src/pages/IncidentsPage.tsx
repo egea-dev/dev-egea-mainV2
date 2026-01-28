@@ -59,6 +59,7 @@ export default function IncidentsPage() {
                 query = query.eq('status', statusFilter);
             }
 
+            // @ts-ignore
             const { data, error } = await query;
 
             if (error) throw error;
@@ -114,15 +115,15 @@ export default function IncidentsPage() {
         <PageShell title="Gestión de Incidencias" description="Resolución de problemas de producción y envíos">
             <div className="space-y-4">
                 {/* Filtros */}
-                <div className="flex justify-between items-center bg-[#1A1D1F] p-4 rounded-xl border border-[#45474A]">
+                <div className="flex justify-between items-center bg-card p-4 rounded-xl border border-border shadow-sm">
                     <div className="flex items-center gap-2">
-                        <Filter className="w-4 h-4 text-[#8B8D90]" />
-                        <span className="text-sm font-medium text-white">Estado:</span>
+                        <Filter className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-foreground">Estado:</span>
                         <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-[180px] bg-[#323438] border-[#45474A] text-white">
+                            <SelectTrigger className="w-[180px] bg-muted/50 border-border text-foreground">
                                 <SelectValue placeholder="Estado" />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#323438] border-[#45474A] text-white">
+                            <SelectContent className="bg-card border-border">
                                 <SelectItem value="pendiente">Pendientes</SelectItem>
                                 <SelectItem value="en_revision">En Revisión</SelectItem>
                                 <SelectItem value="resuelto">Resueltos</SelectItem>
@@ -131,53 +132,53 @@ export default function IncidentsPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <Button onClick={loadIncidents} variant="outline" className="border-[#45474A] text-white hover:bg-[#323438]">
+                    <Button onClick={loadIncidents} variant="outline" className="border-border text-foreground hover:bg-muted">
                         Refrescar
                     </Button>
                 </div>
 
                 {/* Tabla */}
-                <div className="rounded-xl border border-[#45474A] overflow-hidden">
+                <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
                     <Table>
-                        <TableHeader className="bg-[#1A1D1F]">
-                            <TableRow className="border-[#45474A] hover:bg-transparent">
-                                <TableHead className="text-[#8B8D90]">Prioridad</TableHead>
-                                <TableHead className="text-[#8B8D90]">Pedido</TableHead>
-                                <TableHead className="text-[#8B8D90]">Tipo</TableHead>
-                                <TableHead className="text-[#8B8D90]">Descripción</TableHead>
-                                <TableHead className="text-[#8B8D90]">Fecha</TableHead>
-                                <TableHead className="text-[#8B8D90]">Estado / Acciones</TableHead>
+                        <TableHeader className="bg-muted/50">
+                            <TableRow className="border-border hover:bg-transparent">
+                                <TableHead className="text-muted-foreground font-bold uppercase text-[10px]">Prioridad</TableHead>
+                                <TableHead className="text-muted-foreground font-bold uppercase text-[10px]">Pedido</TableHead>
+                                <TableHead className="text-muted-foreground font-bold uppercase text-[10px]">Tipo</TableHead>
+                                <TableHead className="text-muted-foreground font-bold uppercase text-[10px]">Descripción</TableHead>
+                                <TableHead className="text-muted-foreground font-bold uppercase text-[10px]">Fecha</TableHead>
+                                <TableHead className="text-muted-foreground font-bold uppercase text-[10px]">Estado / Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
-                        <TableBody className="bg-[#1A1D1F]/50">
+                        <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8 text-[#8B8D90]">Cargando incidencias...</TableCell>
+                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Cargando incidencias...</TableCell>
                                 </TableRow>
                             ) : incidents.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-8 text-[#8B8D90]">No hay incidencias en este estado.</TableCell>
+                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay incidencias en este estado.</TableCell>
                                 </TableRow>
                             ) : (
                                 incidents.map((incident) => (
-                                    <TableRow key={incident.id} className="border-[#45474A] hover:bg-[#323438]/50">
+                                    <TableRow key={incident.id} className="border-border hover:bg-muted/30">
                                         <TableCell>
                                             <Badge className={getPriorityColor(incident.priority)}>
                                                 {incident.priority.toUpperCase()}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="font-mono text-white font-medium">
+                                        <TableCell className="font-mono text-foreground font-bold">
                                             {incident.order_number}
                                         </TableCell>
-                                        <TableCell className="text-white capitalize">
+                                        <TableCell className="text-foreground font-medium capitalize">
                                             {incident.type.replace('_', ' ')}
                                         </TableCell>
                                         <TableCell className="max-w-[300px]">
-                                            <p className="text-sm text-[#B5B8BA] truncate" title={incident.description}>
+                                            <p className="text-sm text-foreground/80 truncate" title={incident.description}>
                                                 {incident.description}
                                             </p>
                                         </TableCell>
-                                        <TableCell className="text-[#8B8D90] text-xs">
+                                        <TableCell className="text-muted-foreground text-xs font-medium">
                                             {format(new Date(incident.created_at), "d MMM, HH:mm", { locale: es })}
                                         </TableCell>
                                         <TableCell>

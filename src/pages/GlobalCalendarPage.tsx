@@ -9,9 +9,9 @@ import { format, startOfWeek, endOfWeek, subDays, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2 } from "lucide-react";
-import { MobileTaskList } from "@/components/installations/MobileTaskList"; // Import new component
-import { WeeklyBoard } from "@/components/installations/WeeklyBoard"; // Reuse existing board
-import { TaskDialog } from "@/components/installations/TaskDialog";
+import { MobileTaskList } from "@/features/installations/components/MobileTaskList"; // Import new component
+import { WeeklyBoard } from "@/features/installations/components/WeeklyBoard"; // Reuse existing board
+import { TaskDialog } from "@/features/installations/components/TaskDialog";
 import { useAdminData } from "@/hooks/use-admin-data";
 import { CalendarModule } from "@/components/dashboard/CalendarModule";
 

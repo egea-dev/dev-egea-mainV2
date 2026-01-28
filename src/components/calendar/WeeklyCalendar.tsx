@@ -1,11 +1,9 @@
 import { useState, useMemo } from "react";
-import dayjs from "dayjs";
-import "dayjs/locale/es";
+import { format, startOfWeek, addDays, isSameDay, subDays, isValid } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-dayjs.locale("es");
 
 // Tipos para indicadores de estado
 export interface DayTaskInfo {
@@ -32,55 +30,55 @@ export function WeeklyCalendar({
     className,
 }: WeeklyCalendarProps) {
     const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-        return dayjs(selectedDate).startOf("week");
+        return startOfWeek(selectedDate, { weekStartsOn: 1 });
     });
 
     // Generar los 7 días de la semana actual
     const weekDays = useMemo(() => {
         const days = [];
         for (let i = 0; i < 7; i++) {
-            days.push(currentWeekStart.add(i, "day"));
+            days.push(addDays(currentWeekStart, i));
         }
         return days;
     }, [currentWeekStart]);
 
     // Obtener información de tareas para un día
-    const getTaskInfoForDay = (date: dayjs.Dayjs): DayTaskInfo | undefined => {
-        return dayTaskInfo.find((info) => dayjs(info.date).isSame(date, "day"));
+    const getTaskInfoForDay = (date: Date): DayTaskInfo | undefined => {
+        return dayTaskInfo.find((info) => isSameDay(info.date, date));
     };
 
     // Verificar si un día tiene tareas (legacy support)
-    const hasTasksOnDay = (date: dayjs.Dayjs) => {
+    const hasTasksOnDay = (date: Date) => {
         if (dayTaskInfo.length > 0) {
             const info = getTaskInfoForDay(date);
             return info && (info.hasOverdue || info.hasPending || info.hasCompleted);
         }
-        return daysWithTasks.some((taskDate) => dayjs(taskDate).isSame(date, "day"));
+        return daysWithTasks.some((taskDate) => isSameDay(taskDate, date));
     };
 
     // Verificar si un día está seleccionado
-    const isSelectedDay = (date: dayjs.Dayjs) => {
-        return dayjs(selectedDate).isSame(date, "day");
+    const isSelectedDay = (date: Date) => {
+        return isSameDay(selectedDate, date);
     };
 
     // Verificar si un día es hoy
-    const isToday = (date: dayjs.Dayjs) => {
-        return date.isSame(dayjs(), "day");
+    const isToday = (date: Date) => {
+        return isSameDay(date, new Date());
     };
 
     // Navegar a la semana anterior
     const goToPreviousWeek = () => {
-        setCurrentWeekStart(currentWeekStart.subtract(7, "day"));
+        setCurrentWeekStart(subDays(currentWeekStart, 7));
     };
 
     // Navegar a la semana siguiente
     const goToNextWeek = () => {
-        setCurrentWeekStart(currentWeekStart.add(7, "day"));
+        setCurrentWeekStart(addDays(currentWeekStart, 7));
     };
 
     // Ir a la semana actual
     const goToCurrentWeek = () => {
-        setCurrentWeekStart(dayjs().startOf("week"));
+        setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
         onSelectDate(new Date());
     };
 
@@ -117,7 +115,7 @@ export function WeeklyCalendar({
                     <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-primary" />
                         <p className="text-sm font-semibold capitalize">
-                            {currentWeekStart.format("MMMM YYYY")}
+                            {format(currentWeekStart, "MMMM yyyy", { locale: es })}
                         </p>
                     </div>
                     <Button
@@ -151,8 +149,8 @@ export function WeeklyCalendar({
 
                     return (
                         <button
-                            key={day.format("YYYY-MM-DD")}
-                            onClick={() => onSelectDate(day.toDate())}
+                            key={format(day, "yyyy-MM-dd")}
+                            onClick={() => onSelectDate(day)}
                             className={cn(
                                 "relative flex flex-col items-center justify-center rounded-xl p-2.5 transition-all duration-200",
                                 "hover:bg-accent hover:text-accent-foreground hover:scale-105",
@@ -166,7 +164,7 @@ export function WeeklyCalendar({
                                 "text-[10px] font-medium uppercase tracking-wider",
                                 selected ? "text-primary-foreground/80" : "text-muted-foreground"
                             )}>
-                                {day.format("dd")}
+                                {format(day, "ee", { locale: es })}
                             </span>
 
                             {/* Número del día */}
@@ -175,7 +173,7 @@ export function WeeklyCalendar({
                                 selected && "text-primary-foreground",
                                 !selected && today && "text-primary"
                             )}>
-                                {day.format("D")}
+                                {format(day, "d")}
                             </span>
 
                             {/* Indicador de tareas mejorado */}

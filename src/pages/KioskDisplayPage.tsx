@@ -26,8 +26,8 @@ import { supabaseProductivity } from "@/integrations/supabase";
 import { parseQRCode, extractOrderNumber } from "@/lib/qr-utils";
 import { summarizeMaterials } from "@/lib/materials";
 import { sortWorkOrdersByPriority, isMondayToWednesday, isCanarias, daysToDueDate, getUrgencyBadge } from "@/services/priority-service";
-import { ScannerButton } from "@/components/scanner/ScannerButton";
-import { ScannerModal } from "@/components/scanner/ScannerModal";
+import { ScannerButton } from "@/features/scanner/components/ScannerButton";
+import { ScannerModal } from "@/features/scanner/components/ScannerModal";
 import { useOrientation, useDeviceType } from "@/hooks/useOrientation";
 import { getWorkdaysRemaining } from "@/utils/workday-utils";
 

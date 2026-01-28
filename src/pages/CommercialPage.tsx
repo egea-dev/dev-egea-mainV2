@@ -9,13 +9,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { OrderStatusBadge } from "@/components/badges";
+import { OrderStatusBadge } from "@/features/commercial/components/OrderStatusBadge";
 import { Package, Eye, Plus, LayoutList, History, Mail, Bell } from "lucide-react";
 import { useOrders, useCreateOrder, useUpdateOrderStatus, useDeleteOrder } from "@/hooks/use-orders";
 import { supabase } from "@/integrations/supabase/client";
 import { supabaseProductivity } from "@/integrations/supabase";
 import { cn } from "@/lib/utils";
-import { OrderDetailModal } from "@/components/commercial/OrderDetailModal";
+import { OrderDetailModal } from "@/features/commercial/components/OrderDetailModal";
 import { CalendarModule } from "@/components/dashboard/CalendarModule";
 import { OrderStatus } from "@/types/commercial";
 import { toast } from "sonner";
@@ -472,7 +472,7 @@ export default function CommercialPage() {
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
             <div className="flex items-center gap-3 mb-3">
               <Bell className="w-5 h-5 text-amber-400 animate-pulse" />
-              <h3 className="text-amber-300 font-semibold">
+              <h3 className="text-[hsl(var(--warning))] font-semibold">
                 Notificaciones de Envío Pendientes ({pendingNotificationOrders.length})
               </h3>
             </div>
@@ -493,7 +493,7 @@ export default function CommercialPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-amber-500/50 text-amber-300 hover:bg-amber-500/20"
+                    className="border-warning/50 text-[hsl(var(--warning))] hover:bg-warning/20"
                     onClick={() => setSelectedOrder(order)}
                   >
                     <Mail className="w-4 h-4 mr-2" />

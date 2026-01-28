@@ -13,8 +13,6 @@ import {
   closestCorners
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import dayjs from "dayjs";
-import "dayjs/locale/es";
 import { es } from "date-fns/locale";
 import { format, parseISO, subDays, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -30,12 +28,13 @@ import { Users, Car, Share2, Download, MessageSquare, Plus, Search, ChevronLeft,
 
 import "@/styles/installations.css";
 
-import { DraggableSidebarItem } from "@/components/installations/DraggableSidebarItem";
-import { WeeklyBoard } from "@/components/installations/WeeklyBoard";
-import { TaskCard } from "@/components/installations/TaskCard";
-import { TaskDialog } from "@/components/installations/TaskDialog";
+import { DraggableSidebarItem } from "@/features/installations/components/DraggableSidebarItem";
+import { WeeklyBoard } from "@/features/installations/components/WeeklyBoard";
+import { TaskCard } from "@/features/installations/components/TaskCard";
+import { TaskDialog } from "@/features/installations/components/TaskDialog";
 import { UserDialog } from "@/components/users/UserDialog";
-import { VehicleBadge, StatusBadge } from "@/components/badges";
+import { VehicleBadge } from "@/features/fleet/components/VehicleBadge";
+import { StatusBadge } from "@/components/shared/ui/StatusBadge";
 
 import { useAdminData } from "@/hooks/use-admin-data";
 import {
@@ -49,7 +48,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-dayjs.locale("es");
 
 export default function InstallationsPage() {
   const { users, vehicles, fetchData: refreshAdminData } = useAdminData();
@@ -223,7 +221,7 @@ export default function InstallationsPage() {
         {/* Top Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-card/40 p-3 rounded-2xl border border-border/60 backdrop-blur">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <CalendarIcon className="h-6 w-6 text-emerald-500" />
               Instalaciones <span className="text-muted-foreground font-light text-lg">| Tablero Semanal</span>
             </h1>
@@ -256,7 +254,7 @@ export default function InstallationsPage() {
           {/* Sidebar (Resources) */}
           <Card className="bg-card/30 border-border/60 flex flex-col min-h-0 h-full">
             <div className="p-3 border-b border-border/60">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Usuarios</h3>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">Usuarios</h3>
               <div className="relative">
                 <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground/50" />
                 <Input
@@ -282,9 +280,9 @@ export default function InstallationsPage() {
             </ScrollArea>
 
             <div className="p-3 border-t border-b border-border/60 mt-2">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Vehículos</h3>
+              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">Vehículos</h3>
               <div className="relative">
-                <Search className="absolute left-2 top-2 h-4 w-4 text-slate-600" />
+                <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar..."
                   className="h-8 pl-8 bg-muted/40 border-border/60 text-xs"
@@ -330,7 +328,7 @@ export default function InstallationsPage() {
           draggedItem.type === 'task' ? (
             <div className="w-[200px]"><TaskCard task={draggedItem.item} isOverlay /></div>
           ) : (
-            <div className="bg-card text-white p-2 rounded shadow-xl border border-primary font-bold flex items-center gap-2">
+            <div className="bg-card text-card-foreground p-2 rounded shadow-xl border border-primary font-bold flex items-center gap-2">
               {draggedItem.type === 'user' ? <Users className="w-4 h-4" /> : <Car className="w-4 h-4" />}
               {draggedItem.item.name || draggedItem.item.full_name}
             </div>
