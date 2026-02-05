@@ -1227,7 +1227,7 @@ export function ProductionPage() {
                     Historial de pedidos finalizados
                   </h3>
                   {!isLoading && historyQueue.length === 0 && (
-                    <div className="flex-1 flex flex-col items-center justify-center text-[#B5B8BA] text-center opacity-40 py-12">
+                    <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-center opacity-40 py-12">
                       <p className="text-sm font-medium">Historial vacío</p>
                     </div>
                   )}
@@ -1249,7 +1249,7 @@ export function ProductionPage() {
                               }`}
                           >
                             <div className="flex justify-between items-start mb-2">
-                              <span className="font-mono font-bold text-sm text-[#B5B8BA]">
+                              <span className="font-mono font-bold text-sm text-muted-foreground">
                                 {order.order_number}
                               </span>
                               <div className={cn(
@@ -1333,7 +1333,7 @@ export function ProductionPage() {
                         <Package className="w-5 h-5 mr-2" />
                         Generación de Bultos
                       </h3>
-                      <p className="text-[#B5B8BA] text-sm mb-4">
+                      <p className="text-muted-foreground text-sm mb-4">
                         Indica el número total de bultos generados. Esta información se imprimirá en la etiqueta.
                       </p>
                       <div className="flex flex-col lg:flex-row items-center gap-6 py-4">

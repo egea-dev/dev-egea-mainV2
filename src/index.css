@@ -125,6 +125,85 @@
     --glass-background: 345 18% 12% / 0.7;
     --glass-border: 345 12% 22% / 0.5;
   }
+
+  /* Tema NextBlue - Deep Space Blue */
+  .next-blue {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 13%;
+    /* Slate 900/950 mix */
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 199 89% 48%;
+    /* Sky 500 equivalent usually, adjusted for neon feel */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 217 33% 17%;
+    /* Slate 800 */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 199 89% 48%;
+
+    /* Glassmorphism NextBlue */
+    --glass-background: 222 47% 11% / 0.7;
+    --glass-border: 199 89% 48% / 0.2;
+  }
+
+  /* Tema Haxth3R - Admin Terminal */
+  .haxther {
+    --background: 160 50% 2%;
+    /* #020504 Very dark teal/black */
+    --foreground: 160 85% 55%;
+    /* #14F497 Vibrant Emerald */
+
+    --card: 160 50% 3%;
+    --card-foreground: 160 85% 55%;
+
+    --popover: 160 50% 2%;
+    --popover-foreground: 160 85% 55%;
+
+    --primary: 160 85% 45%;
+    /* #11BE75 Primary button color */
+    --primary-foreground: 160 50% 2%;
+
+    --secondary: 160 50% 10%;
+    --secondary-foreground: 160 85% 65%;
+
+    --muted: 160 30% 12%;
+    --muted-foreground: 160 40% 45%;
+
+    --accent: 160 50% 15%;
+    --accent-foreground: 160 85% 65%;
+
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 160 85% 30%;
+    /* Dimmed Emerald Border */
+    --input: 160 50% 10%;
+    --ring: 160 85% 55%;
+
+    --radius: 0;
+
+    /* Glassmorphism Haxth3R */
+    --glass-background: 160 50% 2% / 0.95;
+    --glass-border: 160 85% 45% / 0.3;
+  }
 }
 
 @layer base {

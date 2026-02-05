@@ -2,13 +2,13 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
-  defaultTheme?: "system" | "light" | "dark" | "egea";
+  defaultTheme?: "system" | "light" | "dark" | "egea" | "next-blue" | "haxther";
   storageKey?: string;
 };
 
 type ThemeProviderState = {
-  theme: "system" | "light" | "dark" | "egea";
-  setTheme: (theme: "system" | "light" | "dark" | "egea") => void;
+  theme: "system" | "light" | "dark" | "egea" | "next-blue" | "haxther";
+  setTheme: (theme: "system" | "light" | "dark" | "egea" | "next-blue" | "haxther") => void;
 };
 
 const initialState: ThemeProviderState = {
@@ -24,9 +24,9 @@ export function ThemeProvider({
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<"system" | "light" | "dark" | "egea">(() => {
+  const [theme, setTheme] = useState<"system" | "light" | "dark" | "egea" | "next-blue" | "haxther">(() => {
     const storedTheme = localStorage.getItem(storageKey);
-    return (storedTheme as "system" | "light" | "dark" | "egea") || defaultTheme;
+    return (storedTheme as "system" | "light" | "dark" | "egea" | "next-blue" | "haxther") || defaultTheme;
   });
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function ThemeProvider({
     const mobileMedia = window.matchMedia("(max-width: 768px)");
 
     const applyTheme = () => {
-      root.classList.remove("light", "dark", "egea");
+      root.classList.remove("light", "dark", "egea", "next-blue", "haxther");
       const resolvedSystem = systemMedia.matches ? "dark" : "light";
       let resolvedTheme = theme === "system" ? resolvedSystem : theme;
 

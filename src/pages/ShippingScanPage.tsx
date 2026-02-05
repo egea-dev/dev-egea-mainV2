@@ -885,9 +885,9 @@ export default function ShippingScanPage() {
                                 </div>
                                 <div className="flex flex-col items-end gap-2 text-right">
                                   {order.due_date && (
-                                    <div className="text-[10px] font-black uppercase text-[#8B8D90] px-2 py-1 bg-[#1A1D1F] rounded border border-[#323438] min-w-[65px] text-center">
+                                    <div className="text-[10px] font-black uppercase text-muted-foreground px-2 py-1 bg-muted rounded border border-border min-w-[65px] text-center">
                                       <span className="text-sm block leading-none">{daysToDueDate(order.due_date)}</span>
-                                      DÃAS
+                                      DÍAS
                                     </div>
                                   )}
                                 </div>
@@ -921,17 +921,17 @@ export default function ShippingScanPage() {
                                   </div>
 
                                   <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <div className="bg-[#1A1D1F] p-2 rounded border border-[#45474A]">
-                                      <p className="text-[10px] text-[#B5B8BA]">Material</p>
-                                      <p className="font-bold text-white truncate">{order.fabric}</p>
+                                    <div className="bg-muted p-2 rounded border border-border">
+                                      <p className="text-[10px] text-muted-foreground">Material</p>
+                                      <p className="font-bold text-foreground truncate">{order.fabric}</p>
                                     </div>
-                                    <div className="bg-[#1A1D1F] p-2 rounded border border-[#45474A]">
-                                      <p className="text-[10px] text-[#B5B8BA]">Bultos</p>
-                                      <p className="font-bold text-white">{order.scanned_packages || 0}/{order.packages_count || 1}</p>
+                                    <div className="bg-muted p-2 rounded border border-border">
+                                      <p className="text-[10px] text-muted-foreground">Bultos</p>
+                                      <p className="font-bold text-foreground">{order.scanned_packages || 0}/{order.packages_count || 1}</p>
                                     </div>
                                   </div>
 
-                                  <div className="text-[11px] text-[#B5B8BA] bg-[#1A1D1F]/50 p-2 rounded italic">
+                                  <div className="text-[11px] text-muted-foreground bg-muted/50 p-2 rounded italic">
                                     {summarizeLines(order)}
                                   </div>
                                 </div>
@@ -1075,17 +1075,17 @@ export default function ShippingScanPage() {
 
                   {/* Bultos y Unidades */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-[#1A1D1F] md:border-[#45474A]">
-                      <p className="text-xs text-[#8B8D90] font-bold uppercase mb-1 flex items-center">
+                    <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-muted md:border-border">
+                      <p className="text-xs text-muted-foreground font-bold uppercase mb-1 flex items-center">
                         <Package className="w-3 h-3 mr-1" /> Bultos Totales
                       </p>
-                      <p className="font-medium text-[#B5B8BA]">{scannedOrder.packages_count || 1}</p>
+                      <p className="font-medium text-foreground">{scannedOrder.packages_count || 1}</p>
                     </div>
-                    <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-[#1A1D1F] md:border-[#45474A]">
-                      <p className="text-xs text-[#8B8D90] font-bold uppercase mb-1 flex items-center">
+                    <div className="p-4 rounded-lg border border-transparent bg-transparent md:bg-muted md:border-border">
+                      <p className="text-xs text-muted-foreground font-bold uppercase mb-1 flex items-center">
                         <Truck className="w-3 h-3 mr-1" /> Total Uds
                       </p>
-                      <p className="font-medium text-[#B5B8BA]">{scannedOrder.quantity_total}</p>
+                      <p className="font-medium text-foreground">{scannedOrder.quantity_total}</p>
                     </div>
                   </div>
 

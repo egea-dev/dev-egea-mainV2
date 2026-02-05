@@ -10,18 +10,26 @@
  * - Boton "CONFIRMAR ENVÍO" con validaciones
  */
 
-import React, { useState } from 'react';
-import { Package, Truck, Plus, Trash2, CheckCircle, AlertTriangle, Scale, Ruler, Box, Send } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Package, Truck, Plus, Trash2, CheckCircle, AlertTriangle, Scale, Ruler, Box, Send, FileText, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import { supabaseProductivity } from '@/integrations/supabase';
 import {
     useShipmentPackages,
     useCreatePackage,
+    useCreatePackages,
     useUpdatePackage,
     useDeletePackage,
     useNextPackageNumber,
@@ -31,6 +39,9 @@ import {
     validatePackagesForShipping,
     ShipmentPackage
 } from '@/hooks/use-shipment-packages';
+import { getPackagesConfiguration } from '@/utils/packaging-rules';
+import Roadmap from './Roadmap';
+import { Shipment, InventoryItem, InventoryStatus, ShipmentStatus } from '../hooks/use-logistics';
 
 interface Order {
     id: string;
@@ -60,17 +71,45 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
     const [trackingNumber, setTrackingNumber] = useState<string>('');
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // Derived state needed early
+    const expectedUnits = order.quantity_total || 0;
+
     // Hooks de datos
     const { data: packages = [], isLoading: loadingPackages } = useShipmentPackages(order.id);
     const { data: nextPackageNumber = 1 } = useNextPackageNumber(order.id);
     const createPackage = useCreatePackage();
+    const createPackages = useCreatePackages();
+
+    // Control para autogeneración
+    const autoGenAttempted = useRef(false);
+
+    // Efecto para autogenerar bultos recomendados
+    useEffect(() => {
+        // Solo si ya terminaron de cargar los paquetes y no hay ninguno
+        if (!loadingPackages && packages.length === 0 && order.fabric && expectedUnits > 0 && !autoGenAttempted.current) {
+            autoGenAttempted.current = true; // Marcamos como intentado para evitar bucles
+
+            const config = getPackagesConfiguration(order.fabric, expectedUnits);
+
+            if (config.length > 0) {
+                const newPackages = config.map((units, index) => ({
+                    order_id: order.id,
+                    package_number: nextPackageNumber + index,
+                    units_count: units,
+                    weight_kg: 0
+                }));
+
+                toast.info("Generando bultos recomendados...");
+                createPackages.mutate(newPackages);
+            }
+        }
+    }, [loadingPackages, packages.length, order.fabric, expectedUnits, nextPackageNumber, order.id]);
     const updatePackage = useUpdatePackage();
     const deletePackage = useDeletePackage();
 
     // Cálculos
     const totalUnits = calculateTotalUnits(packages);
     const totalWeight = calculateTotalWeight(packages);
-    const expectedUnits = order.quantity_total || 0;
     const isProcessed = order.status === 'ENVIADO' || order.status === 'ENTREGADO';
 
     // Handlers
@@ -443,8 +482,70 @@ const ShippedOrdersPanel: React.FC<ShippedOrdersPanelProps> = ({ order, onProces
                 </CardContent>
             </Card>
 
-            {/* Botón PROCESADO */}
-            <div className="flex justify-end">
+            {/* Botones de Acción */}
+            <div className="flex justify-end gap-3">
+                {/* Botón HOJA DE RUTA */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="lg"
+                            className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                        >
+                            <FileText className="w-5 h-5 mr-2" />
+                            Previsualizar Hoja de Ruta
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-[850px] max-h-[90vh] overflow-y-auto bg-slate-900 border-border/60">
+                        <DialogHeader>
+                            <DialogTitle className="text-white flex items-center justify-between">
+                                Previsualización de Hoja de Ruta
+                                <Button
+                                    size="sm"
+                                    onClick={() => window.print()}
+                                    className="bg-primary hover:bg-primary/90"
+                                >
+                                    <Printer className="w-4 h-4 mr-2" />
+                                    Imprimir
+                                </Button>
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Roadmap
+                                shipment={{
+                                    id: order.id,
+                                    tracking_number: trackingNumber || null,
+                                    carrier_name: carrierCompany === 'OTRO' ? customCarrier : (CARRIER_COMPANIES.find(c => c.value === carrierCompany)?.label || null),
+                                    shipment_date: new Date().toISOString(),
+                                    estimated_arrival: null,
+                                    status: (isProcessed ? 'ENTREGADO' : 'PENDIENTE') as ShipmentStatus,
+                                    recipient_name: order.customer_company || order.customer_name,
+                                    delivery_address: order.delivery_address || null,
+                                    delivery_city: order.region || null,
+                                    delivery_phone: order.phone || null,
+                                    packages_count: packages.length,
+                                    created_at: order.created_at || new Date().toISOString(),
+                                    updated_at: new Date().toISOString()
+                                }}
+                                items={packages.map(pkg => ({
+                                    id: pkg.id,
+                                    work_order_id: null,
+                                    order_number: order.order_number,
+                                    rack: null,
+                                    shelf: null,
+                                    status: (isProcessed ? 'ENTREGADO' : 'EN_REPARTO') as InventoryStatus,
+                                    packaging_type: 'CAJA/BULTO',
+                                    weight_kg: pkg.weight_kg || 0,
+                                    dimensions_cm: `${pkg.height_cm || 0}x${pkg.width_cm || 0}x${pkg.length_cm || 0}`,
+                                    notes: null,
+                                    created_at: pkg.created_at,
+                                    updated_at: pkg.updated_at
+                                }))}
+                            />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+
                 <Button
                     size="lg"
                     onClick={handleProcess}

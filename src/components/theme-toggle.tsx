@@ -1,6 +1,8 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
+import { useProfile } from "@/hooks/use-supabase";
+import { Terminal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +12,8 @@ import {
 
 export function ThemeToggle() {
   const { setTheme } = useTheme();
+  const { data: profile } = useProfile();
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <DropdownMenu>
@@ -33,6 +37,17 @@ export function ThemeToggle() {
         <DropdownMenuItem onClick={() => setTheme("egea")}>
           Egea
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("next-blue")}>
+          NextBlue
+        </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuItem onClick={() => setTheme("haxther")} className="text-emerald-500 font-mono tracking-tighter">
+              <Terminal className="w-3 h-3 mr-2" />
+              Haxth3R
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -176,17 +176,17 @@ export function getUrgencyBadge(
     if (daysRemaining < 0) {
         return {
             label: 'VENCIDO',
-            color: 'bg-red-900/40 text-red-400 border-red-500/30'
+            color: 'bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/40'
         };
     }
     if (daysRemaining <= urgentThreshold) {
         return {
             label: 'URGENTE',
-            color: 'bg-amber-900/40 text-amber-400 border-amber-500/30'
+            color: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/40'
         };
     }
     return {
         label: 'A TIEMPO',
-        color: 'bg-emerald-900/40 text-emerald-400 border-emerald-500/30'
+        color: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/40'
     };
 }

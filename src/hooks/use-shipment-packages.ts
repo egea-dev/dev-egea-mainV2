@@ -115,6 +115,43 @@ export const useCreatePackage = () => {
 };
 
 /**
+ * Hook para crear múltiples bultos a la vez (Batch)
+ */
+export const useCreatePackages = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (inputs: CreatePackageInput[]) => {
+            const { data, error } = await supabaseProductivity
+                .from('shipment_packages')
+                .insert(inputs)
+                .select();
+
+            if (error) {
+                console.error('Error creating packages batch:', error);
+                throw error;
+            }
+
+            return data as ShipmentPackage[];
+        },
+        onSuccess: (data) => {
+            if (data.length > 0) {
+                queryClient.invalidateQueries({ queryKey: ['shipment-packages', data[0].order_id] });
+                // Evitamos mostrar spam de toasts si son muchos bultos, uno general está bien
+                if (data.length > 1) {
+                    toast.success(`${data.length} bultos generados automáticamente`);
+                } else {
+                    toast.success(`Bulto añadido`);
+                }
+            }
+        },
+        onError: (error: any) => {
+            toast.error(`Error al crear bultos: ${error.message}`);
+        },
+    });
+};
+
+/**
  * Hook para actualizar un bulto existente
  */
 export const useUpdatePackage = () => {
