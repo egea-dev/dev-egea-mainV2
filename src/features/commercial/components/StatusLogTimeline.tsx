@@ -52,7 +52,7 @@ export const StatusLogTimeline: React.FC<StatusLogTimelineProps> = ({ orderId })
                                             <span className={`text-sm font-medium ${getOrderStatusText(log.old_status)}`}>
                                                 {getOrderStatusLabel(log.old_status)}
                                             </span>
-                                            <span className="text-muted-foreground">-></span>
+                                            <span className="text-muted-foreground">{'->'}</span>
                                         </>
                                     )}
                                     <span className={`text-sm font-bold ${getOrderStatusText(log.new_status)}`}>
