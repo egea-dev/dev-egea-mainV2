@@ -151,7 +151,6 @@ export function ProductionPage() {
   // v3.1.0 - Estado de expansión vertical para móvil
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [printerStatus, setPrinterStatus] = useState<any>('checking');
   const [activeTab, setActiveTab] = useState<string>(() => {
     return localStorage.getItem(STORAGE_ACTIVE_TAB_KEY) || "active";
@@ -228,7 +227,6 @@ export function ProductionPage() {
       }).catch(() => ({ ok: false }));
 
       clearTimeout(timeoutId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setPrinterStatus(response.ok || (response as any).status === 404 ? 'online' : 'offline');
     } catch (e) {
       setPrinterStatus('offline');
@@ -542,7 +540,6 @@ export function ProductionPage() {
     try {
       const payload: any = { ...patch };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabaseProductivity as any)
         .from('produccion_work_orders')
         .update(payload)
@@ -942,7 +939,6 @@ export function ProductionPage() {
       // Buscamos tanto por ID como por número de pedido para asegurar que "siga el proceso de venta"
       if (scannedOrder.commercial_order_id || scannedOrder.order_number) {
         console.log('🔄 Sincronizando con comercial_orders:', scannedOrder.order_number);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const query = (supabaseProductivity as any).from('comercial_orders').update({ status: 'PTE_ENVIO' });
 
         if (scannedOrder.commercial_order_id) {
