@@ -18,6 +18,7 @@ import { ScannerModal } from '@/features/scanner/components/ScannerModal';
 import { useOrientation, useDeviceType } from '@/hooks/useOrientation';
 import { sortWorkOrdersByPriority, daysToDueDate, getUrgencyBadge } from '@/services/priority-service';
 import ProductionCalendar from '@/features/production/components/ProductionCalendar';
+import { getPackageCapacity, getRecommendedPackagesCount } from '@/utils/packaging-rules';
 
 function escapeZpl(str: string): string {
   if (!str) return "";
@@ -155,6 +156,13 @@ export function ProductionPage() {
   const [activeTab, setActiveTab] = useState<string>(() => {
     return localStorage.getItem(STORAGE_ACTIVE_TAB_KEY) || "active";
   });
+
+  const getInitialPackagesInput = (order: Order | null) => {
+    if (!order) return 1;
+    if (typeof order.packages_count === 'number' && order.packages_count > 0) return order.packages_count;
+    const recommended = getRecommendedPackagesCount(order.fabric, order.quantity_total || 0);
+    return recommended ?? 1;
+  };
 
   // Guardar la pestaña activa cuando cambie
   useEffect(() => {
@@ -569,7 +577,7 @@ export function ProductionPage() {
       setSelectedOrderId(order.id);
       setCameraActive(false);
       setQrInput('');
-      setPackagesInput(order.packages_count || 1);
+      setPackagesInput(getInitialPackagesInput(order));
 
       // Mostrar alertas según el resultado de la validación
       if (!validation.isValid) {
@@ -955,7 +963,7 @@ export function ProductionPage() {
       if (nextInQueue) {
         setScannedOrder(nextInQueue);
         setSelectedOrderId(nextInQueue.id);
-        setPackagesInput(nextInQueue.packages_count || 1);
+        setPackagesInput(getInitialPackagesInput(nextInQueue));
         toast.info(`Siguiente pedido cargado: ${nextInQueue.order_number}`);
       } else {
         setScannedOrder(null);
@@ -1112,7 +1120,7 @@ export function ProductionPage() {
                                 }
                                 setScannedOrder(order);
                                 setSelectedOrderId(order.id);
-                                setPackagesInput(order.packages_count || 1);
+                                setPackagesInput(getInitialPackagesInput(order));
                               }}
                               className={cn(
                                 "w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden",
@@ -1241,7 +1249,7 @@ export function ProductionPage() {
                             onClick={() => {
                               setScannedOrder(order);
                               setSelectedOrderId(order.id);
-                              setPackagesInput(order.packages_count || 1);
+                              setPackagesInput(getInitialPackagesInput(order));
                             }}
                             className={`w-full text-left p-4 rounded-xl border transition-all duration-200 group relative overflow-hidden ${isSelected
                               ? 'bg-emerald-500/10 border-emerald-500/30'
@@ -1361,6 +1369,31 @@ export function ProductionPage() {
                           >
                             +
                           </button>
+                        </div>
+                        <div className="flex-1 w-full min-w-0">
+                          {(() => {
+                            const recommended = getRecommendedPackagesCount(scannedOrder.fabric, scannedOrder.quantity_total || 0);
+                            const capacity = getPackageCapacity(scannedOrder.fabric);
+                            if (recommended && capacity) {
+                              return (
+                                <div className="text-xs text-emerald-400 font-semibold uppercase tracking-wide">
+                                  Recomendado: {recommended} bultos ({capacity} uds por caja)
+                                </div>
+                              );
+                            }
+                            if (capacity && (scannedOrder.quantity_total || 0) > 0) {
+                              return (
+                                <div className="text-xs text-amber-400 font-semibold uppercase tracking-wide">
+                                  Sin recomendación: unidades no exactas para {capacity} uds/caja
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="text-xs text-muted-foreground">
+                                Sin recomendación disponible
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex-1 w-full min-w-0">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

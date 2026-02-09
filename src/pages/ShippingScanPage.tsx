@@ -885,9 +885,11 @@ export default function ShippingScanPage() {
                                 </div>
                                 <div className="flex flex-col items-end gap-2 text-right">
                                   {order.due_date && (
-                                    <div className="text-[10px] font-black uppercase text-muted-foreground px-2 py-1 bg-muted rounded border border-border min-w-[65px] text-center">
+                                    <div className="text-[10px] font-black uppercase text-muted-foreground px-2 py-1 bg-muted rounded border border-border min-w-[65px] text-center flex flex-col items-center gap-0.5 leading-none">
                                       <span className="text-sm block leading-none">{daysToDueDate(order.due_date)}</span>
-                                      DÍAS
+                                      <span className="text-[9px] font-black uppercase text-muted-foreground leading-none whitespace-nowrap">
+                                        DÍAS
+                                      </span>
                                     </div>
                                   )}
                                 </div>
