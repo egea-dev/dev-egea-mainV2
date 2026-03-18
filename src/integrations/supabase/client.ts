@@ -99,6 +99,15 @@ if (import.meta.env.DEV) {
 
 export const supabaseMain = mainClient;
 
+// Listener para detectar sesiones fantasma o corruptas
+mainClient.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT' || (!session && localStorage.getItem('supabase.main.auth.token'))) {
+    console.warn('[Auth] Limpiando tokens de sesión expirada/fantasma');
+    localStorage.removeItem('supabase.main.auth.token');
+    localStorage.removeItem('supabase.productivity.auth.token');
+  }
+});
+
 // Alias para compatibilidad
 export const supabase = supabaseMain;
 

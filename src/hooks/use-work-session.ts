@@ -96,7 +96,7 @@ const resolveLocation = async (
           lng: position.coords.longitude,
           accuracy: position.coords.accuracy ?? null,
           source: 'geolocation',
-          collected_at: new Date(position.timestamp || Date.now()).toISOString(),
+          collected_at: new Date().toISOString(), // Usar hora real del JS, no del GPS que puede estar desfasado
         });
       },
       () => {
@@ -104,9 +104,16 @@ const resolveLocation = async (
           resolve(fallbackPayload);
           return;
         }
-        resolve(requestManualLocation());
+
+        const isMobile = typeof window !== 'undefined' && (/Mobi|Android/i.test(navigator.userAgent) || 'ontouchstart' in window);
+        if (isMobile) {
+          console.warn('[WorkSession] Geolocalización denegada/timeout en móvil. Entrando sin ubicación.');
+          resolve(null);
+        } else {
+          resolve(requestManualLocation());
+        }
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60_000 }
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 120_000 }
     );
   });
 };
@@ -231,7 +238,18 @@ export const useWorkSession = ({ profileId, taskId, task }: UseWorkSessionParams
         p_metadata: options.metadata ?? null,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[WorkSession][startSession] RPC error:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          profileId,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'Desconocido',
+          timestamp: new Date().toISOString(),
+        });
+        throw error;
+      }
       const session = Array.isArray(data) ? (data[0] as WorkSession | undefined) : null;
       return session ?? null;
     },
