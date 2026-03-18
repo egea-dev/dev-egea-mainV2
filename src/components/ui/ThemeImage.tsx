@@ -1,4 +1,4 @@
-import { useTheme } from "@/components/theme-provider";
+import { useTheme } from "@/components/theme/theme-provider";
 import { cn } from "@/lib/utils";
 
 interface ThemeImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {

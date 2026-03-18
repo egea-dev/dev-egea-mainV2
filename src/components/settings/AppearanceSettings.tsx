@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Palette, Sun, Moon, Monitor } from "lucide-react";
 import { useSystemConfig, useUpdateSystemConfig } from "@/hooks/use-system-config";
-import { useTheme } from "@/components/theme-provider";
+import { useTheme } from "@/components/theme/theme-provider";
 
 export default function AppearanceSettings() {
     const { data: configs = [] } = useSystemConfig();

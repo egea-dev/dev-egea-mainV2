@@ -3,8 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthGuard } from "./components/AuthGuard";
-import { PermissionGuardEnhanced } from "./components/PermissionGuardEnhanced";
+import { AuthGuard } from "./components/auth/AuthGuard";
+import { PermissionGuardEnhanced } from "./components/auth/PermissionGuardEnhanced";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { RolePreviewProvider } from "./context/RolePreviewContext";
 

@@ -1,7 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import Layout, { CompactLayout } from "@/components/Layout";
+import Layout, { CompactLayout } from "@/components/layout/Layout";
 import { useUsers, useVehicles, useProfile } from "@/hooks/use-supabase";
 import { getNavItemsForRole } from "@/config/navigation";
 import { useRolePreview } from "@/context/RolePreviewContext";

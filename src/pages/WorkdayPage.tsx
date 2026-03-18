@@ -278,26 +278,57 @@ export default function WorkdayPage() {
     return format(currentTime, "eeee d 'de' MMMM - HH:mm:ss", { locale: es }).toUpperCase();
   }, [currentTime]);
 
-  // Registrar llegada/salida para una tarea específica
-  const handleSessionToggle = async (task: Task) => {
-    if (isSessionBusy) return;
+   // Registrar llegada/salida para una tarea específica
+   const handleSessionToggle = async (task: Task) => {
+     if (isSessionBusy) return;
 
-    try {
-      if (isSessionActive) {
-        // REGISTRAR SALIDA - NO cierra la tarea, solo finaliza sesión
-        await endSession();
-        toast.success("Salida registrada correctamente");
-      } else {
-        // REGISTRAR LLEGADA
-        await startSession({ taskId: task.id });
-        toast.success("Llegada registrada correctamente");
-      }
-      queryClient.invalidateQueries({ queryKey: ["tasks"], exact: false });
-    } catch (error) {
-      console.error("Error toggling work session", error);
-      toast.error("Error al registrar llegada/salida");
-    }
-  };
+     try {
+       if (isSessionActive) {
+         // REGISTRAR SALIDA - NO cierra la tarea, solo finaliza sesión
+         await endSession();
+         toast.success("Salida registrada correctamente");
+       } else {
+         // REGISTRAR LLEGADA
+         await startSession({ taskId: task.id });
+         toast.success("Llegada registrada correctamente");
+       }
+       queryClient.invalidateQueries({ queryKey: ["tasks"], exact: false });
+     } catch (error) {
+       console.error("Error toggling work session", error);
+       toast.error("Error al registrar llegada/salida");
+     }
+   };
+
+   // Registrar llegada específica para una tarea (usando RPC)
+   const handleRegisterArrival = useCallback(
+     async (task: Task) => {
+       if (!profile?.id) {
+         toast.error('Necesitas una sesión activa para registrar la llegada');
+         return;
+       }
+       try {
+         const { data, error } = await (supabase.rpc as any)('register_arrival', {
+           p_profile_id: profile.id,
+           p_task_id: task.id,
+           p_start_location: {
+             label: task.data?.location ?? task.data?.site ?? 'Sin ubicación',
+             source: 'user_dashboard',
+             collected_at: new Date().toISOString()
+           } as any,
+           p_metadata: { source: 'user' } as any
+         });
+
+         if (error) throw error;
+         toast.success('Llegada registrada correctamente');
+         // Refetch tasks to update any state
+         queryClient.invalidateQueries({ queryKey: ['all-user-tasks', profile?.id] });
+       } catch (error) {
+         console.error('Error registrando llegada desde usuario', error);
+         toast.error('No se pudo registrar la llegada');
+       }
+     },
+     [profile?.id, queryClient]
+   );
 
   // Reportar incidencia
   // Reportar incidencia - Abre modal
@@ -377,48 +408,57 @@ export default function WorkdayPage() {
             <p className="text-sm text-muted-foreground">{String(task.data.description)}</p>
           )}
 
-          {/* Botones de acción */}
-          <div className="flex flex-col gap-2 pt-2">
-            <Button
-              variant={isSessionActive ? "destructive" : "default"}
-              className="w-full gap-2"
-              onClick={() => handleSessionToggle(task)}
-              disabled={isSessionBusy}
-            >
-              <Clock className="h-4 w-4" />
-              {isSessionActive ? "Registrar salida" : "Registrar llegada"}
-            </Button>
+           {/* Botones de acción */}
+           <div className="flex flex-col gap-2 pt-2">
+             <Button
+               variant={isSessionActive ? "destructive" : "default"}
+               className="w-full gap-2"
+               onClick={() => handleSessionToggle(task)}
+               disabled={isSessionBusy}
+             >
+               <Clock className="h-4 w-4" />
+               {isSessionActive ? "Registrar salida" : "Registrar llegada"}
+             </Button>
 
-            <Button
-              variant="outline"
-              className="w-full gap-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
-              onClick={() => openMapsForTask(task)}
-            >
-              <MapPin className="h-4 w-4" />
-              Ver en Maps
-            </Button>
+             <Button
+               variant="outline"
+               className="w-full gap-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+               onClick={() => openMapsForTask(task)}
+             >
+               <MapPin className="h-4 w-4" />
+               Ver en Maps
+             </Button>
 
-            <Button
-              variant="outline"
-              className="w-full gap-2 border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
-              onClick={() => {
-                setDetailsTask(task);
-                setDetailsOpen(true);
-              }}
-            >
-              <Info className="h-4 w-4" />
-              Ver detalles
-            </Button>
+             <Button
+               variant="outline"
+               className="w-full gap-2 border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+               onClick={() => {
+                 setDetailsTask(task);
+                 setDetailsOpen(true);
+               }}
+             >
+               <Info className="h-4 w-4" />
+               Ver detalles
+             </Button>
 
-            <Button
-              variant="outline"
-              className="w-full gap-2 border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
-              onClick={() => handleReportIncident(task)}
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Reportar incidencia
-            </Button>
-          </div>
+             <Button
+               variant="outline"
+               className="w-full gap-2 border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+               onClick={() => handleReportIncident(task)}
+             >
+               <AlertTriangle className="h-4 w-4" />
+               Reportar incidencia
+             </Button>
+
+             <Button
+               variant="outline"
+               className="w-full gap-2 border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+               onClick={() => handleRegisterArrival(task)}
+             >
+               <MapPin className="h-4 w-4" />{" "}
+               Registrar llegada
+             </Button>
+           </div>
         </CardContent>
       </Card>
     );

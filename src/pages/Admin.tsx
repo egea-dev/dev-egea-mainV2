@@ -34,7 +34,7 @@ import { toast } from "sonner";
 import { TaskDetailsDialog } from "@/features/tasks/components/TaskDetailsDialog";
 import type { TaskActionConfig } from "@/features/tasks/components/TaskActionButtons";
 import { useNavigate } from "react-router-dom";
-import { StatusBadge } from "@/components/shared/ui/StatusBadge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { VehicleBadge } from "@/features/fleet/components/VehicleBadge";
 import { TaskStateBadge } from "@/features/tasks/components/TaskStateBadge";
 import { useDashboardTasks, useDashboardStats } from "@/hooks/use-detailed-tasks";
@@ -1237,36 +1237,35 @@ export default function AdminPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasksLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><div className="animate-pulse bg-muted h-4 w-4 rounded"></div></TableCell>
-                      <TableCell><div className="animate-pulse bg-muted h-4 w-20 rounded"></div></TableCell>
-                      <TableCell><div className="animate-pulse bg-muted h-8 w-24 rounded"></div></TableCell>
-                      <TableCell><div className="animate-pulse bg-muted h-4 w-32 rounded"></div></TableCell>
-                      <TableCell><div className="animate-pulse bg-muted h-4 w-40 rounded"></div></TableCell>
-                      <TableCell><div className="animate-pulse bg-muted h-6 w-20 rounded"></div></TableCell>
-                      <TableCell><div className="animate-pulse bg-muted h-6 w-16 rounded"></div></TableCell>
-                      <TableCell><div className="animate-pulse bg-muted h-6 w-28 rounded"></div></TableCell>
-                      <TableCell><div className="animate-pulse bg-muted h-8 w-8 rounded"></div></TableCell>
-                    </TableRow>
-                  ))
-                ) : sortedTasks.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-12">
-                      <div className="flex flex-col items-center gap-2">
-                        <ClipboardList className="h-12 w-12 text-muted-foreground/50" />
-                        <div>
-                          <p className="font-medium">No hay tareas pendientes</p>
-                          <p className="text-sm">
-                            {selectedDate
-                              ? `No hay tareas para el ${format(selectedDate, "d 'de' MMMM", { locale: es })}`
-                              : 'Todas las tareas están completadas'
-                            }
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
+{tasksLoading ? (
+                   Array.from({ length: 5 }).map((_, i) => (
+                     <TableRow key={i}>
+                       <TableCell><div className="animate-pulse bg-muted h-4 w-4 rounded"></div></TableCell>
+                       <TableCell><div className="animate-pulse bg-muted h-4 w-20 rounded"></div></TableCell>
+                       <TableCell><div className="animate-pulse bg-muted h-8 w-24 rounded"></div></TableCell>
+                       <TableCell><div className="animate-pulse bg-muted h-4 w-32 rounded"></div></TableCell>
+                       <TableCell><div className="animate-pulse bg-muted h-4 w-40 rounded"></div></TableCell>
+                       <TableCell><div className="animate-pulse bg-muted h-6 w-20 rounded"></div></TableCell>
+                       <TableCell><div className="animate-pulse bg-muted h-6 w-16 rounded"></div></TableCell>
+                       <TableCell><div className="animate-pulse bg-muted h-8 w-8 rounded"></div></TableCell>
+                       <TableCell><div className="animate-pulse bg-muted h-4 w-10 rounded"></div></TableCell>
+                     </TableRow>
+                   ))
+) : sortedTasks.length === 0 ? (
+                   <TableRow>
+                     <TableCell colSpan={10} className="text-center text-muted-foreground py-12">
+                       <div className="flex flex-col items-center gap-2">
+                         <ClipboardList className="h-12 w-12 text-muted-foreground/50" />
+                         <div>
+                           <p className="font-medium">No hay tareas pendientes</p>
+                           <p className="text-sm">
+                             {selectedDate
+                               ? `No hay tareas para el ${format(selectedDate, "d 'de' MMMM", { locale: es })}`
+                               : 'Todas las tareas están completadas'}
+                           </p>
+                         </div>
+                       </div>
+                     </TableCell>
                   </TableRow>
                 ) : (
                   sortedTasks.map((task) => {

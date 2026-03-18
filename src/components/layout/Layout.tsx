@@ -16,9 +16,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn, shellBackground } from "@/lib/utils";
-import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
-import { Button } from "./ui/button";
-import { ThemeToggle } from "./theme-toggle";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useProfile } from "@/hooks/use-supabase";
 import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
 import { HeaderStatus } from "@/layout/HeaderStatus";
@@ -31,12 +31,12 @@ import {
 import type { Profile } from "@/types";
 import type { AppNavEntry, AppNavGroup, AppNavItem } from "@/config/navigation";
 import { getNavItemsForRole } from "@/config/navigation";
-import { MobileNavigation } from "./layout/MobileNavigation";
+import { MobileNavigation } from "./MobileNavigation";
 import { useRolePreview } from "@/context/RolePreviewContext";
 import type { AppRole } from "@/config/navigation";
 import { RolePreviewSelector } from "./layout/RolePreviewSelector";
-import { VersionDisplay } from "./VersionDisplay";
-import { ThemeImage } from "./ui/ThemeImage";
+import { VersionDisplay } from "@/components/shared/VersionDisplay";
+import { ThemeImage } from "@/components/ui/ThemeImage";
 
 const logoLight = "/img/logo-placeholder.png";
 const logoDark = "/img/logo-placeholder.png";

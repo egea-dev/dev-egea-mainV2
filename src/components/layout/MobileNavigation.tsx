@@ -10,7 +10,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { flattenNavItems, getNavItemsForRole } from "@/config/navigation";
 import type { AppNavEntry, AppNavItem, AppRole } from "@/config/navigation";
 
