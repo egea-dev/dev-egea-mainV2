@@ -43,9 +43,9 @@ BEGIN
          ended_at = COALESCE(ws.ended_at, v_now),
          end_location = COALESCE(ws.end_location, p_start_location),
          updated_at = v_now
-   WHERE ws.profile_id = p_profile_id
-     AND ws.status = 'active'
-     AND ws.ended_at IS NULL;
+  WHERE ws.profile_id = p_profile_id
+    AND ws.status = 'active'
+    AND ws.ended_at IS NULL;
 
   -- Insertar nueva sesión
   INSERT INTO public.work_sessions (
@@ -55,7 +55,9 @@ BEGIN
     start_location,
     device_info,
     status,
-    metadata
+    metadata,
+    updated_at,
+    created_at
   )
   VALUES (
     p_profile_id,
@@ -64,7 +66,9 @@ BEGIN
     p_start_location,
     p_device_info,
     'active',
-    COALESCE(p_metadata, '{}'::jsonb)
+    COALESCE(p_metadata, '{}'::jsonb),
+    v_now,
+    v_now
   )
   RETURNING * INTO v_session;
 
@@ -117,8 +121,8 @@ BEGIN
            ELSE jsonb_strip_nulls(ws.metadata || p_metadata)
          END,
          updated_at = v_now
-   WHERE ws.id = p_session_id
-     AND (p_profile_id IS NULL OR ws.profile_id = p_profile_id)
+  WHERE ws.id = p_session_id
+    AND (p_profile_id IS NULL OR ws.profile_id = p_profile_id)
   RETURNING * INTO v_session;
 
   IF NOT FOUND THEN

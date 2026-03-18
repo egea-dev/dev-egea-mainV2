@@ -274,12 +274,14 @@ CREATE TABLE IF NOT EXISTS public.work_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   task_id UUID REFERENCES public.screen_data(id) ON DELETE SET NULL,
-  work_site_id UUID REFERENCES public.work_sites(id) ON DELETE SET NULL,
   started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   ended_at TIMESTAMP WITH TIME ZONE,
-  location_start POINT,
-  location_end POINT,
-  notes TEXT,
+  start_location JSONB,
+  end_location JSONB,
+  device_info JSONB,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'aborted')),
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
