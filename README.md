@@ -1,4 +1,4 @@
-# Egea Productivity App
+# Egea Productivity App - EGEA-DEV
 
 Sistema de gestión integral para instalaciones, producción comercial y logística.
 
