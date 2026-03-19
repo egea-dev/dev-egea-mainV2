@@ -4,15 +4,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Plus, Car, Edit, Trash2, Users } from "lucide-react";
 import { VehicleDialog } from "./VehicleDialog";
-import type { Vehicle } from "@/types";
+import { Profile, Vehicle } from "@/types";
 import { VehicleBadge, VehicleStatusBadge } from "@/components/badges";
 
 type VehicleListProps = {
   vehicles: Vehicle[];
+  users: Profile[];
   onVehiclesUpdate: () => void;
 };
 
-export const VehicleList = ({ vehicles, onVehiclesUpdate }: VehicleListProps) => {
+export const VehicleList = ({ vehicles, users, onVehiclesUpdate }: VehicleListProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
 
@@ -58,74 +59,57 @@ export const VehicleList = ({ vehicles, onVehiclesUpdate }: VehicleListProps) =>
         </div>
 
         <div className="space-y-3">
-          {vehicles.map((vehicle) => (
-            <div
-              key={vehicle.id}
-              className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:bg-muted/30 shadow-sm"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-full bg-muted p-2 ring-1 ring-border mt-1">
-                    <Car className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-bold text-foreground">{vehicle.name}</p>
-                      <VehicleStatusBadge
-                        status={vehicle.status || "normal"}
-                        size="sm"
-                        showIcon={true}
-                      />
+          {vehicles.map((vehicle) => {
+            const driver = users.find(u => u.id === vehicle.assigned_driver_id);
+            return (
+              <div
+                key={vehicle.id}
+                className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:bg-muted/30 shadow-sm"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-full bg-muted p-2 ring-1 ring-border flex-shrink-0">
+                      <Car className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      <VehicleBadge
-                        name={vehicle.name}
-                        type={vehicle.type}
-                        size="sm"
-                        showIcon={false}
-                        variant="solid"
-                      />
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40 border border-border/50">
-                        <Users className="h-3 w-3 text-muted-foreground/70" />
-                        <span className="font-medium text-foreground/80">Cap: {vehicle.capacity ?? "N/D"}</span>
-                      </div>
-                      {vehicle.km !== undefined && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/40 border border-border/50">
-                          <span className="font-mono text-primary font-bold">{vehicle.km.toLocaleString()}</span>
-                          <span className="text-muted-foreground/60">km</span>
-                        </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{vehicle.name}</p>
+                      {vehicle.license_plate && (
+                        <p className="text-[11px] font-mono font-bold text-muted-foreground uppercase mt-0.5">
+                          {vehicle.license_plate}
+                        </p>
+                      )}
+                      {driver && (
+                        <p className="text-[10px] text-primary font-medium mt-1 inline-flex items-center gap-1 bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10">
+                          <Users className="h-3 w-3" />
+                          Conductor: {driver.full_name}
+                        </p>
                       )}
                     </div>
-                    {vehicle.license_plate && (
-                      <div className="inline-block px-2 py-0.5 rounded border border-border bg-muted text-[10px] font-mono text-foreground font-bold">
-                        {vehicle.license_plate}
-                      </div>
-                    )}
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full border border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={() => handleOpenDialog(vehicle)}
+                      title="Editar vehículo"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full border border-destructive/30 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
+                      onClick={() => handleDelete(vehicle.id)}
+                      title="Eliminar vehículo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 rounded-full border border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                    onClick={() => handleOpenDialog(vehicle)}
-                    title="Editar vehículo"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 rounded-full border border-destructive/30 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
-                    onClick={() => handleDelete(vehicle.id)}
-                    title="Eliminar vehículo"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       <VehicleDialog
@@ -133,6 +117,7 @@ export const VehicleList = ({ vehicles, onVehiclesUpdate }: VehicleListProps) =>
         onOpenChange={setIsDialogOpen}
         onSuccess={onVehiclesUpdate}
         vehicle={selectedVehicle}
+        users={users}
       />
     </>
   );

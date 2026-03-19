@@ -16,7 +16,7 @@ export default function UsersAndVehiclesPage() {
           <UserList users={users} onUsersUpdate={fetchData} />
         </div>
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <VehicleList vehicles={vehicles} onVehiclesUpdate={fetchData} />
+          <VehicleList vehicles={vehicles} users={users} onVehiclesUpdate={fetchData} />
         </div>
       </div>
     </PageShell>

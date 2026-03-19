@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Vehicle } from "@/types";
+import { Profile, Vehicle } from "@/types";
 
 const VEHICLE_TYPE_OPTIONS = [
   { value: "jumper", label: "Jumper" },
@@ -20,9 +20,10 @@ type VehicleDialogProps = {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   vehicle?: Vehicle | null;
+  users: Profile[];
 };
 
-export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: VehicleDialogProps) => {
+export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle, users }: VehicleDialogProps) => {
   const [currentVehicle, setCurrentVehicle] = useState<Partial<Vehicle>>({
     id: undefined,
     name: '',
@@ -31,9 +32,13 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
     capacity: 1,
     km: 0,
     status: 'normal',
-    is_active: true
+    is_active: true,
+    assigned_driver_id: null
   });
   const [loading, setLoading] = useState(false);
+
+  // Filtrar solo operarios para el selector de conductores
+  const operators = users.filter(u => u.role === 'operario');
 
   useEffect(() => {
     if (vehicle) {
@@ -50,7 +55,8 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
         capacity: vehicle.capacity || 1,
         km: vehicle.km || 0,
         status: vehicle.status || 'normal',
-        is_active: vehicle.is_active !== undefined ? vehicle.is_active : true
+        is_active: vehicle.is_active !== undefined ? vehicle.is_active : true,
+        assigned_driver_id: vehicle.assigned_driver_id || null
       });
     } else {
       setCurrentVehicle({
@@ -61,7 +67,8 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
         capacity: 1,
         km: 0,
         status: 'normal',
-        is_active: true
+        is_active: true,
+        assigned_driver_id: null
       });
     }
   }, [vehicle, open]);
@@ -75,7 +82,7 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setCurrentVehicle(prev => ({ ...prev, [name]: value }));
+    setCurrentVehicle(prev => ({ ...prev, [name]: value === "unassigned" ? null : value }));
   };
 
   const handleSubmit = async () => {
@@ -95,7 +102,7 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
 
     setLoading(true);
 
-    const { data, error } = await supabase.rpc('upsert_vehicle', {
+    const { data, error } = await (supabase.rpc as any)('upsert_vehicle', {
       p_vehicle_id: currentVehicle.id ?? null,
       p_name: name,
       p_type: type,
@@ -103,7 +110,8 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
       p_capacity: currentVehicle.capacity ?? 1,
       p_is_active: currentVehicle.is_active !== undefined ? currentVehicle.is_active : true,
       p_km: currentVehicle.km ?? 0,
-      p_status: currentVehicle.status ?? 'normal'
+      p_status: currentVehicle.status ?? 'normal',
+      p_assigned_driver_id: currentVehicle.assigned_driver_id || null
     });
 
     if (error) {
@@ -114,7 +122,7 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
       return;
     }
 
-    const action = Array.isArray(data) ? data[0]?.result_action : undefined;
+    const action = (data as any)?.[0]?.result_action;
     toast.success(action === 'updated' ? 'Vehículo actualizado.' : 'Vehículo creado.');
     onSuccess();
     onOpenChange(false);
@@ -141,23 +149,44 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
               <Input id="license_plate" name="license_plate" value={currentVehicle.license_plate || ''} onChange={handleChange} />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="type">Tipo</Label>
-            <Select
-              value={currentVehicle.type ?? 'otro'}
-              onValueChange={(value) => handleSelectChange('type', value)}
-            >
-              <SelectTrigger id="type">
-                <SelectValue placeholder="Seleccionar tipo de vehículo" />
-              </SelectTrigger>
-              <SelectContent>
-                {VEHICLE_TYPE_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="type">Tipo</Label>
+              <Select
+                value={currentVehicle.type ?? 'otro'}
+                onValueChange={(value) => handleSelectChange('type', value)}
+              >
+                <SelectTrigger id="type">
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VEHICLE_TYPE_OPTIONS.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="assigned_driver_id">Conductor Asignado</Label>
+              <Select
+                value={currentVehicle.assigned_driver_id || "unassigned"}
+                onValueChange={(value) => handleSelectChange('assigned_driver_id', value)}
+              >
+                <SelectTrigger id="assigned_driver_id">
+                  <SelectValue placeholder="Sin asignar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Sin asignar</SelectItem>
+                  {operators.map(op => (
+                    <SelectItem key={op.id} value={op.id}>
+                      {op.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
@@ -186,7 +215,7 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle }: Vehicl
               <Label htmlFor="status">Estado</Label>
               <Select value={currentVehicle.status || 'normal'} onValueChange={(value) => handleSelectChange('status', value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar estado" />
+                  <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="normal">Normal</SelectItem>

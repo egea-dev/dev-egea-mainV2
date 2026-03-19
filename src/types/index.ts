@@ -14,6 +14,8 @@ export type Profile = {
   updated_at?: string;
   status?: 'activo' | 'baja' | 'vacaciones';
   active_tasks_count?: number;
+  has_driving_license?: boolean;
+  has_residence_certificate?: boolean;
 };
 
 export type Vehicle = {
@@ -25,6 +27,7 @@ export type Vehicle = {
   is_active?: boolean;
   km?: number;
   status?: 'normal' | 'accidentado' | 'revision';
+  assigned_driver_id?: string | null;
 };
 
 export interface TaskData extends JsonObject {

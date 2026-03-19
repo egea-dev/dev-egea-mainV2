@@ -73,7 +73,9 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
       p_email: profile.email || null,
       p_phone: profile.phone || null,
       p_status: profile.status || 'activo',
-      p_role: profile.role || 'operario'
+      p_role: profile.role || 'operario',
+      p_has_driving_license: profile.has_driving_license || false,
+      p_has_residence_certificate: profile.has_residence_certificate || false
     });
 
     if (error) {
@@ -94,9 +96,13 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
     setLoading(false);
   };
 
+  const handleCheckboxChange = (name: keyof Profile, checked: boolean) => {
+    setProfile(prev => ({ ...prev, [name]: checked }));
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{user ? "Editar Usuario" : "Nuevo Usuario"}</DialogTitle>
           <DialogDescription>
@@ -108,33 +114,40 @@ export const UserDialog = ({ open, onOpenChange, onSuccess, user }: UserDialogPr
             <Label htmlFor="full_name">Nombre Completo</Label>
             <Input id="full_name" name="full_name" value={profile.full_name || ''} onChange={handleChange} />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email (Opcional)</Label>
-            <Input id="email" name="email" type="email" value={profile.email || ''} onChange={handleChange} placeholder="Email para futura invitación" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Teléfono</Label>
-            <Input id="phone" name="phone" value={profile.phone || ''} onChange={handleChange} placeholder="+34 600 000 000" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="whatsapp">WhatsApp (Opcional)</Label>
-            <Input id="whatsapp" name="whatsapp" value={profile.whatsapp || ''} onChange={handleChange} placeholder="+34 600 000 000" />
-          </div>
-          {profile.public_url && (
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>URL Pública</Label>
-              <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                <span className="text-sm text-muted-foreground flex-1 truncate">{profile.public_url}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(profile.public_url, '_blank')}
-                >
-                  Ver
-                </Button>
-              </div>
+              <Label htmlFor="email">Email (Opcional)</Label>
+              <Input id="email" name="email" type="email" value={profile.email || ''} onChange={handleChange} />
             </div>
-          )}
+            <div className="space-y-2">
+              <Label htmlFor="phone">Teléfono</Label>
+              <Input id="phone" name="phone" value={profile.phone || ''} onChange={handleChange} />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 border p-3 rounded-lg bg-muted/20">
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="has_driving_license" 
+                checked={profile.has_driving_license || false} 
+                onChange={(e) => handleCheckboxChange('has_driving_license', e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="has_driving_license" className="text-xs cursor-pointer">Carnet Conducir</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="has_residence_certificate" 
+                checked={profile.has_residence_certificate || false} 
+                onChange={(e) => handleCheckboxChange('has_residence_certificate', e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="has_residence_certificate" className="text-xs cursor-pointer">Certif. Residencia</Label>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
             <Select

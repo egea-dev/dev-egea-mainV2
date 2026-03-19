@@ -205,8 +205,8 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                   className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:bg-muted/30 shadow-sm"
                 >
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="h-11 w-11 rounded-full bg-muted ring-1 ring-border overflow-hidden">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-muted ring-1 ring-border overflow-hidden flex-shrink-0">
                         {user.avatar_url ? (
                           <img
                             src={user.avatar_url}
@@ -220,41 +220,30 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1">
-                            <p className="text-sm font-bold text-foreground">{user.full_name}</p>
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                              <StatusBadge status={user.status} size="sm" variant="dot" />
-                              <span className="rounded-full bg-muted px-2.5 py-0.5 font-bold capitalize text-muted-foreground border border-border">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-bold text-foreground truncate">{user.full_name}</p>
+                              <div className="flex gap-1">
+                                {user.has_driving_license && (
+                                  <span title="Carnet de conducir" className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded font-bold border border-blue-200">
+                                    CARNET
+                                  </span>
+                                )}
+                                {user.has_residence_certificate && (
+                                  <span title="Certificado de residencia" className="text-[10px] bg-emerald-100 text-emerald-700 px-1 rounded font-bold border border-emerald-200">
+                                    RESID.
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold capitalize text-muted-foreground">
                                 {user.role}
                               </span>
-                              {user.active_tasks_count !== undefined && (
-                                <span className={`rounded-full px-2.5 py-0.5 font-bold border ${user.active_tasks_count > 3 ? 'bg-destructive/10 text-destructive border-destructive/20' : user.active_tasks_count > 0 ? 'bg-primary/10 text-primary border-primary/20' : 'bg-muted text-muted-foreground border-border'}`}>
-                                  {user.active_tasks_count} {user.active_tasks_count === 1 ? 'tarea' : 'tareas'}
-                                </span>
-                              )}
-                              {!user.auth_user_id && <span className="text-warning font-bold">Acceso pendiente</span>}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold border ${availability.label === "Disponible" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" :
-                              availability.label === "Vacaciones" ? "bg-warning/10 text-warning border-warning/20" :
-                                "bg-destructive/10 text-destructive border-destructive/20"
-                              }`}>
-                              {availability.label}
-                            </span>
-                            {canInvite && !user.auth_user_id && user.email && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 rounded-full border border-warning/30 bg-warning/10 text-warning hover:bg-warning/20"
-                                title="Invitar o vincular usuario"
-                                onClick={() => handleInviteUser(user)}
-                                disabled={inviteLoadingId === user.id}
-                              >
-                                <Link2 className={`h-4 w-4 ${inviteLoadingId === user.id ? "animate-spin" : ""}`} />
-                              </Button>
-                            )}
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             {canEdit && (
                               <Button
                                 variant="ghost"
@@ -278,35 +267,6 @@ export const UserList = ({ users, onUsersUpdate }: UserListProps) => {
                               </Button>
                             )}
                           </div>
-                        </div>
-                        <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 mt-3 p-3 rounded-lg bg-muted/20 border border-border/50">
-                          <div className="flex items-center gap-2 break-words">
-                            <Mail className="h-3 w-3 text-muted-foreground/70" />
-                            <span className="text-foreground/80 font-medium">{user.email ?? "Sin correo"}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Phone className="h-3 w-3 text-muted-foreground/70" />
-                            <span className="text-foreground/80 font-medium">{user.phone ?? "Sin teléfono"}</span>
-                          </div>
-                          {(user.whatsapp) && (
-                            <div className="flex items-center gap-2">
-                              <MessageCircle className="h-3 w-3 text-emerald-600/70" />
-                              <span className="text-foreground/80 font-medium">{user.whatsapp}</span>
-                            </div>
-                          )}
-                          {user.public_url && (
-                            <div className="flex items-center gap-2">
-                              <ExternalLink className="h-3 w-3 text-primary/70" />
-                              <a
-                                href={user.public_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline hover:text-primary/80 font-bold"
-                              >
-                                Perfil público
-                              </a>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
