@@ -16,6 +16,7 @@ import { buildMapsSearchUrl } from "@/utils/maps";
 import { MapPin } from "lucide-react";
 import { TaskActionButtons, type TaskActionConfig } from "./TaskActionButtons";
 import { normalizeTaskLocation } from "@/utils/task";
+import { VehicleBadge } from "@/features/fleet/components/VehicleBadge";
 
 interface TaskDetailsDialogProps {
   task: Task | null;
@@ -193,23 +194,15 @@ export function TaskDetailsDialog({
               <p className="text-sm font-medium text-muted-foreground">Vehículos asignados</p>
               <div className="flex flex-wrap gap-2">
                 {task.assigned_vehicles && task.assigned_vehicles.length > 0 ? (
-                  task.assigned_vehicles.map((vehicle) => {
-                    const type = vehicle.type?.toLowerCase() ?? "";
-                    const style = type.includes("jumper")
-                      ? "bg-muted/60 text-foreground ring-border/60"
-                      : type.includes("camión") || type.includes("camion")
-                        ? "bg-amber-500/10 text-amber-300 ring-amber-500/30"
-                        : "bg-muted/40 text-muted-foreground ring-border/60";
-
-                    return (
-                      <div
-                        key={vehicle.id}
-                        className={`rounded-md px-3 py-1.5 text-sm ring-1 ${style}`}
-                      >
-                        {vehicle.name}
-                      </div>
-                    );
-                  })
+                  task.assigned_vehicles.map((vehicle) => (
+                    <VehicleBadge
+                      key={vehicle.id}
+                      name={vehicle.name}
+                      type={vehicle.type}
+                      licensePlate={vehicle.license_plate}
+                      size="md"
+                    />
+                  ))
                 ) : (
                   <p className="text-sm text-muted-foreground">Sin vehículos asignados</p>
                 )}

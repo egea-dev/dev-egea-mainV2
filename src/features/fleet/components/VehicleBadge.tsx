@@ -6,6 +6,7 @@ import { Truck } from "lucide-react";
 interface VehicleBadgeProps {
   name: string;
   type?: string | null;
+  licensePlate?: string | null;
   className?: string;
   showIcon?: boolean;
   size?: "sm" | "md" | "lg";
@@ -19,6 +20,7 @@ interface VehicleBadgeProps {
 export function VehicleBadge({
   name,
   type,
+  licensePlate,
   className,
   showIcon = true,
   size = "md",
@@ -63,7 +65,14 @@ export function VehicleBadge({
           aria-hidden="true"
         />
       )}
-      <span className="truncate">{name}</span>
+      <div className="flex flex-col text-left">
+        <span className="truncate">{name}</span>
+        {licensePlate && (
+          <span className="text-[10px] opacity-80 font-mono tracking-wider leading-none mt-0.5">
+            {licensePlate}
+          </span>
+        )}
+      </div>
       {typeLabel && size === "lg" && (
         <span className="opacity-70 text-xs">({typeLabel})</span>
       )}

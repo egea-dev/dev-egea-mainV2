@@ -28,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { subDays, format, parseISO, isSameDay, isBefore } from "date-fns";
+import { subDays, format, parseISO, isSameDay, isBefore, startOfDay, addDays } from "date-fns";
 import { es } from 'date-fns/locale';
 import { toast } from "sonner";
 import { TaskDetailsDialog } from "@/features/tasks/components/TaskDetailsDialog";
@@ -42,9 +42,12 @@ import { useScreens, useVehicles, useUsers } from "@/hooks/use-supabase";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { DetailedTask } from "@/integrations/supabase/client";
 import { TaskDialog } from "@/features/installations/components/TaskDialog";
+import { TaskQuickEditPanel } from "@/features/tasks/components/TaskQuickEditPanel";
+import { TaskTimelineToolbar } from "@/features/tasks/components/TaskTimelineToolbar";
 import { Badge } from "@/components/ui/badge";
 import { buildMapsSearchUrl } from "@/utils/maps";
 import { normalizeTaskLocation } from "@/utils/task";
+import { cn } from "@/lib/utils";
 import type { Profile, Task, Vehicle } from "@/types";
 import { getTaskStateColor } from "@/lib/constants";
 
@@ -377,6 +380,7 @@ type DashboardAssignedVehicle = {
   id: string;
   name: string;
   type: string | null;
+  license_plate: string | null;
 };
 
 const normalizeAssignedProfiles = (value: unknown): DashboardAssignedProfile[] => {
@@ -412,11 +416,13 @@ const normalizeAssignedVehicles = (value: unknown): DashboardAssignedVehicle[] =
       const id = typeof record.id === 'string' ? record.id : null;
       const name = typeof record.name === 'string' ? record.name : null;
       const type = typeof record.type === 'string' ? record.type : null;
+      const license_plate = typeof record.license_plate === 'string' ? record.license_plate : null;
       if (!id || !name) return null;
       return {
         id,
         name,
-        type: type || null
+        type: type || null,
+        license_plate: license_plate || null,
       };
     })
     .filter((vehicle): vehicle is DashboardAssignedVehicle =>
@@ -446,8 +452,11 @@ export default function AdminPage() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [quickEditOpen, setQuickEditOpen] = useState(false);
+  const [quickEditTask, setQuickEditTask] = useState<Task | null>(null);
   const [isRegisteringArrival, setIsRegisteringArrival] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'all' | 'instalaciones' | 'confeccion' | 'tapiceria'>('instalaciones');
+  const [timeScale, setTimeScale] = useState<'week' | '3days' | 'today'>('week');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [currentUser, setCurrentUser] = useState<SimpleProfile | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -660,11 +669,13 @@ export default function AdminPage() {
       });
 
       if (error) {
+        console.error('[Admin][archiveTask] RPC error:', error);
         throw error;
       }
 
       const result = Array.isArray(data) ? data[0] : data;
       if (!result?.archived) {
+        console.warn('[Admin][archiveTask] Tarea no archivada:', result);
         toast.error(result?.message || 'No se pudo archivar la tarea');
       } else {
         toast.success(result?.message || 'Tarea archivada correctamente');
@@ -788,12 +799,21 @@ export default function AdminPage() {
   );
 
   const handleEditTask = (taskId: string) => {
-    // Find task in any list (using sortedTasks which is our source of truth)
+    // Para edición completa (se abre desde el menú o doble clic/otro lugar)
     const candidate = sortedTasks.find(t => t.id === taskId);
     if (candidate) {
       const task = mapDetailedTaskToTask(candidate);
       setEditingTask(task);
       setTaskDialogOpen(true);
+    }
+  };
+
+  const handleQuickEdit = (taskId: string) => {
+    const candidate = sortedTasks.find(t => t.id === taskId);
+    if (candidate) {
+      const task = mapDetailedTaskToTask(candidate);
+      setQuickEditTask(task);
+      setQuickEditOpen(true);
     }
   };
 
@@ -828,7 +848,18 @@ export default function AdminPage() {
   }, [pendingTasks, taskFilter]);
 
   const sortedTasks = useMemo(() => {
+    const now = startOfDay(new Date());
+    const end = timeScale === 'week' ? addDays(now, 7)
+              : timeScale === '3days' ? addDays(now, 3)
+              : addDays(now, 1);
+
     return filteredTasks
+      .filter((task) => {
+        if (!task.start_date) return true;
+        const d = parseISO(task.start_date);
+        if (Number.isNaN(d.getTime())) return true;
+        return d < end;
+      })
       .map((task, index) => ({ task, index }))
       .sort((a, b) => {
         const aTerminated = (a.task.state ?? '').toLowerCase() === 'terminado';
@@ -839,7 +870,7 @@ export default function AdminPage() {
         return aTerminated ? 1 : -1; // Terminated at the bottom
       })
       .map((entry) => entry.task);
-  }, [filteredTasks]);
+  }, [filteredTasks, timeScale]);
 
   const dataShortcutScreens = useMemo(() => {
     return screens
@@ -1183,30 +1214,14 @@ export default function AdminPage() {
                 }
               </CardDescription>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Select value={taskFilter} onValueChange={(value: 'all' | 'instalaciones' | 'confeccion' | 'tapiceria') => setTaskFilter(value)}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Filtrar por..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="instalaciones">Instalaciones</SelectItem>
-                  <SelectItem value="confeccion">Confección</SelectItem>
-                  <SelectItem value="tapiceria">Tapicería</SelectItem>
-                </SelectContent>
-              </Select>
-              {selectedDate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedDate(undefined)}
-                  className="whitespace-nowrap"
-                >
-                  Limpiar filtro
-                </Button>
-              )}
-            </div>
+            <TaskTimelineToolbar
+              timeScale={timeScale}
+              setTimeScale={setTimeScale}
+              taskFilter={taskFilter}
+              setTaskFilter={setTaskFilter}
+              selectedDate={selectedDate}
+              onClearDate={() => setSelectedDate(undefined)}
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -1290,11 +1305,18 @@ export default function AdminPage() {
                     const mapsEnabled = Boolean(task.work_site_imagotipo_enabled);
                     const hasMaps = mapsEnabled && Boolean(resolvedLocation || task.work_site_maps_url);
 
+                    const rowClassName = cn(
+                      "hover:bg-muted/50 cursor-pointer transition-colors border-l-2",
+                      task.state === 'urgente' ? "border-l-red-500" :
+                      task.state === 'terminado' ? "border-l-emerald-500 opacity-80 bg-muted/20" :
+                      "border-l-transparent"
+                    );
+
                     return (
                       <TableRow
                         key={task.id}
-                        className="hover:bg-muted/50 cursor-pointer"
-                        onDoubleClick={() => handleEditTask(task.id)}
+                        className={rowClassName}
+                        onClick={() => handleQuickEdit(task.id)}
                       >
                         <TableCell>
                           <Checkbox
@@ -1378,6 +1400,7 @@ export default function AdminPage() {
                                   key={`${task.id}-${vehicle.id}`}
                                   name={vehicle.name}
                                   type={vehicle.type}
+                                  licensePlate={vehicle.license_plate}
                                   size="sm"
                                 />
                               ))
@@ -1455,9 +1478,12 @@ export default function AdminPage() {
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver detalles
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEditTask(task.id)}>
+                              <DropdownMenuItem onClick={(event) => {
+                                event.stopPropagation();
+                                handleEditTask(task.id);
+                              }}>
                                 <Pencil className="mr-2 h-4 w-4" />
-                                Editar
+                                Edición completa
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => updateTaskState(task.id, 'pendiente')}>
@@ -1578,6 +1604,16 @@ export default function AdminPage() {
         }}
         task={editingTask}
         selectedDate={selectedDate || new Date()}
+        users={users}
+        vehicles={vehicles}
+      />
+      <TaskQuickEditPanel
+        task={quickEditTask}
+        open={quickEditOpen}
+        onOpenChange={setQuickEditOpen}
+        onSuccess={() => {
+          refreshAllData();
+        }}
         users={users}
         vehicles={vehicles}
       />
