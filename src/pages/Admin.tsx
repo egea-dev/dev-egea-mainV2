@@ -704,6 +704,7 @@ export default function AdminPage() {
 
       // 4. Insertar en archived_tasks
       const { error: insertError } = await (supabase.from('archived_tasks') as any).insert({
+        id: crypto.randomUUID(),
         data: task.data,
         status: task.status,
         state: task.state,
@@ -1550,7 +1551,7 @@ export default function AdminPage() {
                                 Marcar como terminado
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleArchiveTask(task.id)}>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleArchiveTask(task.id); }}>
                                 <Archive className="mr-2 h-4 w-4" />
                                 Archivar
                               </DropdownMenuItem>
