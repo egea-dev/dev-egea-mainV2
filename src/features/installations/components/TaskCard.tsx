@@ -6,14 +6,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, MapPin, Clock, Truck, Users as UsersIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { VehicleBadge } from '@/features/fleet/components/VehicleBadge';
 
 interface TaskCardProps {
     task: DetailedTask;
     isOverlay?: boolean;
     onEdit?: (task: DetailedTask) => void;
+    onQuickEdit?: (task: DetailedTask) => void;
 }
 
-export const TaskCard = ({ task, isOverlay, onEdit }: TaskCardProps) => {
+export const TaskCard = ({ task, isOverlay, onEdit, onQuickEdit }: TaskCardProps) => {
     // Draggable: The task itself can be moved (to change dates)
     const {
         attributes,
@@ -50,7 +52,11 @@ export const TaskCard = ({ task, isOverlay, onEdit }: TaskCardProps) => {
     return (
         <Card
             ref={setNodeRef}
-            onDoubleClick={() => onEdit?.(task)} // NUEVO: doble-click para editar
+            onClick={() => onQuickEdit?.(task)}
+            onDoubleClick={(e) => {
+                e.stopPropagation();
+                onEdit?.(task);
+            }}
             style={isOverlay ? { cursor: 'grabbing', opacity: 0.9, scale: 1.05 } : undefined}
             className={cn(
                 "relative group transition-all duration-200 border-none select-none",
@@ -58,7 +64,10 @@ export const TaskCard = ({ task, isOverlay, onEdit }: TaskCardProps) => {
                 isDragging ? "opacity-30" : "opacity-100",
                 isOverResource ? "ring-2 ring-primary bg-primary/10" : "ring-1 ring-border/40",
                 "shadow-sm",
-                onEdit && "cursor-pointer" // NUEVO: indicar que es clickeable
+                onQuickEdit && "cursor-pointer",
+                isUrgent ? "border-l-2 border-l-red-500" : 
+                isCompleted ? "border-l-2 border-l-emerald-500 opacity-70" : 
+                "border-l-2 border-l-transparent"
             )}
         >
             <CardContent className="p-3">
@@ -157,13 +166,13 @@ export const TaskCard = ({ task, isOverlay, onEdit }: TaskCardProps) => {
                         <Truck className="w-3 h-3 text-muted-foreground/50 mr-0.5" />
                         {(task.assigned_vehicles as any[])?.length > 0 ? (
                             (task.assigned_vehicles as any[]).map((vehicle: any) => (
-                                <div
+                                <VehicleBadge
                                     key={vehicle.id}
-                                    className="bg-muted/60 text-muted-foreground text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 border border-border/60"
-                                    title={vehicle.name}
-                                >
-                                    <span className="truncate max-w-[80px]">{vehicle.name}</span>
-                                </div>
+                                    name={vehicle.name}
+                                    type={vehicle.type || 'otro'}
+                                    licensePlate={vehicle.license_plate}
+                                    size="sm"
+                                />
                             ))
                         ) : (
                             <span className="text-[9px] text-muted-foreground/60 italic">Sin vehículo</span>

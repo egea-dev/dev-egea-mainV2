@@ -8,10 +8,11 @@ export type TaskFilter = 'all' | 'instalaciones' | 'confeccion' | 'tapiceria';
 interface TaskTimelineToolbarProps {
   timeScale: TimeScale;
   setTimeScale: (scale: TimeScale) => void;
-  taskFilter: TaskFilter;
-  setTaskFilter: (filter: TaskFilter) => void;
+  taskFilter: 'all' | 'instalaciones' | 'confeccion' | 'tapiceria';
+  setTaskFilter: (filter: 'all' | 'instalaciones' | 'confeccion' | 'tapiceria') => void;
   selectedDate?: Date;
-  onClearDate: () => void;
+  onClearDate?: () => void;
+  showFilter?: boolean;
 }
 
 export function TaskTimelineToolbar({
@@ -20,7 +21,8 @@ export function TaskTimelineToolbar({
   taskFilter,
   setTaskFilter,
   selectedDate,
-  onClearDate
+  onClearDate,
+  showFilter = true
 }: TaskTimelineToolbarProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-2">
@@ -50,18 +52,20 @@ export function TaskTimelineToolbar({
           Semana
         </Button>
       </div>
-      <Select value={taskFilter} onValueChange={setTaskFilter}>
-        <SelectTrigger className="w-full sm:w-[150px]">
-          <Filter className="mr-2 h-4 w-4" />
-          <SelectValue placeholder="Filtrar por..." />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todas</SelectItem>
-          <SelectItem value="instalaciones">Instalaciones</SelectItem>
-          <SelectItem value="confeccion">Confección</SelectItem>
-          <SelectItem value="tapiceria">Tapicería</SelectItem>
-        </SelectContent>
-      </Select>
+      {showFilter && (
+        <Select value={taskFilter} onValueChange={(value: 'all' | 'instalaciones' | 'confeccion' | 'tapiceria') => setTaskFilter(value)}>
+          <SelectTrigger className="w-full sm:w-[150px] h-9 bg-background">
+            <Filter className="mr-2 h-4 w-4" />
+            <SelectValue placeholder="Filtrar por..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas las salas</SelectItem>
+            <SelectItem value="instalaciones">Instalaciones</SelectItem>
+            <SelectItem value="confeccion">Confección</SelectItem>
+            <SelectItem value="tapiceria">Tapicería</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
       {selectedDate && (
         <Button
           variant="outline"

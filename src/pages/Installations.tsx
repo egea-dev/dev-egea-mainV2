@@ -34,7 +34,9 @@ import { TaskCard } from "@/features/installations/components/TaskCard";
 import { TaskDialog } from "@/features/installations/components/TaskDialog";
 import { UserDialog } from "@/components/users/UserDialog";
 import { VehicleBadge } from "@/features/fleet/components/VehicleBadge";
-import { StatusBadge } from "@/components/shared/ui/StatusBadge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { TaskQuickEditPanel } from "@/features/tasks/components/TaskQuickEditPanel";
+import { TaskTimelineToolbar } from "@/features/tasks/components/TaskTimelineToolbar";
 
 import { useAdminData } from "@/hooks/use-admin-data";
 import {
@@ -57,6 +59,10 @@ export default function InstallationsPage() {
 
   // State for Date Navigation (Weekly)
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [timeScale, setTimeScale] = useState<'week' | '3days' | 'today'>('week');
+  const [taskFilter, setTaskFilter] = useState<'all' | 'instalaciones' | 'confeccion' | 'tapiceria'>('all');
+  const [quickEditTask, setQuickEditTask] = useState<DetailedTask | null>(null);
+  const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
 
   // Start/End of Current View
   const viewStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -239,6 +245,15 @@ export default function InstallationsPage() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+            
+            <TaskTimelineToolbar
+              timeScale={timeScale}
+              setTimeScale={setTimeScale}
+              taskFilter={taskFilter}
+              setTaskFilter={setTaskFilter}
+              showFilter={false} // Ocultamos el filtro de categoría porque ya estamos en Instalaciones
+            />
+
             <Button
               onClick={() => { setSelectedTask(null); setIsTaskDialogOpen(true); }}
               className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2"
@@ -316,6 +331,11 @@ export default function InstallationsPage() {
                 setSelectedTask(task);
                 setIsTaskDialogOpen(true);
               }}
+              onQuickEdit={(task) => {
+                setQuickEditTask(task);
+                setIsQuickEditOpen(true);
+              }}
+              timeScale={timeScale}
             />
           </div>
 
@@ -347,6 +367,16 @@ export default function InstallationsPage() {
           users={users}
           vehicles={vehicles}
           draggedItem={null}
+        />
+      )}
+      {isQuickEditOpen && quickEditTask && (
+        <TaskQuickEditPanel
+          task={quickEditTask}
+          open={isQuickEditOpen}
+          onOpenChange={setIsQuickEditOpen}
+          onSuccess={fetchTasks}
+          users={users}
+          vehicles={vehicles}
         />
       )}
     </DndContext>

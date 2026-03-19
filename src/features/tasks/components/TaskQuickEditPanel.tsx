@@ -14,7 +14,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { CalendarIcon, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Task, Profile, Vehicle } from "@/types";
+import type { Profile, Vehicle } from "@/types";
+import type { DetailedTask } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
 import { upsertTask } from "@/lib/upsert-task";
 
@@ -28,7 +29,7 @@ const quickEditSchema = z.object({
 type QuickEditFormData = z.infer<typeof quickEditSchema>;
 
 interface TaskQuickEditPanelProps {
-  task: Task | null;
+  task: DetailedTask | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
@@ -51,11 +52,20 @@ export function TaskQuickEditPanel({ task, open, onOpenChange, onSuccess, users,
 
   useEffect(() => {
     if (open && task) {
+      const initialUsers = (task.assigned_profiles as any[])?.map((u: any) => ({ 
+        id: u.id || u.profile_id, 
+        name: u.full_name || u.name 
+      })) || [];
+      const initialVehicles = (task.assigned_vehicles as any[])?.map((v: any) => ({ 
+        id: v.id || v.vehicle_id, 
+        name: v.name 
+      })) || [];
+
       form.reset({
         state: task.state || "pendiente",
         startDate: task.start_date ? new Date(task.start_date) : new Date(),
-        selectedUsers: task.assigned_users?.map((u) => ({ id: u.id, name: u.full_name })) || [],
-        selectedVehicles: task.assigned_vehicles?.map((v) => ({ id: v.id, name: v.name })) || [],
+        selectedUsers: initialUsers,
+        selectedVehicles: initialVehicles,
       });
     }
   }, [open, task, form]);
@@ -71,14 +81,15 @@ export function TaskQuickEditPanel({ task, open, onOpenChange, onSuccess, users,
       // Por suerte the upsertTask in admin is usually an edit, so we can re-query the screenId 
       // if missing or just fetch screen_data.
       
-      const { data: screenData, error: screenError } = await supabase
+      const { data: screenData, error: screenError } = await (supabase
         .from("screen_data")
         .select("screen_id")
         .eq("id", task.id)
-        .single();
+        .single() as any);
       
       if (screenError) throw screenError;
-      const dbScreenId = screenData?.screen_id;
+      if (!screenData) throw new Error("No se encontró la tarea especificada");
+      const dbScreenId = screenData.screen_id;
       if (!dbScreenId) throw new Error("No screen_id found for task");
 
       const formattedDate = format(data.startDate, "yyyy-MM-dd");

@@ -664,31 +664,60 @@ export default function AdminPage() {
 
   const archiveTask = useCallback(async (taskId: string, options?: { skipRefresh?: boolean }) => {
     try {
-      const { data, error } = await (supabase.rpc as any)('archive_task_by_id', {
-        p_task_id: taskId
+      // 1. Obtener la tarea completa con sus relaciones
+      const { data: task, error: fetchError } = await (supabase.from('screen_data') as any)
+        .select('*, task_profiles(profile_id, profiles(full_name)), task_vehicles(vehicle_id, vehicles(name))')
+        .eq('id', taskId)
+        .single();
+
+      if (fetchError || !task) {
+        throw fetchError || new Error('Tarea no encontrada');
+      }
+
+      // 2. Insertar en archived_tasks
+      const { error: insertError } = await (supabase.from('archived_tasks') as any).insert({
+        data: task.data,
+        status: task.status,
+        state: task.state,
+        start_date: task.start_date,
+        end_date: task.end_date,
+        location: task.location,
+        responsible_profile_id: task.responsible_profile_id,
+        responsible_name: task.responsible_name || null,
+        assigned_users: (task.task_profiles || []).map((tp: any) => ({
+          id: tp.profile_id,
+          full_name: tp.profiles?.full_name || 'Desconocido'
+        })),
+        assigned_vehicles: (task.task_vehicles || []).map((tv: any) => ({
+          id: tv.vehicle_id,
+          name: tv.vehicles?.name || 'Desconocido'
+        })),
+        archived_by: currentUser?.id || null,
       });
 
-      if (error) {
-        console.error('[Admin][archiveTask] RPC error:', error);
-        throw error;
-      }
+      if (insertError) throw insertError;
 
-      const result = Array.isArray(data) ? data[0] : data;
-      if (!result?.archived) {
-        console.warn('[Admin][archiveTask] Tarea no archivada:', result);
-        toast.error(result?.message || 'No se pudo archivar la tarea');
-      } else {
-        toast.success(result?.message || 'Tarea archivada correctamente');
-      }
+      // 3. Borrar relaciones (Supabase suele tener ON DELETE CASCADE, pero lo hacemos explícito por seguridad si no está configurado)
+      await (supabase.from('task_profiles') as any).delete().eq('task_id', taskId);
+      await (supabase.from('task_vehicles') as any).delete().eq('task_id', taskId);
 
+      // 4. Borrar la tarea original
+      const { error: deleteError } = await (supabase.from('screen_data') as any)
+        .delete()
+        .eq('id', taskId);
+
+      if (deleteError) throw deleteError;
+
+      toast.success('Tarea archivada correctamente');
+      
       if (!options?.skipRefresh) {
         refreshAllData();
       }
-    } catch (err) {
-      console.error('Error archiving task:', err);
-      toast.error('Error al archivar la tarea');
+    } catch (err: any) {
+      console.error('[Admin][archiveTask] Error:', err);
+      toast.error(err.message || 'Error al archivar la tarea');
     }
-  }, [refreshAllData]);
+  }, [refreshAllData, currentUser]);
 
   const updateTaskState = useCallback(async (taskId: string, newState: 'pendiente' | 'urgente' | 'terminado') => {
     try {

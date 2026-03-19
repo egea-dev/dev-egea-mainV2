@@ -10,14 +10,17 @@ interface WeeklyBoardProps {
     currentDate: Date;
     tasks: DetailedTask[];
     onDateClick: (date: Date) => void;
-    onTaskEdit?: (task: DetailedTask) => void; // NUEVO
+    onTaskEdit?: (task: DetailedTask) => void;
+    onQuickEdit?: (task: DetailedTask) => void;
+    timeScale?: 'week' | '3days' | 'today';
 }
 
-const DayColumn = ({ day, tasks, isToday, onTaskEdit }: {
+const DayColumn = ({ day, tasks, isToday, onTaskEdit, onQuickEdit }: {
     day: Date;
     tasks: DetailedTask[];
     isToday: boolean;
-    onTaskEdit?: (task: DetailedTask) => void; // NUEVO
+    onTaskEdit?: (task: DetailedTask) => void;
+    onQuickEdit?: (task: DetailedTask) => void;
 }) => {
     const { setNodeRef, isOver } = useDroppable({
         id: `day-${day.toISOString()}`,
@@ -63,7 +66,7 @@ const DayColumn = ({ day, tasks, isToday, onTaskEdit }: {
                         return timeA.localeCompare(timeB);
                     })
                     .map(task => (
-                        <TaskCard key={task.id} task={task} onEdit={onTaskEdit} />
+                        <TaskCard key={task.id} task={task} onEdit={onTaskEdit} onQuickEdit={onQuickEdit} />
                     ))}
                 {tasks.length === 0 && (
                     <div className="h-full flex items-center justify-center pointer-events-none">
@@ -75,15 +78,33 @@ const DayColumn = ({ day, tasks, isToday, onTaskEdit }: {
     );
 };
 
-export const WeeklyBoard = ({ currentDate, tasks, onDateClick, onTaskEdit }: WeeklyBoardProps) => {
-    const start = startOfWeek(currentDate, { weekStartsOn: 1 });
-    // Generar 7 días pero filtrar domingo (día 0)
-    const allDays = Array.from({ length: 7 }).map((_, i) => addDays(start, i));
-    const weekDays = allDays.filter(day => day.getDay() !== 0); // Eliminar domingo
+export const WeeklyBoard = ({ currentDate, tasks, onDateClick, onTaskEdit, onQuickEdit, timeScale = 'week' }: WeeklyBoardProps) => {
+    const generateDays = (date: Date, scale: string): Date[] => {
+        if (scale === 'today') return [date];
+        if (scale === '3days') {
+            const days: Date[] = [];
+            let d = date;
+            while (days.length < 3) {
+                if (d.getDay() !== 0) days.push(new Date(d)); // saltar domingos
+                d = addDays(d, 1);
+            }
+            return days;
+        }
+        // 'week' (L-S, sin domingo)
+        const start = startOfWeek(date, { weekStartsOn: 1 });
+        return Array.from({ length: 7 }).map((_, i) => addDays(start, i)).filter(d => d.getDay() !== 0);
+    };
+
+    const weekDays = generateDays(currentDate, timeScale);
     const today = new Date();
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-2 h-full min-h-[600px] overflow-x-auto pb-4">
+        <div className={cn(
+            "grid gap-2 h-full min-h-[600px] overflow-x-auto pb-4",
+            weekDays.length === 1 ? "grid-cols-1" :
+            weekDays.length === 3 ? "grid-cols-1 md:grid-cols-3" :
+            "grid-cols-1 md:grid-cols-6"
+        )}>
             {weekDays.map((day) => {
                 const dayTasks = tasks.filter(t => t.start_date && isSameDay(new Date(t.start_date), day));
                 // Sort by time
@@ -100,6 +121,7 @@ export const WeeklyBoard = ({ currentDate, tasks, onDateClick, onTaskEdit }: Wee
                         tasks={sortedTasks}
                         isToday={isSameDay(day, today)}
                         onTaskEdit={onTaskEdit}
+                        onQuickEdit={onQuickEdit}
                     />
                 );
             })}
