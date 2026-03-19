@@ -664,9 +664,9 @@ export default function AdminPage() {
 
   const archiveTask = useCallback(async (taskId: string, options?: { skipRefresh?: boolean }) => {
     try {
-      // 1. Obtener la tarea completa con sus relaciones
+      // 1. Obtener la tarea (sin joins anidados — no hay FK task_profiles→profiles)
       const { data: task, error: fetchError } = await (supabase.from('screen_data') as any)
-        .select('*, task_profiles(profile_id, profiles(full_name)), task_vehicles(vehicle_id, vehicles(name))')
+        .select('*')
         .eq('id', taskId)
         .single();
 
@@ -674,7 +674,35 @@ export default function AdminPage() {
         throw fetchError || new Error('Tarea no encontrada');
       }
 
-      // 2. Insertar en archived_tasks
+      // 2. Obtener perfiles asignados (consulta separada)
+      const { data: taskProfiles } = await (supabase.from('task_profiles') as any)
+        .select('profile_id')
+        .eq('task_id', taskId);
+
+      let assignedUsers: any[] = [];
+      if (taskProfiles && taskProfiles.length > 0) {
+        const profileIds = taskProfiles.map((tp: any) => tp.profile_id);
+        const { data: profiles } = await (supabase.from('profiles') as any)
+          .select('id, full_name')
+          .in('id', profileIds);
+        assignedUsers = (profiles || []).map((p: any) => ({ id: p.id, full_name: p.full_name }));
+      }
+
+      // 3. Obtener vehículos asignados (consulta separada)
+      const { data: taskVehicles } = await (supabase.from('task_vehicles') as any)
+        .select('vehicle_id')
+        .eq('task_id', taskId);
+
+      let assignedVehicles: any[] = [];
+      if (taskVehicles && taskVehicles.length > 0) {
+        const vehicleIds = taskVehicles.map((tv: any) => tv.vehicle_id);
+        const { data: vehicles } = await (supabase.from('vehicles') as any)
+          .select('id, name')
+          .in('id', vehicleIds);
+        assignedVehicles = (vehicles || []).map((v: any) => ({ id: v.id, name: v.name }));
+      }
+
+      // 4. Insertar en archived_tasks
       const { error: insertError } = await (supabase.from('archived_tasks') as any).insert({
         data: task.data,
         status: task.status,
@@ -683,25 +711,19 @@ export default function AdminPage() {
         end_date: task.end_date,
         location: task.location,
         responsible_profile_id: task.responsible_profile_id,
-        responsible_name: task.responsible_name || null,
-        assigned_users: (task.task_profiles || []).map((tp: any) => ({
-          id: tp.profile_id,
-          full_name: tp.profiles?.full_name || 'Desconocido'
-        })),
-        assigned_vehicles: (task.task_vehicles || []).map((tv: any) => ({
-          id: tv.vehicle_id,
-          name: tv.vehicles?.name || 'Desconocido'
-        })),
+        responsible_name: null,
+        assigned_users: assignedUsers,
+        assigned_vehicles: assignedVehicles,
         archived_by: currentUser?.id || null,
       });
 
       if (insertError) throw insertError;
 
-      // 3. Borrar relaciones (Supabase suele tener ON DELETE CASCADE, pero lo hacemos explícito por seguridad si no está configurado)
+      // 5. Borrar relaciones
       await (supabase.from('task_profiles') as any).delete().eq('task_id', taskId);
       await (supabase.from('task_vehicles') as any).delete().eq('task_id', taskId);
 
-      // 4. Borrar la tarea original
+      // 6. Borrar la tarea original
       const { error: deleteError } = await (supabase.from('screen_data') as any)
         .delete()
         .eq('id', taskId);
