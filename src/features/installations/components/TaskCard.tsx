@@ -81,14 +81,14 @@ export const TaskCard = ({ task, isOverlay, onEdit, onQuickEdit }: TaskCardProps
                         <div className="flex items-center gap-1.5 mb-0.5">
                             {isUrgent && <AlertTriangle className="w-3 h-3 text-red-500 animate-pulse" />}
                             <span className={cn(
-                                "font-bold text-sm truncate",
+                                "font-bold text-sm md:text-base truncate", // Aumentado
                                 isCompleted ? "text-muted-foreground line-through" : "text-foreground"
                             )}>
                                 {(typeof task.data?.site === 'string' ? task.data.site : null) || task.client || "Sin título"}
                             </span>
                         </div>
                         {task.data?.description && (
-                            <div className="text-[10px] text-muted-foreground truncate mb-1">
+                            <div className="text-[11px] text-muted-foreground truncate mb-1">
                                 {typeof task.data.description === 'string' ? task.data.description : ''}
                             </div>
                         )}
@@ -144,20 +144,26 @@ export const TaskCard = ({ task, isOverlay, onEdit, onQuickEdit }: TaskCardProps
                 <div className="flex flex-col gap-1.5 pt-2 border-t border-border/40">
 
                     {/* Assigned Users */}
-                    <div className="flex flex-wrap gap-1 items-center min-h-[1.25rem]">
-                        <UsersIcon className="w-3 h-3 text-muted-foreground/50 mr-0.5" />
+                    <div className="flex flex-wrap gap-1 items-center min-h-[1.5rem]">
+                        <UsersIcon className="w-3.5 h-3.5 text-muted-foreground/50 mr-0.5" />
                         {(task.assigned_profiles as any[])?.length > 0 ? (
-                            (task.assigned_profiles as any[]).map((user: any) => (
-                                <div
-                                    key={user.id}
-                                    className="bg-muted text-foreground text-[9px] px-1.5 py-0.5 rounded flex items-center gap-1 border border-border/60 shadow-none font-medium"
-                                    title={user.full_name}
-                                >
-                                    <span className="truncate max-w-[80px]">{user.full_name.split(' ')[0]}</span>
-                                </div>
-                            ))
+                            (task.assigned_profiles as any[]).map((user: any) => {
+                                const statusColor = user.status === 'activo' ? 'bg-emerald-500' : 
+                                                   user.status === 'vacaciones' ? 'bg-amber-500' : 
+                                                   'bg-slate-400';
+                                return (
+                                    <div
+                                        key={user.id}
+                                        className="bg-muted text-foreground text-[11px] px-2 py-1 rounded flex items-center gap-1.5 border border-border/60 shadow-none font-medium"
+                                        title={`${user.full_name} (${user.status || 'activo'})`}
+                                    >
+                                        <span className={cn("w-1.5 h-1.5 rounded-full", statusColor)} /> 
+                                        <span className="truncate max-w-[100px]">{user.full_name.split(' ')[0]}</span>
+                                    </div>
+                                );
+                            })
                         ) : (
-                            <span className="text-[9px] text-muted-foreground/60 italic">Sin operarios</span>
+                            <span className="text-[10px] text-muted-foreground/60 italic">Sin operarios</span>
                         )}
                     </div>
 
@@ -171,6 +177,7 @@ export const TaskCard = ({ task, isOverlay, onEdit, onQuickEdit }: TaskCardProps
                                     name={vehicle.name}
                                     type={vehicle.type || 'otro'}
                                     licensePlate={vehicle.license_plate}
+                                    className="scale-[0.85] origin-left -my-1 -ml-1" // Reducción de escala y ajuste de márgenes
                                     size="sm"
                                 />
                             ))
