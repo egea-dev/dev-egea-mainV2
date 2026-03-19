@@ -61,8 +61,6 @@ export default function InstallationsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeScale, setTimeScale] = useState<'week' | '3days' | 'today'>('week');
   const [taskFilter, setTaskFilter] = useState<'all' | 'instalaciones' | 'confeccion' | 'tapiceria'>('all');
-  const [quickEditTask, setQuickEditTask] = useState<DetailedTask | null>(null);
-  const [isQuickEditOpen, setIsQuickEditOpen] = useState(false);
 
   // Start/End of Current View
   const viewStart = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -332,8 +330,9 @@ export default function InstallationsPage() {
                 setIsTaskDialogOpen(true);
               }}
               onQuickEdit={(task) => {
-                setQuickEditTask(task);
-                setIsQuickEditOpen(true);
+                // Redirigir al diálogo completo en lugar de quick edit (según requisito)
+                setSelectedTask(task);
+                setIsTaskDialogOpen(true);
               }}
               timeScale={timeScale}
             />
@@ -367,16 +366,6 @@ export default function InstallationsPage() {
           users={users}
           vehicles={vehicles}
           draggedItem={null}
-        />
-      )}
-      {isQuickEditOpen && quickEditTask && (
-        <TaskQuickEditPanel
-          task={quickEditTask}
-          open={isQuickEditOpen}
-          onOpenChange={setIsQuickEditOpen}
-          onSuccess={fetchTasks}
-          users={users}
-          vehicles={vehicles}
         />
       )}
     </DndContext>

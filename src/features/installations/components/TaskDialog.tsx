@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -308,8 +308,12 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl w-full max-h-[90vh] overflow-y-auto hide-scrollbar border border-border/70 bg-background/95 p-0 text-foreground backdrop-blur-2xl">
         <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="text-2xl font-semibold text-primary">{task ? "Editar Tarea" : "Nueva Tarea"}</DialogTitle>
-          <DialogDescription className="text-muted-foreground">Completa los detalles de la tarea de planificacion.</DialogDescription>
+          <DialogTitle className="text-2xl font-bold text-primary">
+            {task ? `Editando: ${task.site || task.data?.site || task.location || 'Tarea'}` : "Nueva Tarea"}
+          </DialogTitle>
+          <DialogDescription className="text-base text-muted-foreground/90">
+            {task ? "Modifica los detalles de la planificación actual." : "Completa los detalles para crear una nueva tarea de planificación."}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 px-5 pb-5">

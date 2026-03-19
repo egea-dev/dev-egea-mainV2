@@ -88,7 +88,7 @@ export const TaskCard = ({ task, isOverlay, onEdit, onQuickEdit }: TaskCardProps
                             </span>
                         </div>
                         {task.data?.description && (
-                            <div className="text-[11px] text-muted-foreground truncate mb-1">
+                            <div className="text-[14px] font-bold text-foreground/90 leading-tight truncate mb-1">
                                 {typeof task.data.description === 'string' ? task.data.description : ''}
                             </div>
                         )}

@@ -213,7 +213,24 @@
 
   body {
     @apply bg-background text-foreground;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* Mejora de contraste para textos secundarios */
+:root {
+  --muted-foreground: 215 15% 35%; /* Más oscuro que el anterior para mejor legibilidad */
+}
+
+.dark {
+  --muted-foreground: 215 10% 75%; /* Más claro para modo oscuro */
+}
+
+.egea {
+  --muted-foreground: 345 10% 80%;
 }
 
 @layer components {
