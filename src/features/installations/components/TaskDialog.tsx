@@ -412,48 +412,56 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                 control={form.control}
                 name="dueDate"
                 render={({ field }) => (
-                  <FormItem className={FIELD_WRAPPER}>
+                  <FormItem className={cn(FIELD_WRAPPER, isCalendarOpen && "ring-2 ring-primary/30")}>
                     <FormLabel>Fecha</FormLabel>
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            console.log("Date picker clicked");
-                            setIsCalendarOpen(true);
-                          }}
-                          className={cn(
-                            "w-full justify-start text-left font-normal bg-background/50 border-white/10 hover:bg-background/80 transition-colors",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-3 h-5 w-5 text-primary" />
+                    <div className="space-y-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-background/50 border-white/10 hover:bg-background/80 transition-colors h-11",
+                          !field.value && "text-muted-foreground",
+                          isCalendarOpen && "border-primary/50 bg-primary/5 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                        )}
+                      >
+                        <CalendarIcon className={cn("mr-3 h-5 w-5", isCalendarOpen ? "text-primary animate-pulse" : "text-muted-foreground")} />
+                        <span className="font-semibold text-sm">
                           {field.value && isValid(field.value) 
                             ? format(field.value, "PPP", { locale: esLocale }) 
                             : "Elige una fecha"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent 
-                        className="w-auto p-0 border border-border/70 bg-popover/95 backdrop-blur-xl z-[999]" 
-                        align="start" 
-                        side="bottom"
-                        sideOffset={8}
-                      >
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            if (date) {
-                              field.onChange(date);
-                              setIsCalendarOpen(false);
-                            }
-                          }}
-                          initialFocus
-                          locale={esLocale}
-                        />
-                      </PopoverContent>
-                    </Popover>
+                        </span>
+                      </Button>
+
+                      {isCalendarOpen && (
+                        <div className="rounded-xl border border-white/10 bg-black/40 p-2 shadow-2xl animate-in fade-in zoom-in duration-200">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={(date) => {
+                              if (date) {
+                                field.onChange(date);
+                                setIsCalendarOpen(false);
+                              }
+                            }}
+                            initialFocus
+                            locale={esLocale}
+                            className="w-full"
+                          />
+                          <div className="mt-2 flex justify-end px-2 pb-1">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => setIsCalendarOpen(false)}
+                              className="text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              Cerrar selector
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}
