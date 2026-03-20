@@ -77,6 +77,7 @@ const formatRepeatLabel = (date: Date) => {
 export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, users, vehicles, draggedItem }: TaskDialogProps) => {
   const [saving, setSaving] = useState(false);
   const [installationsScreenId, setInstallationsScreenId] = useState<string | null>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const form = useForm<TaskFormData>({
     resolver: zodResolver(taskSchema),
@@ -414,7 +415,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                 render={({ field }) => (
                   <FormItem className={FIELD_WRAPPER}>
                     <FormLabel>Fecha</FormLabel>
-                    <Popover>
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -433,29 +434,19 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 border border-border/70 bg-popover/95 backdrop-blur-xl" align="start">
+                      <PopoverContent className="w-auto p-0 border border-border/70 bg-popover/95 backdrop-blur-xl" align="start" side="bottom">
                         <Calendar
                           mode="single"
                           selected={field.value}
                           onSelect={(date) => {
-                            field.onChange(date);
-                            // Cierre automático del popover se maneja por el componente Popover si no se previene
+                            if (date) {
+                              field.onChange(date);
+                              setIsCalendarOpen(false);
+                            }
                           }}
                           initialFocus
                           locale={esLocale}
-                          classNames={{
-                            caption_label: "text-slate-200",
-                            head_cell: "text-slate-500 rounded-md w-9 font-medium text-[0.8rem]",
-                            day: cn(
-                              buttonVariants({ variant: "ghost", size: "icon" }),
-                              "h-9 w-9 p-0 font-normal text-slate-300 hover:bg-slate-800/70 aria-selected:bg-emerald-500/90 aria-selected:text-emerald-50"
-                            ),
-                            day_today: "bg-slate-800/80 text-slate-200",
-                            nav_button: cn(
-                              buttonVariants({ variant: "outline", size: "icon" }),
-                              "h-7 w-7 border border-slate-700/60 bg-transparent text-slate-300 hover:bg-slate-800/70"
-                            ),
-                          }}
+                          className="rounded-md"
                         />
                       </PopoverContent>
                     </Popover>

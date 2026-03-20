@@ -115,6 +115,7 @@ export default function InstallationsPage() {
 
   // Dialog States
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [dialogDate, setDialogDate] = useState(new Date());
   const [selectedTask, setSelectedTask] = useState<DetailedTask | null>(null); // Use DetailedTask
   const [draggedItem, setDraggedItem] = useState<{ type: "user" | "vehicle" | "task"; item: any } | null>(null);
 
@@ -265,7 +266,11 @@ export default function InstallationsPage() {
             />
 
             <Button
-              onClick={() => { setSelectedTask(null); setIsTaskDialogOpen(true); }}
+              onClick={() => { 
+                setSelectedTask(null); 
+                setDialogDate(currentDate); 
+                setIsTaskDialogOpen(true); 
+              }}
               className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2"
             >
               <Plus className="h-4 w-4" /> Nueva Tarea
@@ -336,9 +341,14 @@ export default function InstallationsPage() {
             <WeeklyBoard
               currentDate={currentDate}
               tasks={tasks}
-              onDateClick={(date) => { /* Optional: Navigate to daily view or open add modal */ }}
+              onDateClick={(date) => {
+                setSelectedTask(null);
+                setDialogDate(date);
+                setIsTaskDialogOpen(true);
+              }}
               onTaskEdit={(task) => {
                 setSelectedTask(task);
+                setDialogDate(task.start_date ? new Date(task.start_date) : currentDate);
                 setIsTaskDialogOpen(true);
               }}
               onQuickEdit={(task) => {
@@ -374,7 +384,7 @@ export default function InstallationsPage() {
           onOpenChange={setIsTaskDialogOpen}
           onSuccess={fetchTasks}
           task={selectedTask as any} // Conversión temporal
-          selectedDate={currentDate}
+          selectedDate={dialogDate}
           users={users}
           vehicles={vehicles}
           draggedItem={null}
