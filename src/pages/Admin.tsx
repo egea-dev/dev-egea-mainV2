@@ -1065,10 +1065,10 @@ export default function AdminPage() {
         {/* Main Content - Row with 3 Columns */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Data Shortcuts Card */}
-          <Card className="flex-1 bg-card border-border shadow-md">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-foreground font-bold">
-                <Database className="h-4 w-4 text-primary" />
+          <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
+                <Database className="h-3.5 w-3.5 text-primary" />
                 Accesos Gestión de Datos
               </CardTitle>
               <CardDescription className="text-muted-foreground font-medium">
@@ -1111,10 +1111,10 @@ export default function AdminPage() {
           </Card>
 
           {/* Confección Card */}
-          <Card className="flex-1 bg-card border-border shadow-md">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-foreground font-bold">
-                <div className="w-3 h-3 bg-primary rounded-full shadow-lg shadow-primary/40"></div>
+          <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
+                <div className="w-2.5 h-2.5 bg-primary rounded-full shadow-lg shadow-primary/40"></div>
                 Confección
               </CardTitle>
             </CardHeader>
@@ -1146,17 +1146,14 @@ export default function AdminPage() {
                       </TableHeader>
                       <TableBody>
                         {confeccionTasks.slice(0, 2).map((task) => {
-                          const statusColor = getStateBadgeClasses(task.state);
                           return (
-                            <TableRow key={task.id} className="border-border/60 hover:bg-muted/60">
-                              <TableCell className="text-sm font-bold text-foreground">
+                            <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
+                              <TableCell className="py-1 text-xs font-bold text-foreground">
                                 {getOrderNumberLabel(task)}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground font-medium">{getConfeccionObraLabel(task)}</TableCell>
-                              <TableCell>
-                                <Badge variant="secondary" className={statusColor}>
-                                  {task.state}
-                                </Badge>
+                              <TableCell className="py-1 text-xs text-muted-foreground font-medium">{getConfeccionObraLabel(task)}</TableCell>
+                              <TableCell className="py-1">
+                                <TaskStateBadge state={task.state} size="sm" variant="minimal" />
                               </TableCell>
                             </TableRow>
                           );
@@ -1170,17 +1167,14 @@ export default function AdminPage() {
                         <Table className="min-w-full">
                           <TableBody>
                             {confeccionTasks.slice(2).map((task) => {
-                              const statusColor = getStateBadgeClasses(task.state);
                               return (
-                                <TableRow key={task.id} className="border-border/60 hover:bg-muted/60">
-                                  <TableCell className="text-sm font-medium text-slate-200">
+                                <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
+                                  <TableCell className="py-1 text-xs font-medium text-slate-200">
                                     {getOrderNumberLabel(task)}
                                   </TableCell>
-                                  <TableCell className="text-sm text-slate-300">{getConfeccionObraLabel(task)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="secondary" className={statusColor}>
-                                      {task.state}
-                                    </Badge>
+                                  <TableCell className="py-1 text-xs text-slate-300">{getConfeccionObraLabel(task)}</TableCell>
+                                  <TableCell className="py-1">
+                                    <TaskStateBadge state={task.state} size="sm" variant="minimal" />
                                   </TableCell>
                                 </TableRow>
                               );
@@ -1196,10 +1190,10 @@ export default function AdminPage() {
           </Card>
 
           {/* Tapicería Card */}
-          <Card className="flex-1 bg-card border-border shadow-md">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2 text-foreground font-bold">
-                <div className="w-3 h-3 bg-purple-500 rounded-full shadow-lg shadow-purple-500/50"></div>
+          <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
+                <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-lg shadow-purple-500/50"></div>
                 Tapicería
               </CardTitle>
             </CardHeader>
@@ -1230,16 +1224,12 @@ export default function AdminPage() {
                       </TableRow>
                     ) : (
                       tapiceriaTasks.map((task) => {
-                        const statusColor = getStateBadgeClasses(task.state);
-
                         return (
-                          <TableRow key={task.id} className="border-border/60 hover:bg-muted/60">
-                            <TableCell className="text-sm font-bold text-foreground">{getOrderNumberLabel(task)}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground font-medium">{getTapiceriaGestorLabel(task)}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={statusColor}>
-                                {task.state}
-                              </Badge>
+                          <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
+                            <TableCell className="py-1 text-xs font-bold text-foreground">{getOrderNumberLabel(task)}</TableCell>
+                            <TableCell className="py-1 text-xs text-muted-foreground font-medium">{getTapiceriaGestorLabel(task)}</TableCell>
+                            <TableCell className="py-1">
+                              <TaskStateBadge state={task.state} size="sm" variant="minimal" />
                             </TableCell>
                           </TableRow>
                         );

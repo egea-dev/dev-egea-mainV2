@@ -54,35 +54,47 @@ export const UPHOLSTERY_STATE_LABELS: Record<UpholsteryState, string> = {
 export const TASK_STATES = {
   URGENTE: 'urgente',
   PENDIENTE: 'pendiente',
-  A_LA_ESPERA: 'a la espera',
+  EN_CURSO: 'en_curso',
   EN_FABRICACION: 'en fabricacion',
+  A_LA_ESPERA: 'a la espera',
   TERMINADO: 'terminado',
+  COMPLETADO: 'completado',
   INCIDENTE: 'incidente',
   ARREGLO: 'arreglo',
+  CANCELADO: 'cancelado',
+  NO_REALIZADO: 'no_realizado',
   PENDIENTE_VALIDAR: 'pendiente de validar',
 } as const;
 
 export type TaskState = typeof TASK_STATES[keyof typeof TASK_STATES];
 
 export const TASK_STATE_COLORS: Record<TaskState, string> = {
-  [TASK_STATES.URGENTE]: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40',
-  [TASK_STATES.PENDIENTE]: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/40',
-  [TASK_STATES.A_LA_ESPERA]: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40',
-  [TASK_STATES.EN_FABRICACION]: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/40',
-  [TASK_STATES.TERMINADO]: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40',
-  [TASK_STATES.INCIDENTE]: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40',
-  [TASK_STATES.ARREGLO]: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/40',
-  [TASK_STATES.PENDIENTE_VALIDAR]: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/40',
+  [TASK_STATES.URGENTE]: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 font-bold',
+  [TASK_STATES.PENDIENTE]: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
+  [TASK_STATES.EN_CURSO]: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+  [TASK_STATES.EN_FABRICACION]: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  [TASK_STATES.A_LA_ESPERA]: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30',
+  [TASK_STATES.TERMINADO]: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+  [TASK_STATES.COMPLETADO]: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+  [TASK_STATES.INCIDENTE]: 'bg-red-600/15 text-red-600 dark:text-red-400 border-red-600/30',
+  [TASK_STATES.ARREGLO]: 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30',
+  [TASK_STATES.CANCELADO]: 'bg-gray-500/15 text-gray-500 dark:text-gray-500 border-gray-500/20 grayscale',
+  [TASK_STATES.NO_REALIZADO]: 'bg-gray-600/15 text-gray-400 dark:text-gray-500 border-gray-600/20',
+  [TASK_STATES.PENDIENTE_VALIDAR]: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
 };
 
 export const TASK_STATE_LABELS: Record<TaskState, string> = {
   [TASK_STATES.URGENTE]: 'Urgente',
   [TASK_STATES.PENDIENTE]: 'Pendiente',
-  [TASK_STATES.A_LA_ESPERA]: 'A la Espera',
+  [TASK_STATES.EN_CURSO]: 'En Curso',
   [TASK_STATES.EN_FABRICACION]: 'En Fabricación',
+  [TASK_STATES.A_LA_ESPERA]: 'A la Espera',
   [TASK_STATES.TERMINADO]: 'Terminado',
+  [TASK_STATES.COMPLETADO]: 'Completado',
   [TASK_STATES.INCIDENTE]: 'Incidente',
   [TASK_STATES.ARREGLO]: 'Arreglo',
+  [TASK_STATES.CANCELADO]: 'Cancelado',
+  [TASK_STATES.NO_REALIZADO]: 'No Realizado',
   [TASK_STATES.PENDIENTE_VALIDAR]: 'Pendiente de Validar',
 };
 

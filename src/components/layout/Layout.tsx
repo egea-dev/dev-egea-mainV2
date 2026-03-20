@@ -273,7 +273,7 @@ const MainLayout = ({
           isCollapsed ? "md:ml-14" : "md:ml-64"
         )}
       >
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-[hsl(var(--glass-background))] px-4 backdrop-blur-[var(--glass-blur)] border-[hsl(var(--glass-border))] sm:px-6">
+        <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b bg-[hsl(var(--glass-background))] px-4 backdrop-blur-[var(--glass-blur)] border-[hsl(var(--glass-border))] sm:px-6">
           <div className="flex items-center gap-2">
             <Sheet>
               <SheetTrigger asChild>

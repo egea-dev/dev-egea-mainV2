@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { getTaskStateColor, getTaskStateLabel, type TaskState } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { AlertCircle, CheckCircle, Clock, Hammer, Zap } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Hammer, Zap, Play, XCircle } from "lucide-react";
 
 interface TaskStateBadgeProps {
   state: TaskState | string | null | undefined;
@@ -54,7 +54,10 @@ export function TaskStateBadge({
       case 'urgente':
         return <Zap {...props} />;
       case 'terminado':
+      case 'completado':
         return <CheckCircle {...props} />;
+      case 'en_curso':
+        return <Play {...props} className={cn(props.className, "fill-current")} />;
       case 'incidente':
       case 'arreglo':
         return <AlertCircle {...props} />;
@@ -62,6 +65,9 @@ export function TaskStateBadge({
         return <Clock {...props} />;
       case 'en fabricacion':
         return <Hammer {...props} />;
+      case 'cancelado':
+      case 'no_realizado':
+        return <XCircle {...props} />;
       default:
         return null;
     }
