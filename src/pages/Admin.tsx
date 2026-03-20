@@ -1062,12 +1062,8 @@ export default function AdminPage() {
           mode="installations"
         />
 
-        {/* Main Content - Row with Dynamic Columns based on active sections */}
         <div className={cn(
-          "grid gap-6",
-          activeSections.includes('data_shortcuts') && activeSections.filter(s => ['confeccion', 'tapiceria'].includes(s)).length > 0
-            ? "grid-cols-1 lg:grid-cols-3"
-            : (activeSections.length > 1 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")
+          "grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
         )}>
           {/* Data Shortcuts Card */}
           {activeSections.includes('data_shortcuts') && (

@@ -474,6 +474,9 @@ export function useDashboardTasks() {
         // Aplicar filtro de screen_ids si tenemos alguno
         if (finalScreenIds.length > 0) {
           query = query.in('screen_id', finalScreenIds);
+        } else {
+          // Si no hay pantallas asignadas a esta sección, no hay tareas
+          return [];
         }
 
         if (limit) {
