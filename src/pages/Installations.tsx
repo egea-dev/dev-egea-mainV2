@@ -227,7 +227,8 @@ export default function InstallationsPage() {
   const currentWeekLabel = `${format(viewStart, 'd MMM', { locale: es })} - ${format(viewEnd, 'd MMM', { locale: es })}`;
 
   return (
-    <DndContext
+    <>
+      <DndContext
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
@@ -377,19 +378,21 @@ export default function InstallationsPage() {
         ) : null}
       </DragOverlay>
 
-      {/* Dialogs */}
+      </DndContext>
+ 
+      {/* Dialogs - Moved outside DndContext to avoid pointer event conflicts */}
       {isTaskDialogOpen && (
         <TaskDialog
           open={isTaskDialogOpen}
           onOpenChange={setIsTaskDialogOpen}
           onSuccess={fetchTasks}
-          task={selectedTask as any} // Conversión temporal
+          task={selectedTask as any}
           selectedDate={dialogDate}
           users={users}
           vehicles={vehicles}
           draggedItem={null}
         />
       )}
-    </DndContext>
+    </>
   );
 }
