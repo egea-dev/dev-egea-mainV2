@@ -40,6 +40,7 @@ const taskSchema = z.object({
   locationPreset: z.string().nullable().optional(),
   repeatEnabled: z.boolean().optional(),
   repeatDates: z.array(z.string()).optional(),
+  status: z.string().default("pendiente"),
 });
 
 type TaskFormData = z.infer<typeof taskSchema>;
@@ -92,6 +93,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
       locationPreset: null,
       repeatEnabled: false,
       repeatDates: [],
+      status: "pendiente",
     },
   });
 
@@ -164,6 +166,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
         locationPreset: null,
         repeatEnabled: false,
         repeatDates: [],
+        status: task.status || task.state || "pendiente",
       });
       return;
     }
@@ -183,8 +186,9 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
       locationPreset: null,
       repeatEnabled: false,
       repeatDates: [],
+      status: "pendiente",
     });
-  }, [open, task?.id, form, selectedDate]); // Solo resetear al abrir o cambiar de tarea
+  }, [open, task?.id, form, selectedDate]); 
  
   // Lógica de auto-asignación de conductores al seleccionar vehículos
   const watchSelectedVehicles = form.watch("selectedVehicles");
@@ -240,8 +244,8 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
 
     setSaving(true);
     try {
-      const nextState = task?.state ?? "pendiente";
-      const nextStatus = task?.status ?? "pendiente";
+      const nextStatus = data.status || "pendiente";
+      const nextState = nextStatus;
       const normalizedLocation = formatLocationLabel(data.location);
 
       const repeatKeys = data.repeatEnabled ? Array.from(new Set(data.repeatDates ?? [])) : [];
@@ -364,6 +368,32 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
 
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem className={FIELD_WRAPPER}>
+                    <FormLabel>Estado</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="bg-background/50 border-white/10 h-11">
+                          <SelectValue placeholder="Selecciona estado" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="pendiente">Pendiente</SelectItem>
+                        <SelectItem value="urgente">Urgente</SelectItem>
+                        <SelectItem value="en_curso">En Curso</SelectItem>
+                        <SelectItem value="completado">Completado</SelectItem>
+                        <SelectItem value="terminado">Terminado</SelectItem>
+                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                        <SelectItem value="no_realizado">No Realizado</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
