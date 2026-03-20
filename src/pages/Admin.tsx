@@ -443,7 +443,7 @@ export default function AdminPage() {
   const [selectedTask, setSelectedTask] = useState<DetailedTask | null>(null);
 
   // Usar hooks personalizados para datos del dashboard
-  const { confeccionTasks, tapiceriaTasks, pendingTasks, loading: tasksLoading, templateFieldsByScreen, sessionInfoByTask, refresh: refreshDashboardTasks } = useDashboardTasks();
+  const { confeccionTasks, tapiceriaTasks, pendingTasks, loading: tasksLoading, templateFieldsByScreen, sessionInfoByTask, activeSections, refresh: refreshDashboardTasks } = useDashboardTasks();
   const { stats, loading: statsLoading } = useDashboardStats();
 
   const { data: screens = [] } = useScreens();
@@ -1062,181 +1062,190 @@ export default function AdminPage() {
           mode="installations"
         />
 
-        {/* Main Content - Row with 3 Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content - Row with Dynamic Columns based on active sections */}
+        <div className={cn(
+          "grid gap-6",
+          activeSections.includes('data_shortcuts') && activeSections.filter(s => ['confeccion', 'tapiceria'].includes(s)).length > 0
+            ? "grid-cols-1 lg:grid-cols-3"
+            : (activeSections.length > 1 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")
+        )}>
           {/* Data Shortcuts Card */}
-          <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
-                <Database className="h-3.5 w-3.5 text-primary" />
-                Accesos Gestión de Datos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {dataShortcutScreens.length > 0 ? (
-                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
-                  {dataShortcutScreens.map((screen) => (
+          {activeSections.includes('data_shortcuts') && (
+            <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
+                  <Database className="h-3.5 w-3.5 text-primary" />
+                  Accesos Gestión de Datos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {dataShortcutScreens.length > 0 ? (
+                  <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
+                    {dataShortcutScreens.map((screen) => (
+                      <Button
+                        key={screen.id}
+                        variant="outline"
+                        className="w-full justify-between border-border bg-muted/30 hover:bg-muted/50 text-foreground"
+                        onClick={() => handleOpenDataShortcut(screen.id)}
+                      >
+                        <span className="truncate text-left">{screen.name}</span>
+                        {screen.screen_group ? (
+                          <Badge variant="secondary" className="ml-2 whitespace-nowrap bg-card text-muted-foreground">
+                            {screen.screen_group}
+                          </Badge>
+                        ) : null}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <p className="text-xs mb-2">No hay accesos configurados</p>
                     <Button
-                      key={screen.id}
                       variant="outline"
-                      className="w-full justify-between border-border bg-muted/30 hover:bg-muted/50 text-foreground"
-                      onClick={() => handleOpenDataShortcut(screen.id)}
+                      size="sm"
+                      className="h-7 text-[10px] border-primary/20 hover:bg-primary/10 text-primary"
+                      onClick={() => navigate("/admin/data")}
                     >
-                      <span className="truncate text-left">{screen.name}</span>
-                      {screen.screen_group ? (
-                        <Badge variant="secondary" className="ml-2 whitespace-nowrap bg-card text-muted-foreground">
-                          {screen.screen_group}
-                        </Badge>
-                      ) : null}
+                      Gestionar Datos
                     </Button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  <p className="text-xs mb-2">No hay accesos configurados</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-[10px] border-primary/20 hover:bg-primary/10 text-primary"
-                    onClick={() => navigate("/admin/data")}
-                  >
-                    Gestionar Datos
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Confección Card */}
-          <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
-                <div className="w-2.5 h-2.5 bg-primary rounded-full shadow-lg shadow-primary/40"></div>
-                Confección
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {tasksLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="grid grid-cols-3 gap-4">
-                      <div className="animate-pulse bg-muted/60 h-6 rounded" />
-                      <div className="animate-pulse bg-muted/60 h-6 rounded" />
-                      <div className="animate-pulse bg-muted/60 h-6 rounded" />
+          {activeSections.includes('confeccion') && (
+            <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
+                  <div className="w-2.5 h-2.5 bg-primary rounded-full shadow-lg shadow-primary/40"></div>
+                  Confección
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {tasksLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <div key={i} className="grid grid-cols-3 gap-4">
+                        <div className="animate-pulse bg-muted/60 h-6 rounded" />
+                        <div className="animate-pulse bg-muted/60 h-6 rounded" />
+                        <div className="animate-pulse bg-muted/60 h-6 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : confeccionTasks.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No hay tareas de confección
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="overflow-x-auto">
+                      <Table className="min-w-full">
+                        <TableHeader>
+                          <TableRow className="border-border/60 hover:bg-muted/60">
+                            <TableHead className="text-sm text-muted-foreground font-bold uppercase">Nº Orden</TableHead>
+                            <TableHead className="text-sm text-muted-foreground font-bold uppercase">Obra</TableHead>
+                            <TableHead className="text-sm text-muted-foreground font-bold uppercase">Estado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {confeccionTasks.slice(0, 2).map((task) => {
+                            return (
+                              <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
+                                <TableCell className="py-1 text-xs font-bold text-foreground">
+                                  {getOrderNumberLabel(task)}
+                                </TableCell>
+                                <TableCell className="py-1 text-xs text-muted-foreground font-medium">{getConfeccionObraLabel(task)}</TableCell>
+                                <TableCell className="py-1">
+                                  <TaskStateBadge state={task.state} size="sm" variant="minimal" />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
                     </div>
-                  ))}
-                </div>
-              ) : confeccionTasks.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No hay tareas de confección
-                </div>
-              ) : (
-                <div className="space-y-3">
+                    {confeccionTasks.length > 2 && (
+                      <div className="overflow-x-auto">
+                        <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 custom-scrollbar">
+                          <Table className="min-w-full">
+                            <TableBody>
+                              {confeccionTasks.slice(2).map((task) => {
+                                return (
+                                  <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
+                                    <TableCell className="py-1 text-xs font-medium text-slate-200">
+                                      {getOrderNumberLabel(task)}
+                                    </TableCell>
+                                    <TableCell className="py-1 text-xs text-slate-300">{getConfeccionObraLabel(task)}</TableCell>
+                                    <TableCell className="py-1">
+                                      <TaskStateBadge state={task.state} size="sm" variant="minimal" />
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tapicería Card */}
+          {activeSections.includes('tapiceria') && (
+            <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
+                  <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-lg shadow-purple-500/50"></div>
+                  Tapicería
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {tasksLoading ? (
+                  <div className="space-y-2 text-center py-4">
+                    <div className="animate-pulse bg-muted/60 h-8 w-24 mx-auto rounded"></div>
+                  </div>
+                ) : (
                   <div className="overflow-x-auto">
-                    <Table className="min-w-full">
+                    <Table>
                       <TableHeader>
                         <TableRow className="border-border/60 hover:bg-muted/60">
                           <TableHead className="text-sm text-muted-foreground font-bold uppercase">Nº Orden</TableHead>
-                          <TableHead className="text-sm text-muted-foreground font-bold uppercase">Obra</TableHead>
+                          <TableHead className="text-sm text-muted-foreground font-bold uppercase">Gestor</TableHead>
                           <TableHead className="text-sm text-muted-foreground font-bold uppercase">Estado</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {confeccionTasks.slice(0, 2).map((task) => {
-                          return (
-                            <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
-                              <TableCell className="py-1 text-xs font-bold text-foreground">
-                                {getOrderNumberLabel(task)}
-                              </TableCell>
-                              <TableCell className="py-1 text-xs text-muted-foreground font-medium">{getConfeccionObraLabel(task)}</TableCell>
-                              <TableCell className="py-1">
-                                <TaskStateBadge state={task.state} size="sm" variant="minimal" />
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                        {tapiceriaTasks.length === 0 ? (
+                          <TableRow className="border-border/60 hover:bg-muted/60">
+                            <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                              No hay tareas de tapicería
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          tapiceriaTasks.map((task) => {
+                            return (
+                              <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
+                                <TableCell className="py-1 text-xs font-bold text-foreground">{getOrderNumberLabel(task)}</TableCell>
+                                <TableCell className="py-1 text-xs text-muted-foreground font-medium">{getTapiceriaGestorLabel(task)}</TableCell>
+                                <TableCell className="py-1">
+                                  <TaskStateBadge state={task.state} size="sm" variant="minimal" />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
                       </TableBody>
                     </Table>
                   </div>
-                  {confeccionTasks.length > 2 && (
-                    <div className="overflow-x-auto">
-                      <div className="max-h-48 overflow-y-auto rounded-md border border-border/60 custom-scrollbar">
-                        <Table className="min-w-full">
-                          <TableBody>
-                            {confeccionTasks.slice(2).map((task) => {
-                              return (
-                                <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
-                                  <TableCell className="py-1 text-xs font-medium text-slate-200">
-                                    {getOrderNumberLabel(task)}
-                                  </TableCell>
-                                  <TableCell className="py-1 text-xs text-slate-300">{getConfeccionObraLabel(task)}</TableCell>
-                                  <TableCell className="py-1">
-                                    <TaskStateBadge state={task.state} size="sm" variant="minimal" />
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Tapicería Card */}
-          <Card className="flex-1 bg-card border-border shadow-md overflow-hidden">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm flex items-center gap-2 text-foreground font-bold">
-                <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-lg shadow-purple-500/50"></div>
-                Tapicería
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border/60 hover:bg-muted/60">
-                      <TableHead className="text-sm text-muted-foreground font-bold uppercase">Nº Orden</TableHead>
-                      <TableHead className="text-sm text-muted-foreground font-bold uppercase">Gestor</TableHead>
-                      <TableHead className="text-sm text-muted-foreground font-bold uppercase">Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tasksLoading ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell><div className="animate-pulse bg-muted/60 h-4 w-8 rounded"></div></TableCell>
-                          <TableCell><div className="animate-pulse bg-muted/60 h-4 w-16 rounded"></div></TableCell>
-                          <TableCell><div className="animate-pulse bg-muted/60 h-4 w-20 rounded"></div></TableCell>
-                        </TableRow>
-                      ))
-                    ) : tapiceriaTasks.length === 0 ? (
-                      <TableRow className="border-border/60 hover:bg-muted/60">
-                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                          No hay tareas de tapicería
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      tapiceriaTasks.map((task) => {
-                        return (
-                          <TableRow key={task.id} className="border-border/40 hover:bg-muted/40 h-8">
-                            <TableCell className="py-1 text-xs font-bold text-foreground">{getOrderNumberLabel(task)}</TableCell>
-                            <TableCell className="py-1 text-xs text-muted-foreground font-medium">{getTapiceriaGestorLabel(task)}</TableCell>
-                            <TableCell className="py-1">
-                              <TaskStateBadge state={task.state} size="sm" variant="minimal" />
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

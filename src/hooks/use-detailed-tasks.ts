@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type {
@@ -378,7 +378,7 @@ export function useDashboardTasks() {
         .from('screens')
         .select('id, dashboard_section, dashboard_order, template_id')
         .eq('is_active', true)
-        .in('dashboard_section', ['confeccion', 'tapiceria', 'pendientes']);
+        .in('dashboard_section', ['confeccion', 'tapiceria', 'pendientes', 'data_shortcuts']);
 
       if (dashboardError) throw dashboardError;
 
@@ -438,8 +438,8 @@ export function useDashboardTasks() {
         const screenIds = sectionMap[section];
         let finalScreenIds: string[] = [...screenIds];
 
-        // PASO 1: Si necesitamos filtrar por grupos, obtener screen_ids de la tabla screens
-        if (section === 'pendientes') {
+        // PASO 1: Si necesitamos filtrar por grupos (solo para pendientes si no hay screens especificas)
+        if (section === 'pendientes' && screenIds.length === 0) {
           const groups = [...fallbackGroups, ...PENDING_FALLBACK_GROUPS];
           if (groups.length > 0) {
             const { data: screensData, error: screensError } = await supabase
@@ -451,22 +451,7 @@ export function useDashboardTasks() {
               console.error('[fetchSectionTasks] Error fetching screens:', screensError);
             } else if (screensData) {
               const groupScreenIds = screensData.map(s => s.id);
-              // Combinar screen_ids de dashboard_section + screen_ids de grupos
               finalScreenIds = Array.from(new Set([...finalScreenIds, ...groupScreenIds]));
-            }
-          }
-        } else {
-          // Para confección/tapicería, si no hay screenIds, buscar por grupos
-          if (screenIds.length === 0 && fallbackGroups.length > 0) {
-            const { data: screensData, error: screensError } = await supabase
-              .from('screens')
-              .select('id')
-              .in('screen_group', fallbackGroups);
-
-            if (screensError) {
-              console.error('[fetchSectionTasks] Error fetching screens:', screensError);
-            } else if (screensData) {
-              finalScreenIds = screensData.map(s => s.id);
             }
           }
         }
@@ -568,7 +553,8 @@ export function useDashboardTasks() {
         tapiceriaTasks,
         pendingTasks,
         templateFieldsByScreen: templateFieldsMapByScreen,
-        sessionInfoByTask
+        sessionInfoByTask,
+        activeSections: Array.from(new Set((dashboardScreens ?? []).map(s => s.dashboard_section).filter(Boolean)))
       };
     },
     refetchInterval: 60000
@@ -581,6 +567,7 @@ export function useDashboardTasks() {
     loading,
     templateFieldsByScreen: data?.templateFieldsByScreen || {},
     sessionInfoByTask: data?.sessionInfoByTask || {},
+    activeSections: data?.activeSections || [],
     refresh,
   };
 }
