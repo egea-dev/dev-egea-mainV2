@@ -99,7 +99,7 @@ export function TaskQuickEditPanel({ task, open, onOpenChange, onSuccess, users,
         screenId: dbScreenId,
         data: task.data || {},
         state: data.state,
-        status: data.state === "terminado" ? "terminado" : task.status || "pendiente",
+        status: data.state,
         startDate: formattedDate,
         endDate: task.end_date || formattedDate,
         location: task.location || null,
@@ -149,7 +149,11 @@ export function TaskQuickEditPanel({ task, open, onOpenChange, onSuccess, users,
                     <SelectContent>
                       <SelectItem value="pendiente">Pendiente</SelectItem>
                       <SelectItem value="urgente">Urgente</SelectItem>
+                      <SelectItem value="en_curso">En Curso</SelectItem>
+                      <SelectItem value="completado">Completado</SelectItem>
                       <SelectItem value="terminado">Terminado</SelectItem>
+                      <SelectItem value="cancelado">Cancelado</SelectItem>
+                      <SelectItem value="no_realizado">No Realizado</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
