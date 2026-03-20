@@ -1071,9 +1071,6 @@ export default function AdminPage() {
                 <Database className="h-3.5 w-3.5 text-primary" />
                 Accesos Gestión de Datos
               </CardTitle>
-              <CardDescription className="text-muted-foreground font-medium">
-                Configura estos accesos en "Gestión de Tablas de Datos".
-              </CardDescription>
             </CardHeader>
             <CardContent>
               {dataShortcutScreens.length > 0 ? (
@@ -1095,15 +1092,15 @@ export default function AdminPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Database className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Añade accesos desde Gestión de Tablas de Datos.</p>
+                <div className="text-center py-4 text-muted-foreground">
+                  <p className="text-xs mb-2">No hay accesos configurados</p>
                   <Button
-                    variant="link"
-                    className="mt-2 text-primary"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[10px] border-primary/20 hover:bg-primary/10 text-primary"
                     onClick={() => navigate("/admin/data")}
                   >
-                    Abrir Gestión de Datos
+                    Gestionar Datos
                   </Button>
                 </div>
               )}
