@@ -185,7 +185,7 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
       repeatEnabled: false,
       repeatDates: [],
     });
-  }, [open, task, selectedDate, draggedItem, form]);
+  }, [open, task?.id, form, selectedDate]); // Solo resetear al abrir o cambiar de tarea
  
   // Lógica de auto-asignación de conductores al seleccionar vehículos
   const watchSelectedVehicles = form.watch("selectedVehicles");
@@ -419,22 +419,21 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
+                            type="button"
                             variant="outline"
                             className={cn(
-                              "w-full justify-start text-left font-normal h-10 px-4",
+                              "w-full justify-start text-left font-normal bg-background/50 border-white/10",
                               !field.value && "text-muted-foreground"
                             )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                            <span className="truncate">
-                              {field.value && isValid(field.value) 
-                                ? format(field.value, "PPP", { locale: esLocale }) 
-                                : "Elige una fecha"}
-                            </span>
+                            <CalendarIcon className="mr-3 h-5 w-5 text-primary" />
+                            {field.value && isValid(field.value) 
+                              ? format(field.value, "PPP", { locale: esLocale }) 
+                              : "Elige una fecha"}
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 border border-border/70 bg-popover/95 backdrop-blur-xl" align="start" side="bottom">
+                      <PopoverContent className="w-auto p-0 border border-border/70 bg-popover/95 backdrop-blur-xl z-[100]" align="start" side="bottom">
                         <Calendar
                           mode="single"
                           selected={field.value}
@@ -446,7 +445,6 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                           }}
                           initialFocus
                           locale={esLocale}
-                          className="rounded-md"
                         />
                       </PopoverContent>
                     </Popover>
