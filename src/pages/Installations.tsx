@@ -101,6 +101,18 @@ export default function InstallationsPage() {
     fetchTasks();
   }, [currentDate]);
 
+  useEffect(() => {
+    if (users.length > 0) {
+      const hasDrivers = users.some(u => u.has_driving_license);
+      if (!hasDrivers) {
+        toast.warning("Aviso: No hay operarios con carnet de conducir registrados.", {
+          duration: 5000,
+          id: "no-drivers-warning"
+        });
+      }
+    }
+  }, [users]);
+
   // Dialog States
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<DetailedTask | null>(null); // Use DetailedTask

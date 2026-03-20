@@ -37,8 +37,8 @@ export const VehicleDialog = ({ open, onOpenChange, onSuccess, vehicle, users }:
   });
   const [loading, setLoading] = useState(false);
 
-  // Filtrar solo operarios para el selector de conductores
-  const operators = users.filter(u => u.role === 'operario');
+  // Filtrar solo operarios CON carnet de conducir para el selector de conductores
+  const operators = users.filter(u => u.role === 'operario' && u.has_driving_license);
 
   useEffect(() => {
     if (vehicle) {

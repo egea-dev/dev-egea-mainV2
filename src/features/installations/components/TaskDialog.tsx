@@ -185,6 +185,38 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
       repeatDates: [],
     });
   }, [open, task, selectedDate, draggedItem, form]);
+ 
+  // Lógica de auto-asignación de conductores al seleccionar vehículos
+  const watchSelectedVehicles = form.watch("selectedVehicles");
+  const watchSelectedUsers = form.watch("selectedUsers");
+
+  useEffect(() => {
+    if (!open || !watchSelectedVehicles.length) return;
+
+    const currentUsers = [...watchSelectedUsers];
+    let changed = false;
+
+    watchSelectedVehicles.forEach((v) => {
+      // Buscar el vehículo completo en la lista de vehículos para obtener el assigned_driver_id
+      const fullVehicle = vehicles.find((veh) => veh.id === v.id);
+      if (fullVehicle?.assigned_driver_id) {
+        // Verificar si el conductor ya está en la lista de usuarios seleccionados
+        const alreadyAssigned = currentUsers.some((u) => u.id === fullVehicle.assigned_driver_id);
+        if (!alreadyAssigned) {
+          // Buscar el perfil del conductor en la lista de usuarios para obtener su nombre
+          const driverProfile = users.find((u) => u.id === fullVehicle.assigned_driver_id);
+          if (driverProfile) {
+            currentUsers.push({ id: driverProfile.id, name: driverProfile.full_name });
+            changed = true;
+          }
+        }
+      }
+    });
+
+    if (changed) {
+      form.setValue("selectedUsers", currentUsers, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [watchSelectedVehicles, vehicles, users, open, form]); // Nota: watchSelectedUsers no se incluye para evitar bucles infinitos
 
   const toggleRepeatDate = (key: string) => {
     const current = new Set(watchRepeatDates);
@@ -387,19 +419,30 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                         <FormControl>
                           <Button
                             variant="outline"
-                            className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                            className={cn(
+                              "w-full justify-start text-left font-normal h-10 px-4",
+                              !field.value && "text-muted-foreground"
+                            )}
                           >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? format(field.value, "PPP") : <span>Elige una fecha</span>}
+                            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                            <span className="truncate">
+                              {field.value && isValid(field.value) 
+                                ? format(field.value, "PPP", { locale: esLocale }) 
+                                : "Elige una fecha"}
+                            </span>
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto border border-border/70 bg-popover/95 p-0 text-popover-foreground backdrop-blur-xl">
+                      <PopoverContent className="w-auto p-0 border border-border/70 bg-popover/95 backdrop-blur-xl" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
-                          onSelect={field.onChange}
+                          onSelect={(date) => {
+                            field.onChange(date);
+                            // Cierre automático del popover se maneja por el componente Popover si no se previene
+                          }}
                           initialFocus
+                          locale={esLocale}
                           classNames={{
                             caption_label: "text-slate-200",
                             head_cell: "text-slate-500 rounded-md w-9 font-medium text-[0.8rem]",
