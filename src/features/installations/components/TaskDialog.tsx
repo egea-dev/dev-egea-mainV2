@@ -26,8 +26,7 @@ import { buildMapsSearchUrl, formatLocationLabel } from "@/utils/maps";
 import { toast } from "sonner";
 import { upsertTask } from "@/lib/upsert-task";
 
-const FIELD_WRAPPER =
-  "rounded-2xl border border-border/70 bg-background px-4 py-3 space-y-2 text-foreground sm:px-5 sm:py-4 backdrop-blur-xl";
+const FIELD_WRAPPER = "p-4 space-y-3 rounded-2xl bg-background/50 border border-white/5 shadow-inner backdrop-blur-md relative group hover:border-white/10 transition-all duration-300";
 
 const taskSchema = z.object({
   site: z.string().min(1, { message: "El sitio de trabajo es obligatorio." }),
@@ -417,23 +416,30 @@ export const TaskDialog = ({ open, onOpenChange, onSuccess, task, selectedDate, 
                     <FormLabel>Fecha</FormLabel>
                     <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                       <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal bg-background/50 border-white/10",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-3 h-5 w-5 text-primary" />
-                            {field.value && isValid(field.value) 
-                              ? format(field.value, "PPP", { locale: esLocale }) 
-                              : "Elige una fecha"}
-                          </Button>
-                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            console.log("Date picker clicked");
+                            setIsCalendarOpen(true);
+                          }}
+                          className={cn(
+                            "w-full justify-start text-left font-normal bg-background/50 border-white/10 hover:bg-background/80 transition-colors",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-3 h-5 w-5 text-primary" />
+                          {field.value && isValid(field.value) 
+                            ? format(field.value, "PPP", { locale: esLocale }) 
+                            : "Elige una fecha"}
+                        </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 border border-border/70 bg-popover/95 backdrop-blur-xl z-[100]" align="start" side="bottom">
+                      <PopoverContent 
+                        className="w-auto p-0 border border-border/70 bg-popover/95 backdrop-blur-xl z-[999]" 
+                        align="start" 
+                        side="bottom"
+                        sideOffset={8}
+                      >
                         <Calendar
                           mode="single"
                           selected={field.value}
